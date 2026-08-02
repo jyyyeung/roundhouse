@@ -396,20 +396,17 @@ export function TablePage({ session }: { session: SessionLike }) {
           {error ? <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p> : null}
         </section>
       ) : (
-        <>
-          <div className="mt-5">
-            {renderGameView({
-              meta,
-              state,
-              currentUserId,
-              onlineUserIds,
-              messages,
-              onIntent: sendIntent,
-              onSendChat: sendChat,
-              rollVersion,
-            })}
-          </div>
-
+        <div data-testid="table-active-shell" className="mt-5 pb-24 md:pb-0">
+          {renderGameView({
+            meta,
+            state,
+            currentUserId,
+            onlineUserIds,
+            messages,
+            onIntent: sendIntent,
+            onSendChat: sendChat,
+            rollVersion,
+          })}
           {meta.status === "finished" ? (
             <div className="mt-5 flex flex-wrap gap-3">
               <button
@@ -424,7 +421,7 @@ export function TablePage({ session }: { session: SessionLike }) {
           ) : null}
 
           {error ? <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p> : null}
-        </>
+        </div>
       )}
     </div>
   );

@@ -255,6 +255,72 @@ describe("TablePage", () => {
     expect(screen.queryByText(/Snapshot/i)).not.toBeInTheDocument();
   });
 
+  it("reserves bottom space for the mobile floating composer during active games", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+
+    act(() => {
+      onMessage?.({
+        v: 1,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta({ status: "active" }),
+        state: {
+          ruleset: "yatzy",
+          playerIds: ["user-a", "user-b"],
+          currentPlayerIndex: 0,
+          rollsLeft: 3,
+          dice: [1, 2, 3, 4, 5],
+          holds: [false, false, false, false, false],
+          sheets: {
+            "user-a": {
+              ones: null,
+              twos: null,
+              threes: null,
+              fours: null,
+              fives: null,
+              sixes: null,
+              one_pair: null,
+              two_pairs: null,
+              three_kind: null,
+              four_kind: null,
+              small_straight: null,
+              large_straight: null,
+              full_house: null,
+              chance: null,
+              yatzy: null,
+              bonus: null,
+            },
+            "user-b": {
+              ones: null,
+              twos: null,
+              threes: null,
+              fours: null,
+              fives: null,
+              sixes: null,
+              one_pair: null,
+              two_pairs: null,
+              three_kind: null,
+              four_kind: null,
+              small_straight: null,
+              large_straight: null,
+              full_house: null,
+              chance: null,
+              yatzy: null,
+              bonus: null,
+            },
+          },
+          phase: "playing",
+          winnerIds: [],
+        },
+      });
+    });
+
+    expect(await screen.findByTestId("table-active-shell")).toHaveClass("pb-24", "md:pb-0");
+  });
+
   it("does not open websocket when invite join fails", async () => {
     mockedJoinTable.mockRejectedValue(new Error("unknown_table"));
 

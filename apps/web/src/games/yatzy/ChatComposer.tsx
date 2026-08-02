@@ -14,8 +14,10 @@ export function ChatComposer(props: ChatComposerProps) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (disabled) return;
-    props.onSend(trimmed);
+    const nextTrimmed = props.draft.trim();
+    const nextDisabled = !props.canSend || nextTrimmed.length === 0;
+    if (nextDisabled) return;
+    props.onSend(nextTrimmed);
   }
 
   if (props.variant === "float") {
