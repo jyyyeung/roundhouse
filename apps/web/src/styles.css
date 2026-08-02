@@ -1,0 +1,52 @@
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+:root {
+  font-family: "Manrope", system-ui, sans-serif;
+  color: #1f2937;
+  background:
+    radial-gradient(circle at top, rgba(255, 214, 102, 0.82), transparent 40%),
+    linear-gradient(180deg, #fff7ed 0%, #fff3e0 45%, #d9f8f3 100%);
+  --color-ink: #17324d;
+  --color-coral: #ee6c4d;
+  --color-mango: #f4a261;
+  --color-teal: #7ae0d4;
+  --color-teal-deep: #2a9d8f;
+  --color-cream: #fff5d6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #fff3e0;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: inherit;
+}
+
+body,
+button,
+input,
+select {
+  font-family: "Manrope", system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: "Fredoka", system-ui, sans-serif;
+}
+
+button,
+a,
+select {
+  cursor: pointer;
+}
+
+input::placeholder {
+  color: #94a3b8;
+}
