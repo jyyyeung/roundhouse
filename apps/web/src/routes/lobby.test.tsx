@@ -51,7 +51,8 @@ describe("LobbyPage layout", () => {
 
     const actions = container.querySelector(".lobby-actions");
     const actionClasses = actions?.className.split(/\s+/) ?? [];
-    expect(actionClasses).toContain("md:grid");
+    expect(actionClasses).toContain("grid");
+    expect(actionClasses).toContain("grid-cols-1");
     expect(actionClasses).toContain("md:grid-cols-2");
 
     expect(screen.getByText(/create table/i)).toBeInTheDocument();

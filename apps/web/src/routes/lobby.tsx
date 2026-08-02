@@ -114,7 +114,7 @@ export function LobbyPage({ session }: { session: SessionLike }) {
         </div>
       </header>
 
-      <div className="lobby-actions mt-5 md:grid md:grid-cols-2 gap-5 md:items-stretch">
+      <div className="lobby-actions mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 md:items-stretch">
         <section className="flex h-full flex-col rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Create table</p>
           <label className="mt-4 block">
@@ -226,7 +226,7 @@ export function LobbyPage({ session }: { session: SessionLike }) {
                     <button
                       type="button"
                       className="hidden shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-[var(--color-ink)] md:inline-flex"
-                      onClick={() => void navigator.clipboard.writeText(shareUrl)}
+                      onClick={() => void navigator.clipboard?.writeText(shareUrl)}
                     >
                       Copy link
                     </button>
