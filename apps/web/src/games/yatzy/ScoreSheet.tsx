@@ -38,6 +38,8 @@ export function ScoreSheet(props: ScoreSheetProps) {
                   const isSelf = playerId === props.currentUserId;
                   const isClickable = isSelf && props.canScore && value === null;
                   const preview = isClickable ? previewScore(props.state, category) : null;
+                  const display =
+                    value !== null ? value : isClickable && preview !== null ? preview : "—";
 
                   return (
                     <td key={`${category}:${playerId}`} className="px-2 py-2">
@@ -57,10 +59,15 @@ export function ScoreSheet(props: ScoreSheetProps) {
                         whileTap={isClickable ? { scale: 0.97 } : undefined}
                         onClick={() => props.onScore(category)}
                         disabled={!isClickable}
-                        aria-label={`Score ${formatCategory(category)}`}
+                        aria-label={
+                          value !== null
+                            ? `${formatCategory(category)} ${value}`
+                            : preview !== null && isClickable
+                              ? `Score ${formatCategory(category)} — ${preview}`
+                              : `Score ${formatCategory(category)}`
+                        }
                       >
-                        <span className="block font-semibold">{value ?? "Open"}</span>
-                        {preview !== null ? <span className="mt-1 block text-xs text-slate-600">Would score {preview}</span> : null}
+                        <span className="block font-semibold">{display}</span>
                       </motion.button>
                     </td>
                   );
