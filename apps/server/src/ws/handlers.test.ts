@@ -1,5 +1,5 @@
-import type { EventEnvelope, Json, ServerMessage, TableMeta } from "@yatzy/game-core";
-import { yatzyModule } from "@yatzy/game-yatzy";
+import type { EventEnvelope, Json, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it } from "vitest";
 
 import { createWsHandlers, type WsRuntime } from "./handlers";

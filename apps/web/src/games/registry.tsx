@@ -1,5 +1,5 @@
-import type { Json, TableMeta } from "@yatzy/game-core";
-import type { YatzyState } from "@yatzy/game-yatzy";
+import type { Json, TableMeta } from "@roundhouse/game-core";
+import type { YatzyState } from "@roundhouse/game-yatzy";
 
 import { YatzyTable } from "./yatzy/YatzyTable";
 import type { TableChatMessage } from "./yatzy/model";

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { YatzyState } from "@yatzy/game-yatzy";
+import type { YatzyState } from "@roundhouse/game-yatzy";
 
 import { ScoreSheet } from "./ScoreSheet";
 

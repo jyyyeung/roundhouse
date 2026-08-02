@@ -1,5 +1,5 @@
-import type { GameModule } from "@yatzy/game-core";
-import { yatzyModule } from "@yatzy/game-yatzy";
+import type { GameModule } from "@roundhouse/game-core";
+import { yatzyModule } from "@roundhouse/game-yatzy";
 
 const modules: Record<string, GameModule> = {
   [yatzyModule.id]: yatzyModule,

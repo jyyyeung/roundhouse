@@ -55,8 +55,9 @@ describe("LobbyPage layout", () => {
     expect(actionClasses).toContain("grid-cols-1");
     expect(actionClasses).toContain("md:grid-cols-2");
 
-    expect(screen.getByText(/create table/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^create table$/i })).toBeInTheDocument();
     expect(screen.getByText(/join by code/i)).toBeInTheDocument();
+    expect(screen.getByText("Roundhouse")).toBeInTheDocument();
   });
 
   it("renders denser recent-table row classes and copies the share url", async () => {

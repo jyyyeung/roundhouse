@@ -1,5 +1,5 @@
 {
-  "name": "@yatzy/server",
+  "name": "@roundhouse/server",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -19,8 +19,8 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.12",
-    "@yatzy/game-core": "workspace:*",
-    "@yatzy/game-yatzy": "workspace:*",
+    "@roundhouse/game-core": "workspace:*",
+    "@roundhouse/game-yatzy": "workspace:*",
     "better-auth": "^1.6.25",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",

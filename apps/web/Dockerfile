@@ -18,7 +18,7 @@ COPY apps/web apps/web
 COPY packages/game-core packages/game-core
 COPY packages/games/yatzy packages/games/yatzy
 
-RUN pnpm --filter @yatzy/web build
+RUN pnpm --filter @roundhouse/web build
 
 FROM nginx:1.27-alpine
 

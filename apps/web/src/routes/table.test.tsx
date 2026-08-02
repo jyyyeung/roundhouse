@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import type { ServerMessage, TableMeta } from "@yatzy/game-core";
+import type { ServerMessage, TableMeta } from "@roundhouse/game-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TablePage } from "./table";

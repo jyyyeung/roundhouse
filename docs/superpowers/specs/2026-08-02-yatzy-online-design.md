@@ -1,8 +1,8 @@
-# Yatzy Online — Design Spec
+# Roundhouse — Design Spec
 
 **Date:** 2026-08-02  
 **Status:** Approved for planning  
-**Product:** Real-time multiplayer party games for remote friends, starting with Yatzy/Yahtzee — phone-first installable web app, cloud- or self-hostable
+**Product:** Roundhouse — real-time multiplayer party games for remote friends, starting with Yatzy/Yahtzee — phone-first installable web app, cloud- or self-hostable
 
 ## Goal
 
@@ -63,11 +63,13 @@ interface GameModule {
 
 ### Monorepo (pnpm)
 
-- `apps/web` — Vite + React + TypeScript + PWA  
-- `apps/server` — Node + TypeScript (Fastify or Hono) + WebSockets  
-- `packages/game-core` — table/room protocol, event envelope, chat snapshot hook, shared types  
-- `packages/games/yatzy` — Yatzy + Yahtzee rules, turn machine (first module)  
-- (later) `packages/games/<other>` — additional modules  
+Workspace packages use the `@roundhouse/*` scope. The first game module remains `yatzy`.
+
+- `apps/web` — Vite + React + TypeScript + PWA (`@roundhouse/web`)
+- `apps/server` — Node + TypeScript (Hono) + WebSockets (`@roundhouse/server`)
+- `packages/game-core` — table/room protocol, event envelope, chat snapshot hook (`@roundhouse/game-core`)
+- `packages/games/yatzy` — Yatzy + Yahtzee rules, turn machine (`@roundhouse/game-yatzy`)
+- (later) `packages/games/<other>` — additional modules
 
 ### Auth (self-host friendly)
 

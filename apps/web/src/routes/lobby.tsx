@@ -97,8 +97,8 @@ export function LobbyPage({ session }: { session: SessionLike }) {
       <header className="rounded-[2rem] bg-[linear-gradient(135deg,var(--color-coral),var(--color-mango))] p-6 text-white shadow-[0_20px_50px_rgba(238,108,77,0.35)]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-white/80">Lobby</p>
-            <h1 className="mt-3 font-display text-4xl leading-none">Roll with your people</h1>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-white/80">Roundhouse</p>
+            <h1 className="mt-3 font-display text-4xl leading-none">Pull up a seat</h1>
             <p className="mt-3 text-sm text-white/85">
               {session?.user?.name || session?.user?.email || "Signed in"}
             </p>
@@ -134,7 +134,7 @@ export function LobbyPage({ session }: { session: SessionLike }) {
             onClick={handleCreate}
             disabled={busyAction === "create"}
           >
-            {busyAction === "create" ? "Setting the table..." : "Create Yatzy table"}
+            {busyAction === "create" ? "Setting the table..." : "Create table"}
           </button>
 
           {createdTable ? (

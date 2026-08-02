@@ -1,4 +1,4 @@
-import type { ClientMessage, ServerMessage } from "@yatzy/game-core";
+import type { ClientMessage, ServerMessage } from "@roundhouse/game-core";
 import type { IncomingMessage } from "node:http";
 import { WebSocket, type RawData } from "ws";
 

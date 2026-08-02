@@ -81,10 +81,12 @@ export function LoginPage({ session }: { session: SessionState }) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md items-center px-4 py-8">
       <section className="w-full rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(26,26,26,0.14)] backdrop-blur">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--color-coral)]">Remote MVP</p>
-        <h1 className="mt-3 font-display text-4xl leading-none text-[var(--color-ink)]">Sign in</h1>
+        <p className="font-display text-5xl leading-none text-[var(--color-ink)]">Roundhouse</p>
+        <h1 className="mt-4 text-sm font-semibold uppercase tracking-[0.3em] text-[var(--color-coral)]">
+          {mode === "signup" ? "Create account" : "Sign in"}
+        </h1>
         <p className="mt-3 text-sm text-slate-600">
-          Spin up a bright little lobby, invite friends, and get to the dice faster.
+          Pull up a seat — live tables, chat with game context, friends near or far.
         </p>
 
         <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl bg-[var(--color-cream)] p-1">

@@ -6,7 +6,7 @@
 
 **Architecture:** Extract shared `ChatComposer`. Teach `ChatPanel` `dock` | `overlay` modes with controlled draft. `YatzyTable` resolves mode via `matchMedia("(min-width: 1280px)")`, wraps board+rail in an `xl` grid, hides banner Chat at `xl`, and mounts a floating composer below `md` when overlay is closed. Widen `table.tsx` shell to `xl:max-w-7xl`. No protocol/server changes.
 
-**Tech Stack:** React 19, Tailwind CSS 4, Motion (existing overlay), Vitest + Testing Library, pnpm workspace `@yatzy/web`.
+**Tech Stack:** React 19, Tailwind CSS 4, Motion (existing overlay), Vitest + Testing Library, pnpm workspace `@roundhouse/web`.
 
 ## Global Constraints
 
@@ -112,7 +112,7 @@ describe("ChatComposer", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ChatComposer.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ChatComposer.test.tsx`
 
 Expected: FAIL — module `./ChatComposer` not found
 
@@ -193,7 +193,7 @@ Note: parent clears `draft` after `onSend` (not `ChatComposer`).
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ChatComposer.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ChatComposer.test.tsx`
 
 Expected: PASS
 
@@ -279,7 +279,7 @@ describe("ChatPanel", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ChatPanel.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ChatPanel.test.tsx`
 
 Expected: FAIL — missing `mode` / always-overlay behavior / dock still uses fixed drawer
 
@@ -360,7 +360,7 @@ Keep existing message bubble markup + `ChatDiceChips`.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ChatPanel.test.tsx src/games/yatzy/ChatComposer.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ChatPanel.test.tsx src/games/yatzy/ChatComposer.test.tsx`
 
 Expected: PASS
 
@@ -383,7 +383,7 @@ EOF
 - Modify: `apps/web/src/games/yatzy/YatzyTable.tsx`
 - Modify: `apps/web/src/games/yatzy/YatzyTable.test.tsx`
 - Modify: `apps/web/src/routes/table.tsx` (active shell `max-w-5xl` → `max-w-5xl xl:max-w-7xl`)
-- Regression: `pnpm --filter @yatzy/web test src/routes/table.test.tsx src/games/yatzy/`
+- Regression: `pnpm --filter @roundhouse/web test src/routes/table.test.tsx src/games/yatzy/`
 
 **Interfaces:**
 - Consumes: `ChatPanel` (Task 2), `ChatComposer` (Task 1)
@@ -469,7 +469,7 @@ If `table.test.tsx` has no shell assertion, skip adding one (YAGNI) — class ch
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/YatzyTable.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/YatzyTable.test.tsx`
 
 Expected: FAIL — missing float / shell / xl:hidden / draft share
 
@@ -585,7 +585,7 @@ Leave lobby/unavailable `max-w-md` shells alone.
 Run:
 
 ```bash
-pnpm --filter @yatzy/web test \
+pnpm --filter @roundhouse/web test \
   src/games/yatzy/ChatComposer.test.tsx \
   src/games/yatzy/ChatPanel.test.tsx \
   src/games/yatzy/YatzyTable.test.tsx \

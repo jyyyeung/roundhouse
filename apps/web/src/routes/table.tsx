@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ClientMessage, Json, ServerMessage, TableMeta } from "@yatzy/game-core";
+import type { ClientMessage, Json, ServerMessage, TableMeta } from "@roundhouse/game-core";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { renderGameView } from "../games/registry";

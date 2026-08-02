@@ -1,4 +1,4 @@
-import { intentFromClientMessage, type ClientMessage, type ServerMessage } from "@yatzy/game-core";
+import { intentFromClientMessage, type ClientMessage, type ServerMessage } from "@roundhouse/game-core";
 
 import type { ApplyGameIntentResult, TablesRuntime } from "../room/runtime";
 

@@ -6,7 +6,7 @@
 
 **Architecture:** Keep game logic untouched. Restructure `YatzyTable` into a `md+` two-column CSS grid (left: status + dice + standings; right: score sheet). Cap die button sizes in `DiceTray`. Densify `ScoreSheet` cells and enable in-panel overflow on desktop. Mobile status uses local React expand/collapse state (always starts collapsed).
 
-**Tech Stack:** React 19, Tailwind CSS 4, Motion (existing), Vitest + Testing Library, pnpm workspace `@yatzy/web`.
+**Tech Stack:** React 19, Tailwind CSS 4, Motion (existing), Vitest + Testing Library, pnpm workspace `@roundhouse/web`.
 
 ## Global Constraints
 
@@ -70,7 +70,7 @@ Add to `apps/web/src/games/yatzy/DiceTray.test.tsx`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/DiceTray.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/DiceTray.test.tsx`
 
 Expected: FAIL — missing `size-12` / `dice-row` / still has `aspect-square`
 
@@ -117,7 +117,7 @@ Keep the section header / Roll button markup unchanged. Optional: slightly reduc
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/DiceTray.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/DiceTray.test.tsx`
 
 Expected: PASS
 
@@ -175,7 +175,7 @@ Keep existing preview / dash tests intact.
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ScoreSheet.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ScoreSheet.test.tsx`
 
 Expected: FAIL — missing `md:min-h-0` / still `py-3` on cells
 
@@ -209,7 +209,7 @@ Do not change display logic (`value` / `preview` / `—`) or `aria-label` rules.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ScoreSheet.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ScoreSheet.test.tsx`
 
 Expected: PASS (including existing preview tests)
 
@@ -244,8 +244,8 @@ Create `apps/web/src/games/yatzy/YatzyTable.test.tsx`:
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { TableMeta } from "@yatzy/game-core";
-import type { YatzyState } from "@yatzy/game-yatzy";
+import type { TableMeta } from "@roundhouse/game-core";
+import type { YatzyState } from "@roundhouse/game-yatzy";
 
 import { YatzyTable } from "./YatzyTable";
 
@@ -364,7 +364,7 @@ describe("YatzyTable", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/YatzyTable.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/YatzyTable.test.tsx`
 
 Expected: FAIL — module / selectors / buttons missing
 
@@ -515,7 +515,7 @@ Notes for the implementer:
 Run:
 
 ```bash
-pnpm --filter @yatzy/web test src/games/yatzy/YatzyTable.test.tsx src/games/yatzy/DiceTray.test.tsx src/games/yatzy/ScoreSheet.test.tsx src/games/yatzy/DieFace.test.tsx
+pnpm --filter @roundhouse/web test src/games/yatzy/YatzyTable.test.tsx src/games/yatzy/DiceTray.test.tsx src/games/yatzy/ScoreSheet.test.tsx src/games/yatzy/DieFace.test.tsx
 ```
 
 Expected: PASS

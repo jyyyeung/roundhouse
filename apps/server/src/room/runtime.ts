@@ -1,6 +1,6 @@
 import { asc, desc, eq, inArray, sql } from "drizzle-orm";
-import type { ClientIntent, EventEnvelope, Json, TableMeta } from "@yatzy/game-core";
-import { generateInviteCode } from "@yatzy/game-core";
+import type { ClientIntent, EventEnvelope, Json, TableMeta } from "@roundhouse/game-core";
+import { generateInviteCode } from "@roundhouse/game-core";
 
 import type { Database } from "../db/client";
 import { game, gameEvent, gameTable, tablePlayer } from "../db/schema";

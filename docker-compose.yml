@@ -3,9 +3,9 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-yatzy}
-      POSTGRES_USER: ${POSTGRES_USER:-yatzy}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yatzy}
+      POSTGRES_DB: ${POSTGRES_DB:-roundhouse}
+      POSTGRES_USER: ${POSTGRES_USER:-roundhouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-roundhouse}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -25,7 +25,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://yatzy:yatzy@db:5432/yatzy}
+      DATABASE_URL: ${DATABASE_URL:-postgres://roundhouse:roundhouse@db:5432/roundhouse}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-to-a-32+char-secret-value}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8080}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:8080}
@@ -33,7 +33,7 @@ services:
     command:
       - /bin/sh
       - -c
-      - pnpm --filter @yatzy/server db:migrate && pnpm --filter @yatzy/server exec tsx src/index.ts
+      - pnpm --filter @roundhouse/server db:migrate && pnpm --filter @roundhouse/server exec tsx src/index.ts
     ports:
       - "3001:3001"
 

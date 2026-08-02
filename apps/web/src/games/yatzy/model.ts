@@ -1,4 +1,4 @@
-import { scoreCategory, yatzyCategories, yahtzeeCategories, type Ruleset, type Sheet, type YatzyState } from "@yatzy/game-yatzy";
+import { scoreCategory, yatzyCategories, yahtzeeCategories, type Ruleset, type Sheet, type YatzyState } from "@roundhouse/game-yatzy";
 
 export type TableChatMessage = {
   id: string;

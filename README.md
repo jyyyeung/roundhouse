@@ -1,4 +1,6 @@
-# Yatzy
+# Roundhouse
+
+Remote table games for friends — live rooms, chat with game context, pluggable modules (Yatzy/Yahtzee first).
 
 ## Local dev
 1. Enable pnpm via Corepack: `corepack enable`
@@ -17,7 +19,7 @@ The web app runs on `http://localhost:5173` and the server health endpoint is `h
 
 Compose starts:
 - `db`: Postgres 16 with a persistent `postgres-data` volume
-- `server`: runs `pnpm --filter @yatzy/server db:migrate` before starting the API/websocket server
+- `server`: runs `pnpm --filter @roundhouse/server db:migrate` before starting the API/websocket server
 - `web`: serves the Vite build from nginx and proxies `/api` plus `/ws` to the server container
 
-To stop the stack, run `docker compose down`. Add `-v` if you also want to remove the Postgres volume.
+To stop the stack, run `docker compose down`. Add `-v` if you also want to remove the Postgres volume (needed after DB name/user defaults change).

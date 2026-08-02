@@ -6,7 +6,7 @@
 
 **Architecture:** Keep all logic in `LobbyPage`. Use Tailwind responsive classes only: raise shell `max-w` at `md`, wrap Create/Join in a 2-col grid, restyle recent-table articles as horizontal rows at `md+` with truncated URL + Copy. No new routes or shared layout components.
 
-**Tech Stack:** React 19, React Router 7, Tailwind CSS 4, Vitest + Testing Library, pnpm workspace `@yatzy/web`.
+**Tech Stack:** React 19, React Router 7, Tailwind CSS 4, Vitest + Testing Library, pnpm workspace `@roundhouse/web`.
 
 ## Global Constraints
 
@@ -109,7 +109,7 @@ describe("LobbyPage layout", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/routes/lobby.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/routes/lobby.test.tsx`
 
 Expected: FAIL — missing `md:max-w-5xl` and/or `.lobby-actions` grid classes
 
@@ -171,7 +171,7 @@ Notes:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @yatzy/web test src/routes/lobby.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/routes/lobby.test.tsx`
 
 Expected: PASS
 
@@ -257,7 +257,7 @@ Prefer `userEvent.setup()` at the top of the test instead of dynamic import if t
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/routes/lobby.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/routes/lobby.test.tsx`
 
 Expected: FAIL — missing `.lobby-recent-row` / Copy link / truncate classes
 
@@ -313,11 +313,11 @@ Keep loading / empty / error blocks unchanged. Do not add copy on mobile (button
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @yatzy/web test src/routes/lobby.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/routes/lobby.test.tsx`
 
 Expected: PASS
 
-Also run: `pnpm --filter @yatzy/web test src/app.test.tsx`
+Also run: `pnpm --filter @roundhouse/web test src/app.test.tsx`
 
 Expected: PASS (guest redirect untouched)
 

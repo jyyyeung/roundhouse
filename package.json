@@ -1,5 +1,5 @@
 {
-  "name": "yatzy",
+  "name": "roundhouse",
   "private": true,
   "scripts": {
     "test": "pnpm -r run test",

@@ -1,4 +1,4 @@
-import { GameModule, Json } from "@yatzy/game-core";
+import { GameModule, Json } from "@roundhouse/game-core";
 import { yahtzeeCategories, yatzyCategories } from "./categories";
 import { reduce, type YatzyState } from "./reduce";
 import { Ruleset } from "./types";

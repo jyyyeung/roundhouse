@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import type { YatzyState } from "@yatzy/game-yatzy";
+import type { YatzyState } from "@roundhouse/game-yatzy";
 
 import { categoriesFor, formatCategory, previewScore, totalScore, upperTotal } from "./model";
 

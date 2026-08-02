@@ -6,7 +6,7 @@
 
 **Architecture:** Extract a reusable `DieFace` component (`variant: "soft" | "classic"`, default soft) used by `DiceTray`. Keep hold/roll chrome on the tray button. Rewrite `ScoreSheet` cell label to a single primary value derived from scored / preview / dash. No game-logic or server changes.
 
-**Tech Stack:** React 19, Tailwind CSS 4, Motion (existing tray animations), Vitest + Testing Library, pnpm workspace `@yatzy/web`.
+**Tech Stack:** React 19, Tailwind CSS 4, Motion (existing tray animations), Vitest + Testing Library, pnpm workspace `@roundhouse/web`.
 
 ## Global Constraints
 
@@ -88,7 +88,7 @@ describe("DieFace", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/DieFace.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/DieFace.test.tsx`
 
 Expected: FAIL (module `./DieFace` not found, or `DieFace` undefined)
 
@@ -160,7 +160,7 @@ Notes for implementer:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/DieFace.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/DieFace.test.tsx`
 
 Expected: PASS (3 tests)
 
@@ -230,7 +230,7 @@ describe("DiceTray", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/DiceTray.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/DiceTray.test.tsx`
 
 Expected: FAIL — roman numerals still present and/or no `die-face` nodes
 
@@ -261,7 +261,7 @@ Keep `layout`, `animate`, `whileTap`, `onClick`, `disabled`, `aria-pressed`, and
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/DiceTray.test.tsx src/games/yatzy/DieFace.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/DiceTray.test.tsx src/games/yatzy/DieFace.test.tsx`
 
 Expected: PASS
 
@@ -301,7 +301,7 @@ Create `apps/web/src/games/yatzy/ScoreSheet.test.tsx`:
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { YatzyState } from "@yatzy/game-yatzy";
+import type { YatzyState } from "@roundhouse/game-yatzy";
 
 import { ScoreSheet } from "./ScoreSheet";
 
@@ -417,7 +417,7 @@ If the sheet shape needs `as YatzyState` because of index signatures, cast the f
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ScoreSheet.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ScoreSheet.test.tsx`
 
 Expected: FAIL — still shows `Open` / `Would score`
 
@@ -447,7 +447,7 @@ Do not change totals/bonus rows or background class logic.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ScoreSheet.test.tsx src/games/yatzy/DiceTray.test.tsx src/games/yatzy/DieFace.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ScoreSheet.test.tsx src/games/yatzy/DiceTray.test.tsx src/games/yatzy/DieFace.test.tsx`
 
 Expected: PASS
 
@@ -471,17 +471,17 @@ EOF
 
 **Interfaces:**
 - Consumes: Tasks 1–3 deliverables
-- Produces: green `@yatzy/web` test + typecheck suite
+- Produces: green `@roundhouse/web` test + typecheck suite
 
 - [ ] **Step 1: Run full web unit tests**
 
-Run: `pnpm --filter @yatzy/web test`
+Run: `pnpm --filter @roundhouse/web test`
 
 Expected: PASS (all existing + new tests)
 
 - [ ] **Step 2: Run typecheck**
 
-Run: `pnpm --filter @yatzy/web typecheck`
+Run: `pnpm --filter @roundhouse/web typecheck`
 
 Expected: exit 0
 

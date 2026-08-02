@@ -102,7 +102,7 @@
 - Create: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.gitignore`, `packages/game-core/package.json`, `packages/games/yatzy/package.json`, `apps/server/package.json`, `apps/web/package.json`
 
 **Interfaces:**
-- Produces: workspace packages `@yatzy/game-core`, `@yatzy/game-yatzy`, `@yatzy/server`, `@yatzy/web` resolvable via pnpm
+- Produces: workspace packages `@roundhouse/game-core`, `@roundhouse/game-yatzy`, `@roundhouse/server`, `@roundhouse/web` resolvable via pnpm
 
 - [ ] **Step 1: Create root workspace files**
 
@@ -165,7 +165,7 @@ Each package gets `package.json` + `tsconfig.json` extending base, `src/index.ts
 `packages/game-core/package.json`:
 ```json
 {
-  "name": "@yatzy/game-core",
+  "name": "@roundhouse/game-core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -182,7 +182,7 @@ Each package gets `package.json` + `tsconfig.json` extending base, `src/index.ts
 }
 ```
 
-Mirror for `@yatzy/game-yatzy` with dependency `"@yatzy/game-core": "workspace:*"`.
+Mirror for `@roundhouse/game-yatzy` with dependency `"@roundhouse/game-core": "workspace:*"`.
 
 `apps/server` and `apps/web` stubs can wait for later tasks but must exist as empty packages with name fields so the workspace is valid.
 
@@ -240,7 +240,7 @@ describe("generateInviteCode", () => {
 - [ ] **Step 2: Run test — expect FAIL**
 
 ```bash
-pnpm --filter @yatzy/game-core test
+pnpm --filter @roundhouse/game-core test
 ```
 
 Expected: FAIL — cannot find module `./codes`.
@@ -339,7 +339,7 @@ export type ChatWire = {
 - [ ] **Step 4: Run tests — expect PASS**
 
 ```bash
-pnpm --filter @yatzy/game-core test
+pnpm --filter @roundhouse/game-core test
 ```
 
 - [ ] **Step 5: Commit**
@@ -407,7 +407,7 @@ describe("scoreCategory yahtzee", () => {
 - [ ] **Step 2: Run — expect FAIL**
 
 ```bash
-pnpm --filter @yatzy/game-yatzy test
+pnpm --filter @roundhouse/game-yatzy test
 ```
 
 - [ ] **Step 3: Implement categories + score**
@@ -421,7 +421,7 @@ Implement `scoreCategory` with frequency maps; return `0` when the combination i
 - [ ] **Step 4: Run — expect PASS**
 
 ```bash
-pnpm --filter @yatzy/game-yatzy test
+pnpm --filter @roundhouse/game-yatzy test
 ```
 
 - [ ] **Step 5: Commit**
@@ -441,7 +441,7 @@ git commit -m "feat(yatzy): add pure scoring for Yatzy and Yahtzee"
 - Modify: wire `yatzyModule: GameModule`
 
 **Interfaces:**
-- Consumes: `GameModule`, `ReduceContext` from `@yatzy/game-core`
+- Consumes: `GameModule`, `ReduceContext` from `@roundhouse/game-core`
 - Produces: `yatzyModule` with intents:
   - `{ type: "roll", payload: {} }`
   - `{ type: "set_holds", payload: { holds: boolean[5] } }`
@@ -481,7 +481,7 @@ Use a deterministic `randomInt` stub that returns a fixed sequence.
 - [ ] **Step 4: Run all yatzy tests — PASS**
 
 ```bash
-pnpm --filter @yatzy/game-yatzy test
+pnpm --filter @roundhouse/game-yatzy test
 ```
 
 - [ ] **Step 5: Commit**
@@ -580,10 +580,10 @@ export const chatMessage = pgTable("chat_message", {
 - [ ] **Step 3: Add migrate script and generate migration**
 
 ```bash
-pnpm --filter @yatzy/server exec drizzle-kit generate
+pnpm --filter @roundhouse/server exec drizzle-kit generate
 ```
 
-Document in README that `pnpm --filter @yatzy/server db:migrate` applies migrations.
+Document in README that `pnpm --filter @roundhouse/server db:migrate` applies migrations.
 
 - [ ] **Step 4: Commit**
 
@@ -667,8 +667,8 @@ git commit -m "feat(auth): add Better Auth email/password"
 - [ ] **Step 1: Module registry**
 
 ```ts
-import { yatzyModule } from "@yatzy/game-yatzy";
-import type { GameModule } from "@yatzy/game-core";
+import { yatzyModule } from "@roundhouse/game-yatzy";
+import type { GameModule } from "@roundhouse/game-core";
 
 const modules: Record<string, GameModule> = {
   [yatzyModule.id]: yatzyModule,
@@ -794,9 +794,9 @@ git commit -m "feat(server): realtime chat with server-built game snapshots"
 - [ ] **Step 1: Scaffold Vite React + Tailwind**
 
 ```bash
-# from apps/web — ensure react-router-dom, @yatzy/game-core workspace dep
-pnpm --filter @yatzy/web add react react-dom react-router-dom
-pnpm --filter @yatzy/web add -D tailwindcss @tailwindcss/vite typescript @types/react @types/react-dom vite @vitejs/plugin-react
+# from apps/web — ensure react-router-dom, @roundhouse/game-core workspace dep
+pnpm --filter @roundhouse/web add react react-dom react-router-dom
+pnpm --filter @roundhouse/web add -D tailwindcss @tailwindcss/vite typescript @types/react @types/react-dom vite @vitejs/plugin-react
 ```
 
 Phone-first CSS variables for a bright playful theme (avoid purple-on-white / Inter).

@@ -23,8 +23,8 @@ export default defineConfig(({ mode }) => {
           ],
         },
         manifest: {
-          name: "Yatzy",
-          short_name: "Yatzy",
+          name: "Roundhouse",
+          short_name: "Roundhouse",
           display: "standalone",
           start_url: "/",
           background_color: "#FFF8E7",

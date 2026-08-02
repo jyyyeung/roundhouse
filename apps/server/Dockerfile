@@ -20,4 +20,4 @@ COPY packages/games/yatzy packages/games/yatzy
 
 EXPOSE 3001
 
-CMD ["pnpm", "--filter", "@yatzy/server", "exec", "tsx", "src/index.ts"]
+CMD ["pnpm", "--filter", "@roundhouse/server", "exec", "tsx", "src/index.ts"]

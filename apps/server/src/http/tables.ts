@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
-import type { Json } from "@yatzy/game-core";
+import type { Json } from "@roundhouse/game-core";
 import { TablesError, type TablesRuntime } from "../room/runtime";
 
 type Session = { user?: { id: string } } | null;

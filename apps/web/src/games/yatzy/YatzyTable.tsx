@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import type { YatzyState } from "@yatzy/game-yatzy";
-import type { Json, TableMeta } from "@yatzy/game-core";
+import type { YatzyState } from "@roundhouse/game-yatzy";
+import type { Json, TableMeta } from "@roundhouse/game-core";
 
 import { ChatComposer } from "./ChatComposer";
 import { ChatPanel } from "./ChatPanel";

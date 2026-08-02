@@ -1,4 +1,4 @@
-import type { ClientMessage, ServerMessage } from "@yatzy/game-core";
+import type { ClientMessage, ServerMessage } from "@roundhouse/game-core";
 
 function toWebSocketUrl(apiUrl: string) {
   const url = new URL("/ws", apiUrl);

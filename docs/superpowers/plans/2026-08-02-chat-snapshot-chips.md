@@ -6,7 +6,7 @@
 
 **Architecture:** Add a presentational `ChatDiceChips` component (`dice` + `holds`). Wire it into `ChatPanel` between the name/time row and message body when the snapshot has dice. Drop rolls-left and the nested Snapshot chrome. No protocol or server changes.
 
-**Tech Stack:** React 19, Tailwind CSS 4, Vitest + Testing Library, pnpm workspace `@yatzy/web`.
+**Tech Stack:** React 19, Tailwind CSS 4, Vitest + Testing Library, pnpm workspace `@roundhouse/web`.
 
 ## Global Constraints
 
@@ -85,7 +85,7 @@ describe("ChatDiceChips", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ChatDiceChips.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ChatDiceChips.test.tsx`
 
 Expected: FAIL (module `./ChatDiceChips` not found, or `ChatDiceChips` undefined)
 
@@ -139,7 +139,7 @@ export function ChatDiceChips(props: ChatDiceChipsProps) {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @yatzy/web test src/games/yatzy/ChatDiceChips.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/games/yatzy/ChatDiceChips.test.tsx`
 
 Expected: PASS (3 tests)
 
@@ -189,7 +189,7 @@ expect(screen.queryByText(/Snapshot/i)).not.toBeInTheDocument();
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @yatzy/web test src/routes/table.test.tsx`
+Run: `pnpm --filter @roundhouse/web test src/routes/table.test.tsx`
 
 Expected: FAIL — still finds old Snapshot / concatenated digits UI, missing new `aria-label`
 
@@ -238,7 +238,7 @@ Delete the nested Snapshot block entirely (the `rounded-2xl bg-white/80` section
 Run:
 
 ```bash
-pnpm --filter @yatzy/web test src/games/yatzy/ChatDiceChips.test.tsx src/routes/table.test.tsx
+pnpm --filter @roundhouse/web test src/games/yatzy/ChatDiceChips.test.tsx src/routes/table.test.tsx
 ```
 
 Expected: PASS

@@ -1,5 +1,5 @@
 {
-  "name": "@yatzy/web",
+  "name": "@roundhouse/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@yatzy/game-core": "workspace:^",
-    "@yatzy/game-yatzy": "workspace:^",
+    "@roundhouse/game-core": "workspace:^",
+    "@roundhouse/game-yatzy": "workspace:^",
     "better-auth": "^1.6.25",
     "motion": "^12.43.0",
     "react": "^19.2.8",

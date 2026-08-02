@@ -1,5 +1,5 @@
-import type { Json, ServerMessage } from "@yatzy/game-core";
-import { yatzyModule } from "@yatzy/game-yatzy";
+import type { Json, ServerMessage } from "@roundhouse/game-core";
+import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it, vi } from "vitest";
 
 import { createWsHandlers, type WsRuntime } from "./handlers";

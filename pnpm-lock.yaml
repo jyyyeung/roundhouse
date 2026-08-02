@@ -13,10 +13,10 @@ importers:
       '@hono/node-server':
         specifier: ^2.0.12
         version: 2.0.12(hono@4.12.33)
-      '@yatzy/game-core':
+      '@roundhouse/game-core':
         specifier: workspace:*
         version: link:../../packages/game-core
-      '@yatzy/game-yatzy':
+      '@roundhouse/game-yatzy':
         specifier: workspace:*
         version: link:../../packages/games/yatzy
       better-auth:
@@ -62,10 +62,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@yatzy/game-core':
+      '@roundhouse/game-core':
         specifier: workspace:^
         version: link:../../packages/game-core
-      '@yatzy/game-yatzy':
+      '@roundhouse/game-yatzy':
         specifier: workspace:^
         version: link:../../packages/games/yatzy
       better-auth:
@@ -135,7 +135,7 @@ importers:
 
   packages/games/yatzy:
     dependencies:
-      '@yatzy/game-core':
+      '@roundhouse/game-core':
         specifier: workspace:*
         version: link:../../game-core
     devDependencies:

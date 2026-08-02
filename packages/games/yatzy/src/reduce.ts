@@ -1,4 +1,4 @@
-import { EventEnvelope, ReduceContext, ReduceResult } from "@yatzy/game-core";
+import { EventEnvelope, ReduceContext, ReduceResult } from "@roundhouse/game-core";
 import { scoreCategory } from "./score";
 import { yahtzeeCategories, yatzyCategories } from "./categories";
 import { Category, Dice, Ruleset } from "./types";
