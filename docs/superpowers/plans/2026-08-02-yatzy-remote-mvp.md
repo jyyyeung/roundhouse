@@ -265,17 +265,6 @@ export function generateInviteCode(length = 6): string {
 ```ts
 export type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
 
-export type ReduceResult =
-  | { ok: true; state: Json; events: Omit<EventEnvelope, "id" | "seq" | "createdAt">[] }
-  | { ok: false; error: string };
-
-export type ReduceContext = {
-  actorId: string;
-  randomInt: (maxExclusive: number) => number; // 0..maxExclusive-1
-  now: () => Date;
-  playerIds: string[];
-};
-
 export type EventEnvelope = {
   id: string;
   tableId: string;
@@ -285,6 +274,17 @@ export type EventEnvelope = {
   actorId: string | null;
   payload: Json;
   createdAt: string; // ISO
+};
+
+export type ReduceResult =
+  | { ok: true; state: Json; events: Omit<EventEnvelope, "id" | "seq" | "createdAt">[] }
+  | { ok: false; error: string };
+
+export type ReduceContext = {
+  actorId: string;
+  randomInt: (maxExclusive: number) => number; // 0..maxExclusive-1
+  now: () => Date;
+  playerIds: string[];
 };
 
 export interface GameModule {
