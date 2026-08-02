@@ -200,25 +200,42 @@ export function LobbyPage({ session }: { session: SessionLike }) {
             const shareUrl = buildShareUrl({ webBaseUrl, tableId: table.id, code: table.code });
 
             return (
-              <article key={table.id} className="rounded-3xl bg-[var(--color-cream)] p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-display text-2xl text-[var(--color-ink)]">
-                      {table.config?.ruleset === "yahtzee" ? "Yahtzee" : "Yatzy"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {table.status} · {table.seatUserIds.length}/{table.softSeatCap} seated
-                    </p>
+              <article
+                key={table.id}
+                className="lobby-recent-row rounded-3xl bg-[var(--color-cream)] p-4 md:flex md:items-center md:gap-4"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3 md:items-center">
+                    <div className="min-w-0">
+                      <p className="font-display text-2xl text-[var(--color-ink)] md:text-xl">
+                        {table.config?.ruleset === "yahtzee" ? "Yahtzee" : "Yatzy"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {table.status} · {table.seatUserIds.length}/{table.softSeatCap} seated
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-coral)]">
+                      {table.code}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-coral)]">
-                    {table.code}
-                  </span>
+
+                  <div className="mt-3 flex min-w-0 items-center gap-2 md:mt-2">
+                    <p className="min-w-0 flex-1 break-all text-sm text-slate-600 md:truncate md:break-normal">
+                      {shareUrl}
+                    </p>
+                    <button
+                      type="button"
+                      className="hidden shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-[var(--color-ink)] md:inline-flex"
+                      onClick={() => void navigator.clipboard.writeText(shareUrl)}
+                    >
+                      Copy link
+                    </button>
+                  </div>
                 </div>
 
-                <p className="mt-3 break-all text-sm text-slate-600">{shareUrl}</p>
                 <button
                   type="button"
-                  className="mt-4 rounded-2xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)]"
+                  className="mt-4 w-full rounded-2xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)] md:mt-0 md:w-auto md:shrink-0"
                   onClick={() => navigate(`/t/${table.id}?code=${table.code}`)}
                 >
                   Open table
