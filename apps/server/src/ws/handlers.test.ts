@@ -1,0 +1,111 @@
+import type { EventEnvelope, Json, ServerMessage, TableMeta } from "@yatzy/game-core";
+import { yatzyModule } from "@yatzy/game-yatzy";
+import { describe, expect, it } from "vitest";
+
+import { createWsHandlers, type WsRuntime } from "./handlers";
+
+function makeRuntime(): WsRuntime {
+  const tableId = "table-1";
+  const playerIds = ["user-a", "user-b"];
+  const meta: TableMeta = {
+    code: "ABC123",
+    gameId: "yatzy",
+    config: { ruleset: "yatzy", tableId },
+    status: "active",
+    hostUserId: "user-a",
+    seatUserIds: playerIds,
+    softSeatCap: 4,
+  };
+
+  let seq = 0;
+  let state = yatzyModule.createInitialState(meta.config, playerIds);
+
+  return {
+    async getTableSnapshot(input) {
+      if (input.tableId !== tableId) return null;
+      return { tableId, meta, seq, state };
+    },
+    async applyGameIntent({ tableId: nextTableId, userId, intent }) {
+      if (nextTableId !== tableId) {
+        return { ok: false, code: "table_missing", message: "table_missing", seq };
+      }
+
+      const result = yatzyModule.reduce(state, intent, {
+        actorId: userId,
+        now: () => new Date("2026-08-02T00:00:00.000Z"),
+        playerIds,
+        randomInt: () => 0,
+      });
+
+      if (!result.ok) {
+        return { ok: false, code: "illegal_action", message: result.error, seq };
+      }
+
+      state = result.state;
+      const events = result.events.map<EventEnvelope>((event, index) => ({
+        ...event,
+        id: `event-${seq + index + 1}`,
+        seq: seq + index + 1,
+        createdAt: "2026-08-02T00:00:00.000Z",
+      }));
+      seq += events.length;
+
+      return {
+        ok: true,
+        events,
+        finished: yatzyModule.isFinished(state),
+        meta,
+        seq,
+        state,
+      };
+    },
+  };
+}
+
+describe("ws handlers", () => {
+  it("returns illegal_action and leaves seq unchanged for out-of-turn intents", async () => {
+    const sent: ServerMessage[] = [];
+    const published: ServerMessage[] = [];
+    const runtime = makeRuntime();
+    const handlers = createWsHandlers({
+      runtime,
+      isDuplicateAction: () => false,
+      rememberAction: () => {},
+      publishToTable: (_tableId, message) => {
+        published.push(message);
+      },
+    });
+
+    await handlers.onMessage(
+      {
+        send(message) {
+          sent.push(message);
+        },
+        userId: "user-b",
+      },
+      {
+        actionId: "action-1",
+        intentType: "roll",
+        payload: {} satisfies Json,
+        tableId: "table-1",
+        type: "intent",
+        v: 1,
+      },
+    );
+
+    expect(sent).toEqual([
+      {
+        actionId: "action-1",
+        code: "illegal_action",
+        message: "not_your_turn",
+        tableId: "table-1",
+        type: "error",
+        v: 1,
+      },
+    ]);
+    expect(published).toEqual([]);
+
+    const snapshot = await runtime.getTableSnapshot({ tableId: "table-1" });
+    expect(snapshot?.seq).toBe(0);
+  });
+});

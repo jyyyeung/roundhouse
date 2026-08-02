@@ -6,7 +6,9 @@ import type { TablesRuntime } from "../room/runtime";
 
 function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
   return {
+    applyGameIntent: vi.fn(),
     createTable: vi.fn(),
+    getTableSnapshot: vi.fn(),
     joinTable: vi.fn(),
     startTable: vi.fn(),
     rematchTable: vi.fn(),

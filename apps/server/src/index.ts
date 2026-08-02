@@ -1,14 +1,20 @@
+import type { IncomingMessage } from "node:http";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { Hono } from "hono";
+import { WebSocketServer, type WebSocket } from "ws";
 
 import { auth, getSessionFromHeaders } from "./auth";
 import { db } from "./db/client";
 import { env } from "./env";
 import { createTablesRouter } from "./http/tables";
 import { createRoomRuntime } from "./room/runtime";
+import { createWsHub } from "./ws/hub";
 
 const app = new Hono();
+const runtime = createRoomRuntime(db);
+const wsHub = createWsHub({ getSessionFromHeaders, runtime });
+const wss = new WebSocketServer({ noServer: true });
 
 app.get("/health", (c) => c.json({ ok: true }));
 
@@ -39,11 +45,27 @@ app.on(["POST", "GET", "OPTIONS"], "/api/auth/*", (c) =>
 app.route(
   "/api/tables",
   createTablesRouter({
-    runtime: createRoomRuntime(db),
+    runtime,
     getSessionFromHeaders,
   }),
 );
 
-serve({ fetch: app.fetch, port: env.PORT }, (info) => {
+const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Server listening on http://localhost:${info.port}`);
+});
+
+wss.on("connection", (ws: WebSocket, request: IncomingMessage) => {
+  void wsHub.handleConnection(ws, request);
+});
+
+server.on("upgrade", (request, socket, head) => {
+  const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+  if (url.pathname !== "/ws") {
+    socket.destroy();
+    return;
+  }
+
+  wss.handleUpgrade(request, socket, head, (ws: WebSocket) => {
+    wss.emit("connection", ws, request);
+  });
 });

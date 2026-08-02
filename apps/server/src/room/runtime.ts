@@ -1,9 +1,9 @@
 import { asc, desc, eq, inArray } from "drizzle-orm";
-import type { Json } from "@yatzy/game-core";
+import type { ClientIntent, EventEnvelope, Json, TableMeta } from "@yatzy/game-core";
 import { generateInviteCode } from "@yatzy/game-core";
 
 import type { Database } from "../db/client";
-import { game, gameTable, tablePlayer } from "../db/schema";
+import { game, gameEvent, gameTable, tablePlayer } from "../db/schema";
 import { getModule } from "../modules/registry";
 
 type TableRow = typeof gameTable.$inferSelect;
@@ -39,7 +39,38 @@ export type TablesRuntime = {
   startTable(input: { userId: string; tableId: string }): Promise<{ tableId: string; gameRowId: string }>;
   rematchTable(input: { userId: string; tableId: string }): Promise<{ tableId: string; gameRowId: string }>;
   getMine(input: { userId: string }): Promise<TableSummary[]>;
+  getTableSnapshot(input: { tableId: string }): Promise<TableSnapshot | null>;
+  applyGameIntent(input: {
+    tableId: string;
+    userId: string;
+    intent: ClientIntent;
+    randomInt?: (maxExclusive: number) => number;
+    now?: () => Date;
+  }): Promise<ApplyGameIntentResult>;
 };
+
+export type TableSnapshot = {
+  tableId: string;
+  seq: number;
+  state: Json;
+  meta: TableMeta;
+};
+
+export type ApplyGameIntentResult =
+  | {
+      ok: true;
+      events: EventEnvelope[];
+      finished: boolean;
+      meta: TableMeta;
+      seq: number;
+      state: Json;
+    }
+  | {
+      ok: false;
+      code: string;
+      message: string;
+      seq: number;
+    };
 
 async function loadTableById(db: DbLike, tableId: string) {
   const [row] = await db.select().from(gameTable).where(eq(gameTable.id, tableId)).limit(1);
@@ -80,6 +111,23 @@ async function loadCurrentGame(db: DbLike, tableId: string) {
     .orderBy(desc(game.createdAt), desc(game.id))
     .limit(1);
   return row ?? null;
+}
+
+function resolveTableStatus(table: TableSummary, currentGame: GameRow | null) {
+  if (currentGame?.status === "finished") return "finished";
+  return table.status;
+}
+
+function toTableMeta(table: TableSummary, currentGame: GameRow | null): TableMeta {
+  return {
+    code: table.code,
+    config: table.config as Json,
+    gameId: table.gameId,
+    hostUserId: table.hostUserId,
+    seatUserIds: table.seatUserIds,
+    softSeatCap: table.softSeatCap,
+    status: resolveTableStatus(table, currentGame),
+  };
 }
 
 async function loadRecentTables(db: DbLike, userId: string) {
@@ -265,7 +313,135 @@ export function createRoomRuntime(db: Database): TablesRuntime {
     getMine({ userId }) {
       return loadRecentTables(db, userId);
     },
+
+    async getTableSnapshot({ tableId }) {
+      const table = await loadTableById(db, tableId);
+      if (!table) return null;
+
+      const currentGame = table.currentGame;
+      return {
+        tableId,
+        meta: toTableMeta(table, currentGame),
+        seq: currentGame?.seq ?? 0,
+        state: (currentGame?.state ?? null) as Json,
+      };
+    },
+
+    async applyGameIntent({ tableId, userId, intent, randomInt = defaultRandomInt, now = () => new Date() }) {
+      return db.transaction(async (tx) => {
+        const table = await loadTableById(tx, tableId);
+        if (!table) {
+          return { ok: false, code: "table_missing", message: "table_missing", seq: 0 } satisfies ApplyGameIntentResult;
+        }
+        if (!table.seatUserIds.includes(userId)) {
+          return {
+            ok: false,
+            code: "not_a_player",
+            message: "not_a_player",
+            seq: table.currentGame?.seq ?? 0,
+          } satisfies ApplyGameIntentResult;
+        }
+
+        const currentGame = table.currentGame;
+        if (!currentGame) {
+          return {
+            ok: false,
+            code: "game_missing",
+            message: "game_missing",
+            seq: 0,
+          } satisfies ApplyGameIntentResult;
+        }
+
+        let module;
+        try {
+          module = getModule(currentGame.gameId);
+        } catch (error) {
+          if (error instanceof Error && error.message.startsWith("unknown_game:")) {
+            return {
+              ok: false,
+              code: "unknown_game",
+              message: error.message,
+              seq: currentGame.seq,
+            } satisfies ApplyGameIntentResult;
+          }
+          throw error;
+        }
+
+        const reduced = module.reduce(currentGame.state as Json, intent, {
+          actorId: userId,
+          now,
+          playerIds: table.seatUserIds,
+          randomInt,
+        });
+        if (!reduced.ok) {
+          return {
+            ok: false,
+            code: "illegal_action",
+            message: reduced.error,
+            seq: currentGame.seq,
+          } satisfies ApplyGameIntentResult;
+        }
+
+        const createdAt = now();
+        const createdAtIso = createdAt.toISOString();
+        const events = reduced.events.map<EventEnvelope>((event, index) => ({
+          ...event,
+          id: crypto.randomUUID(),
+          seq: currentGame.seq + index + 1,
+          createdAt: createdAtIso,
+        }));
+        const finished = module.isFinished(reduced.state);
+        const nextSeq = currentGame.seq + events.length;
+
+        if (events.length > 0) {
+          await tx.insert(gameEvent).values(
+            events.map((event) => ({
+              actorId: event.actorId,
+              createdAt,
+              gameId: event.gameId,
+              gameRowId: currentGame.id,
+              id: event.id,
+              payload: event.payload,
+              seq: event.seq,
+              tableId: event.tableId,
+              type: event.type,
+            })),
+          );
+        }
+
+        await tx
+          .update(game)
+          .set({
+            finishedAt: finished ? createdAt : null,
+            seq: nextSeq,
+            state: reduced.state,
+            status: finished ? "finished" : "active",
+          })
+          .where(eq(game.id, currentGame.id));
+
+        await tx
+          .update(gameTable)
+          .set({ status: finished ? "finished" : "active" })
+          .where(eq(gameTable.id, tableId));
+
+        return {
+          ok: true,
+          events,
+          finished,
+          meta: toTableMeta(table, { ...currentGame, seq: nextSeq, status: finished ? "finished" : "active" }),
+          seq: nextSeq,
+          state: reduced.state,
+        } satisfies ApplyGameIntentResult;
+      });
+    },
   };
 }
 
 export type { TableRow, GameRow, SeatRow };
+
+function defaultRandomInt(maxExclusive: number) {
+  if (maxExclusive <= 0) throw new Error("maxExclusive");
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return values[0]! % maxExclusive;
+}
