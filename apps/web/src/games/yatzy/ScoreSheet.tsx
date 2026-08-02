@@ -15,14 +15,14 @@ export function ScoreSheet(props: ScoreSheetProps) {
   const categories = categoriesFor(props.state.ruleset);
 
   return (
-    <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/88 shadow-[0_20px_60px_rgba(26,26,26,0.1)] backdrop-blur">
+    <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/88 shadow-[0_20px_60px_rgba(26,26,26,0.1)] backdrop-blur md:h-full md:min-h-0 md:overflow-y-auto">
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse">
           <thead className="bg-[var(--color-cream)] text-left">
             <tr>
-              <th className="px-4 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--color-coral)]">Category</th>
+              <th className="px-3 py-2 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--color-coral)]">Category</th>
               {props.state.playerIds.map((playerId) => (
-                <th key={playerId} className="px-4 py-3 text-sm font-semibold text-[var(--color-ink)]">
+                <th key={playerId} className="px-3 py-2 text-sm font-semibold text-[var(--color-ink)]">
                   {props.playerLabels[playerId] ?? playerId}
                 </th>
               ))}
@@ -31,7 +31,7 @@ export function ScoreSheet(props: ScoreSheetProps) {
           <tbody>
             {categories.map((category) => (
               <tr key={category} className="border-t border-slate-100">
-                <td className="px-4 py-3 text-sm font-semibold text-slate-700">{formatCategory(category)}</td>
+                <td className="px-3 py-1.5 text-sm font-semibold text-slate-700">{formatCategory(category)}</td>
                 {props.state.playerIds.map((playerId) => {
                   const sheet = props.state.sheets[playerId];
                   const value = sheet?.[category] ?? null;
@@ -47,7 +47,7 @@ export function ScoreSheet(props: ScoreSheetProps) {
                         type="button"
                         layout
                         className={[
-                          "w-full rounded-2xl px-3 py-3 text-left text-sm transition",
+                          "w-full rounded-2xl px-3 py-2 text-left text-sm transition",
                           value !== null
                             ? "bg-slate-50 font-semibold text-[var(--color-ink)]"
                             : isClickable
@@ -75,25 +75,25 @@ export function ScoreSheet(props: ScoreSheetProps) {
               </tr>
             ))}
             <tr className="border-t border-slate-200 bg-slate-50/70">
-              <td className="px-4 py-3 text-sm font-semibold text-slate-700">Upper total</td>
+              <td className="px-3 py-2 text-sm font-semibold text-slate-700">Upper total</td>
               {props.state.playerIds.map((playerId) => (
-                <td key={`upper:${playerId}`} className="px-4 py-3 text-sm font-semibold text-[var(--color-ink)]">
+                <td key={`upper:${playerId}`} className="px-3 py-2 text-sm font-semibold text-[var(--color-ink)]">
                   {upperTotal(props.state.sheets[playerId] ?? {})}
                 </td>
               ))}
             </tr>
             <tr className="border-t border-slate-200 bg-slate-50/70">
-              <td className="px-4 py-3 text-sm font-semibold text-slate-700">Bonus</td>
+              <td className="px-3 py-2 text-sm font-semibold text-slate-700">Bonus</td>
               {props.state.playerIds.map((playerId) => (
-                <td key={`bonus:${playerId}`} className="px-4 py-3 text-sm font-semibold text-[var(--color-ink)]">
+                <td key={`bonus:${playerId}`} className="px-3 py-2 text-sm font-semibold text-[var(--color-ink)]">
                   {props.state.sheets[playerId]?.bonus ?? "-"}
                 </td>
               ))}
             </tr>
             <tr className="border-t border-slate-200 bg-slate-100/80">
-              <td className="px-4 py-3 text-sm font-semibold text-slate-700">Total</td>
+              <td className="px-3 py-2 text-sm font-semibold text-slate-700">Total</td>
               {props.state.playerIds.map((playerId) => (
-                <td key={`total:${playerId}`} className="px-4 py-3 text-sm font-bold text-[var(--color-ink)]">
+                <td key={`total:${playerId}`} className="px-3 py-2 text-sm font-bold text-[var(--color-ink)]">
                   {totalScore(props.state, playerId)}
                 </td>
               ))}

@@ -110,4 +110,25 @@ describe("ScoreSheet", () => {
     await user.click(screen.getByRole("button", { name: /score ones/i }));
     expect(onScore).toHaveBeenCalledWith("ones");
   });
+
+  it("uses dense cell padding and desktop scroll shell", () => {
+    const { container } = render(
+      <ScoreSheet
+        state={baseState()}
+        playerLabels={{ "user-a": "You", "user-b": "Player 2" }}
+        currentUserId="user-a"
+        canScore
+        onScore={vi.fn()}
+      />,
+    );
+
+    const section = container.querySelector("section");
+    expect(section?.className).toMatch(/md:min-h-0/);
+    expect(section?.className).toMatch(/md:overflow-y-auto/);
+    expect(section?.className).toMatch(/md:h-full/);
+
+    const onesButton = screen.getByRole("button", { name: /score ones/i });
+    expect(onesButton.className).toMatch(/py-2/);
+    expect(onesButton.className).not.toMatch(/py-3/);
+  });
 });
