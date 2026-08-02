@@ -5,10 +5,7 @@ import { WebSocket, type RawData } from "ws";
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
 import { createWsHandlers } from "./handlers";
 import { db } from "../db/client";
-import type { Database } from "../db/client";
-import { chatMessage, game, gameEvent } from "../db/schema";
-import { desc, eq } from "drizzle-orm";
-import { persistChatMessageToDb, appendGameEventToDb } from "./persistence";
+import { persistChatMessageToDb, appendGameEventToDb, listChatMessagesForTable } from "./persistence";
 type Session = { user?: { id: string } } | null;
 type GetSession = (headers: Headers) => Promise<Session> | Session;
 type HubSocket = WebSocket & { tableId?: string; userId?: string };
@@ -71,16 +68,14 @@ export function createWsHub(opts: {
   return {
     async handleConnection(ws: WebSocket, request: IncomingMessage) {
       const socket = ws as HubSocket;
-      const session = await opts.getSessionFromHeaders(toHeaders(request));
-      const userId = session?.user?.id;
-      if (!userId) {
-        socket.close(4401, "not_authenticated");
-        return;
-      }
+      // Register listeners before awaiting auth — clients send subscribe on open and
+      // those frames are dropped if the handler isn't attached yet.
+      const pending: RawData[] = [];
+      let ready = false;
+      let userId: string | undefined;
 
-      socket.userId = userId;
-
-      socket.on("message", async (raw: RawData) => {
+      async function handleRaw(raw: RawData) {
+        if (!userId) return;
         try {
           const message = parseClientMessage(raw);
           if (!message) {
@@ -122,11 +117,32 @@ export function createWsHub(opts: {
             v: 1,
           });
         }
+      }
+
+      socket.on("message", (raw: RawData) => {
+        if (!ready) {
+          pending.push(raw);
+          return;
+        }
+        void handleRaw(raw);
       });
 
       socket.on("close", () => {
         void unsubscribe(socket);
       });
+
+      const session = await opts.getSessionFromHeaders(toHeaders(request));
+      userId = session?.user?.id;
+      if (!userId) {
+        socket.close(4401, "not_authenticated");
+        return;
+      }
+
+      socket.userId = userId;
+      ready = true;
+      for (const raw of pending) {
+        await handleRaw(raw);
+      }
     },
   };
 
@@ -161,11 +177,30 @@ export function createWsHub(opts: {
     socket.tableId = tableId;
     addSocket(tableId, socket);
     sendSnapshot(socket, snapshot);
+    await sendChatHistory(socket, tableId);
 
     if (previousTableId && previousTableId !== tableId) {
       await publishPresence(previousTableId);
     }
     await publishPresence(tableId);
+  }
+
+  async function sendChatHistory(socket: HubSocket, tableId: string) {
+    const history = await listChatMessagesForTable(db, tableId);
+    for (const row of history) {
+      send(socket, {
+        v: 1,
+        type: "chat",
+        tableId,
+        message: {
+          id: row.id,
+          userId: row.userId,
+          text: row.text,
+          snapshot: row.snapshot as never,
+          createdAt: row.createdAt.toISOString(),
+        },
+      });
+    }
   }
 
   async function unsubscribe(socket: HubSocket) {

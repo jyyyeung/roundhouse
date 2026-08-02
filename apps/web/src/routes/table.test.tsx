@@ -61,21 +61,25 @@ function baseMeta(overrides?: Partial<TableMeta>): TableMeta {
 
 describe("TablePage", () => {
   let onMessage: ((message: ServerMessage) => void) | undefined;
-  const send = vi.fn();
+  const send = vi.fn(() => true);
   const close = vi.fn();
+  const isOpen = vi.fn(() => true);
   const originalCrypto = globalThis.crypto;
 
   beforeEach(() => {
     vi.clearAllMocks();
     onMessage = undefined;
     send.mockReset();
+    send.mockReturnValue(true);
     close.mockReset();
+    isOpen.mockReset();
+    isOpen.mockReturnValue(true);
     mockedGetRecentTables.mockResolvedValue([]);
     mockedJoinTable.mockResolvedValue({ tableId: "table-123" });
     mockedStartTable.mockResolvedValue({ tableId: "table-123", gameRowId: "game-1" });
     mockedConnectTableWs.mockImplementation((opts) => {
       onMessage = opts.onMessage;
-      return { send, close };
+      return { send, close, isOpen };
     });
     Object.defineProperty(globalThis, "crypto", {
       value: { randomUUID: vi.fn(() => "action-123") },

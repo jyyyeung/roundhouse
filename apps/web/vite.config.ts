@@ -13,6 +13,15 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: "autoUpdate",
+        workbox: {
+          navigateFallbackDenylist: [/^\/api/, /^\/ws/],
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith("/api") || url.pathname.startsWith("/ws"),
+              handler: "NetworkOnly",
+            },
+          ],
+        },
         manifest: {
           name: "Yatzy",
           short_name: "Yatzy",

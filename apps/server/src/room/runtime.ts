@@ -214,8 +214,9 @@ export function createRoomRuntime(db: Database): TablesRuntime {
         await lockTableByCode(tx, code);
         const table = await loadTableByCode(tx, code);
         if (!table) throw new TablesError("unknown_table", "unknown_table", 404);
-        if (table.status !== "lobby") throw new TablesError("table_closed", "table_closed");
+        // Already seated: allow re-open of active/finished tables (lobby links always pass ?code=).
         if (table.seatUserIds.includes(userId)) return { tableId: table.id };
+        if (table.status !== "lobby") throw new TablesError("table_closed", "table_closed");
         if (table.seatUserIds.length >= table.softSeatCap) {
           throw new TablesError("table_full", "table_full");
         }

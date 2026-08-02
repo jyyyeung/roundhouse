@@ -144,7 +144,10 @@ export function createWsHandlers(deps: {
         tableMap.set(userId, recent);
 
         // truncate text to 500 chars
-        const rawText = (message.payload && (message.payload as any).text) || "";
+        const rawText =
+          typeof message.text === "string"
+            ? message.text
+            : (message.payload && (message.payload as { text?: unknown }).text) || "";
         const text = String(rawText).slice(0, 500);
 
         const storedSnapshot = {
@@ -192,15 +195,14 @@ export function createWsHandlers(deps: {
           type: "chat",
           v: 1,
           tableId,
-          actionId: message.actionId,
-          chat: {
-            id: chatMessageId,
+          message: {
+            id: chatMessageId ?? crypto.randomUUID(),
             userId,
             text,
             snapshot: storedSnapshot,
             createdAt: createdAt.toISOString(),
           },
-        } as unknown as ServerMessage);
+        });
 
         return;
       }

@@ -5,7 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { renderGameView } from "../games/registry";
 import type { TableChatMessage } from "../games/yatzy/model";
 import { getRecentTables, rematchTable, joinTable, normalizeJoinCode, startTable } from "../lib/tables";
-import { connectTableWs } from "../lib/ws";
+import { connectTableWs, type TableWsConnection } from "../lib/ws";
 
 type SessionLike = {
   user?: {
@@ -63,7 +63,10 @@ export function TablePage({ session }: { session: SessionLike }) {
   const code = searchParams.get("code");
   const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
   const currentUserId = session?.user?.id ?? null;
-  const connectionRef = useRef<ReturnType<typeof connectTableWs> | null>(null);
+  const currentUserIdRef = useRef(currentUserId);
+  currentUserIdRef.current = currentUserId;
+  const connectionRef = useRef<TableWsConnection | null>(null);
+  const hasSnapshotRef = useRef(false);
   const previousDiceRef = useRef<number[] | null>(null);
   const [meta, setMeta] = useState<TableMeta | null>(null);
   const [state, setState] = useState<unknown>(null);
@@ -80,8 +83,14 @@ export function TablePage({ session }: { session: SessionLike }) {
       : "Yatzy";
   }, [meta?.config]);
 
+  function sendOrFlag(message: ClientMessage) {
+    const ok = connectionRef.current?.send(message) ?? false;
+    if (!ok) setError("Connection lost — reconnecting…");
+    return ok;
+  }
+
   function refreshSnapshot() {
-    connectionRef.current?.send({
+    sendOrFlag({
       v: 1,
       type: "subscribe",
       tableId,
@@ -89,7 +98,7 @@ export function TablePage({ session }: { session: SessionLike }) {
   }
 
   function sendIntent(intentType: string, payload: Json) {
-    connectionRef.current?.send({
+    sendOrFlag({
       v: 1,
       type: "intent",
       tableId,
@@ -100,49 +109,95 @@ export function TablePage({ session }: { session: SessionLike }) {
   }
 
   function sendChat(text: string) {
-    const actionId = crypto.randomUUID();
-    connectionRef.current?.send({
+    sendOrFlag({
       v: 1,
       type: "chat",
       tableId,
-      actionId,
+      actionId: crypto.randomUUID(),
       text,
       payload: { text },
     } as ClientMessage);
   }
 
   useEffect(() => {
-    let disposed = false;
+    let alive = true;
+    let connection: TableWsConnection | null = null;
+    let reconnectTimer: number | null = null;
+    let snapshotWatchTimer: number | null = null;
+    let attempt = 0;
+    let joined = false;
+    hasSnapshotRef.current = false;
 
-    async function connect() {
-      let shouldConnect = true;
+    setLoading(true);
+    setError(null);
 
-      if (code) {
-        try {
-          await joinTable({ code: normalizeJoinCode(code) });
-        } catch (caughtError) {
-          const message = getErrorMessage(caughtError);
-          const seated = currentUserId ? await isUserSeated(tableId, currentUserId) : false;
-          if (!seated) {
-            shouldConnect = false;
-            setError(message);
-          }
-        }
+    async function ensureJoined() {
+      if (joined || !code) {
+        joined = true;
+        return true;
       }
-
-      if (disposed) return;
-      if (!shouldConnect) {
+      try {
+        await joinTable({ code: normalizeJoinCode(code) });
+        joined = true;
+        return true;
+      } catch (caughtError) {
+        const message = getErrorMessage(caughtError);
+        const userId = currentUserIdRef.current;
+        const seated = userId ? await isUserSeated(tableId, userId) : false;
+        if (seated) {
+          joined = true;
+          return true;
+        }
         setLoading(false);
+        setError(message);
+        return false;
+      }
+    }
+
+    function scheduleReconnect(reason: string) {
+      if (!alive) return;
+      if (reason === "not_authenticated") {
+        setLoading(false);
+        setError("Session expired — sign in again, then reopen the table.");
         return;
       }
 
-      const connection = connectTableWs({
+      if (!hasSnapshotRef.current) {
+        setLoading(true);
+      }
+      setError(hasSnapshotRef.current ? "Connection lost — reconnecting…" : `Could not connect (${reason}). Retrying…`);
+
+      const delay = Math.min(8_000, 400 * 2 ** attempt);
+      attempt += 1;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      reconnectTimer = window.setTimeout(() => {
+        if (!alive) return;
+        void connect();
+      }, delay);
+    }
+
+    function clearSnapshotWatch() {
+      if (snapshotWatchTimer !== null) {
+        window.clearTimeout(snapshotWatchTimer);
+        snapshotWatchTimer = null;
+      }
+    }
+
+    function attachSocket() {
+      if (!alive) return;
+
+      connection?.close();
+      clearSnapshotWatch();
+      let gotSnapshot = false;
+      connection = connectTableWs({
         apiUrl,
         tableId,
         onMessage(message) {
-          if (disposed) return;
+          if (!alive) return;
 
           if (message.type === "snapshot") {
+            gotSnapshot = true;
+            clearSnapshotWatch();
             const nextDice =
               message.state && typeof message.state === "object" && "dice" in message.state
                 ? readDice(message.state.dice)
@@ -158,10 +213,12 @@ export function TablePage({ session }: { session: SessionLike }) {
             }
 
             previousDiceRef.current = nextDice ? [...nextDice] : null;
+            hasSnapshotRef.current = true;
             setMeta(message.meta);
             setState(message.state);
             setLoading(false);
             setError(null);
+            attempt = 0;
             return;
           }
 
@@ -181,28 +238,67 @@ export function TablePage({ session }: { session: SessionLike }) {
           }
 
           if (message.type === "event") {
-            refreshSnapshot();
+            connectionRef.current?.send({
+              v: 1,
+              type: "subscribe",
+              tableId,
+            });
             return;
           }
 
           if (message.type === "error") {
+            clearSnapshotWatch();
             setLoading(false);
             setError(message.message);
           }
         },
+        onConnectionLost(reason) {
+          if (!alive) return;
+          clearSnapshotWatch();
+          if (connectionRef.current === connection) {
+            connectionRef.current = null;
+          }
+          scheduleReconnect(reason);
+        },
       });
 
       connectionRef.current = connection;
+
+      // Open-but-silent sockets (dropped subscribe) never fire onclose — force retry.
+      snapshotWatchTimer = window.setTimeout(() => {
+        if (!alive || gotSnapshot || hasSnapshotRef.current) return;
+        if (connectionRef.current !== connection) return;
+        connection?.close();
+        connectionRef.current = null;
+        scheduleReconnect("snapshot_timeout");
+      }, 4_000);
+    }
+
+    async function connect() {
+      if (!alive) return;
+      try {
+        const ok = await ensureJoined();
+        if (!alive || !ok) return;
+        attachSocket();
+      } catch (caughtError) {
+        if (!alive) return;
+        setLoading(false);
+        setError(getErrorMessage(caughtError));
+      }
     }
 
     void connect();
 
     return () => {
-      disposed = true;
-      connectionRef.current?.close();
-      connectionRef.current = null;
+      alive = false;
+      clearSnapshotWatch();
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      connection?.close();
+      if (connectionRef.current === connection) {
+        connectionRef.current = null;
+      }
     };
-  }, [apiUrl, code, currentUserId, tableId]);
+  }, [apiUrl, code, tableId]);
 
   async function handleStart() {
     setBusyAction("start");

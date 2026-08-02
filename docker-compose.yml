@@ -27,7 +27,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgres://yatzy:yatzy@db:5432/yatzy}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-to-a-32+char-secret-value}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3001}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8080}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:8080}
       PORT: ${PORT:-3001}
     command:

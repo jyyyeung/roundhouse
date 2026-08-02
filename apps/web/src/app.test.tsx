@@ -51,6 +51,7 @@ describe("app routes", () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByText(/connecting/i)).toBeInTheDocument();
     expect(screen.getByText(/loading table magic/i)).toBeInTheDocument();
   });
 });

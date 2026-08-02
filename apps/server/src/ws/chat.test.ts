@@ -74,7 +74,18 @@ describe("ws chat", () => {
     const serverSnapshot = await runtime.getTableSnapshot({ tableId: "table-1" });
     expect(persisted.snapshot.state).toEqual(serverSnapshot?.state);
     // published a chat ServerMessage
-    expect(published.some((m) => (m as any).type === "chat")).toBe(true);
+    const chat = published.find((m) => m.type === "chat");
+    expect(chat).toEqual(
+      expect.objectContaining({
+        type: "chat",
+        tableId: "table-1",
+        message: expect.objectContaining({
+          id: "msg-1",
+          userId: "user-a",
+          text: "hello",
+        }),
+      }),
+    );
   });
 
   it("rejects chat from unseated users", async () => {

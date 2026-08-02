@@ -1,16 +1,20 @@
+import { desc, eq } from "drizzle-orm";
+
 import type { Database } from "../db/client";
 import { chatMessage, game, gameEvent } from "../db/schema";
-import { desc, eq } from "drizzle-orm";
 
 type DbLike = Pick<Database, "select" | "insert" | "update" | "transaction">;
 
-export async function persistChatMessageToDb(dbLike: DbLike, input: {
-  tableId: string;
-  userId: string;
-  text: string;
-  snapshot: unknown;
-  createdAt: Date;
-}) {
+export async function persistChatMessageToDb(
+  dbLike: DbLike,
+  input: {
+    tableId: string;
+    userId: string;
+    text: string;
+    snapshot: unknown;
+    createdAt: Date;
+  },
+) {
   const id = crypto.randomUUID();
   await dbLike.insert(chatMessage).values({
     id,
@@ -23,13 +27,37 @@ export async function persistChatMessageToDb(dbLike: DbLike, input: {
   return { id, createdAt: input.createdAt.toISOString() };
 }
 
-export async function appendGameEventToDb(dbLike: DbLike & { select: any }, input: {
-  tableId: string;
-  gameId?: string;
-  payload: unknown;
-  actorId: string;
-  createdAt: Date;
-}) {
+export async function listChatMessagesForTable(
+  dbLike: Pick<Database, "select">,
+  tableId: string,
+  limit = 200,
+) {
+  const rows = await dbLike
+    .select({
+      id: chatMessage.id,
+      userId: chatMessage.userId,
+      text: chatMessage.text,
+      snapshot: chatMessage.snapshot,
+      createdAt: chatMessage.createdAt,
+    })
+    .from(chatMessage)
+    .where(eq(chatMessage.tableId, tableId))
+    .orderBy(desc(chatMessage.createdAt))
+    .limit(limit);
+
+  return [...rows].reverse();
+}
+
+export async function appendGameEventToDb(
+  dbLike: DbLike & { select: any },
+  input: {
+    tableId: string;
+    gameId?: string;
+    payload: unknown;
+    actorId: string;
+    createdAt: Date;
+  },
+) {
   return await dbLike.transaction(async (tx: any) => {
     const [current] = await tx
       .select()
@@ -62,4 +90,3 @@ export async function appendGameEventToDb(dbLike: DbLike & { select: any }, inpu
     return { id };
   });
 }
-
