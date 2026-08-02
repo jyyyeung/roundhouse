@@ -1,4 +1,6 @@
 export { scoreCategory } from "./score";
+export { reduce } from "./reduce";
+export { yatzyModule } from "./module";
 export { yatzyCategories, yahtzeeCategories } from "./categories";
 export type {
   Ruleset,
