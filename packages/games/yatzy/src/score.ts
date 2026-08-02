@@ -46,12 +46,14 @@ export function scoreCategory(
 
   if (category === "three_kind") {
     const fk = faces.find((f) => m[f] >= 3);
-    return fk ? fk * 3 : 0;
+    if (!fk) return 0;
+    return ruleset === "yahtzee" ? sum(dice) : fk * 3;
   }
 
   if (category === "four_kind") {
     const fk = faces.find((f) => m[f] >= 4);
-    return fk ? fk * 4 : 0;
+    if (!fk) return 0;
+    return ruleset === "yahtzee" ? sum(dice) : fk * 4;
   }
 
   if (category === "chance") return sum(dice);

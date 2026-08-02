@@ -17,6 +17,14 @@ describe("scoreCategory yatzy", () => {
   it("scores large straight (2-6) as 20", () => {
     expect(scoreCategory("yatzy", "large_straight", [2, 3, 4, 5, 6])).toBe(20);
   });
+
+  it("scores three of a kind (yatzy) as face * 3", () => {
+    expect(scoreCategory("yatzy", "three_kind", [3, 3, 3, 1, 2])).toBe(9);
+  });
+
+  it("scores four of a kind (yatzy) as face * 4", () => {
+    expect(scoreCategory("yatzy", "four_kind", [4, 4, 4, 4, 1])).toBe(16);
+  });
 });
 
 describe("scoreCategory yahtzee", () => {
@@ -30,6 +38,14 @@ describe("scoreCategory yahtzee", () => {
 
   it("scores yahtzee as 50", () => {
     expect(scoreCategory("yahtzee", "yahtzee", [6, 6, 6, 6, 6])).toBe(50);
+  });
+
+  it("scores three of a kind (yahtzee) as sum of all dice", () => {
+    expect(scoreCategory("yahtzee", "three_kind", [2, 2, 2, 3, 4])).toBe(13);
+  });
+
+  it("scores four of a kind (yahtzee) as sum of all dice", () => {
+    expect(scoreCategory("yahtzee", "four_kind", [5, 5, 5, 5, 2])).toBe(22);
   });
 });
 
