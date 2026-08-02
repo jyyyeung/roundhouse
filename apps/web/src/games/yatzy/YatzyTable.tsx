@@ -134,7 +134,7 @@ export function YatzyTable(props: YatzyTableProps) {
           </section>
         </div>
 
-        <div className="min-h-0 min-w-0 md:sticky md:top-4 md:max-h-[calc(100dvh-6rem)]">
+        <div className="min-h-0 min-w-0 md:sticky md:top-4 md:h-[calc(100dvh-6rem)]">
           <ScoreSheet
             state={props.state}
             playerLabels={playerLabels}

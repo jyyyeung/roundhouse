@@ -119,4 +119,15 @@ describe("YatzyTable", () => {
     expect(details.className).toMatch(/md:block/);
     expect(within(details).getByText(/your turn\. roll, hold/i)).toBeInTheDocument();
   });
+
+  it("gives the desktop score-sheet panel a definite height for in-panel scrolling", () => {
+    const { container } = render(<YatzyTable {...defaultProps} />);
+    const board = container.querySelector(".yatzy-board");
+    const scoreSheetPanel = board?.children.item(1) as HTMLElement | null;
+
+    expect(scoreSheetPanel?.className).toMatch(/min-h-0/);
+    expect(scoreSheetPanel?.className).toMatch(/min-w-0/);
+    expect(scoreSheetPanel?.className).toMatch(/md:sticky/);
+    expect(scoreSheetPanel?.className).toMatch(/md:h-\[calc\(100dvh-6rem\)\]/);
+  });
 });
