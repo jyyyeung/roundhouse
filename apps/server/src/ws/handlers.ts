@@ -16,8 +16,26 @@ export function createWsHandlers(deps: {
   isDuplicateAction: (tableId: string, actionId: string) => boolean;
   rememberAction: (tableId: string, actionId: string) => void;
   forgetAction: (tableId: string, actionId: string) => void;
+  // optional persistence hooks
+  persistChatMessage?: (input: {
+    tableId: string;
+    userId: string;
+    text: string;
+    snapshot: unknown;
+    createdAt: Date;
+  }) => Promise<{ id: string; createdAt: string }>;
+  appendGameEvent?: (input: {
+    tableId: string;
+    gameId?: string;
+    payload: unknown;
+    actorId: string;
+    createdAt: Date;
+  }) => Promise<{ id: string }>;
 }) {
   const { isDuplicateAction, publishToTable, rememberAction, forgetAction, runtime } = deps;
+
+  // rate limit state: tableId -> userId -> timestamps (ms)
+  const rateLimits = new Map<string, Map<string, number[]>>();
 
   return {
     async onMessage(connection: WsConnection, message: ClientMessage) {
@@ -70,6 +88,98 @@ export function createWsHandlers(deps: {
             v: 1,
           });
         }
+        return;
+      }
+
+      if (message.type === "chat") {
+        const actionId = message.actionId;
+        const tableId = message.tableId!;
+        const userId = connection.userId;
+
+        // rate-limit: ~5 msg / 10s / user / table
+        const now = Date.now();
+        const windowMs = 10_000;
+        const maxMsgs = 5;
+        let tableMap = rateLimits.get(tableId);
+        if (!tableMap) {
+          tableMap = new Map();
+          rateLimits.set(tableId, tableMap);
+        }
+        const userTimestamps = tableMap.get(userId) ?? [];
+        const recent = userTimestamps.filter((t) => now - t <= windowMs);
+        if (recent.length >= maxMsgs) {
+          connection.send(
+            errorMessage({
+              actionId,
+              code: "rate_limited",
+              message: "rate_limited",
+              tableId,
+            }),
+          );
+          return;
+        }
+        recent.push(now);
+        tableMap.set(userId, recent);
+
+        // truncate text to 500 chars
+        const rawText = (message.payload && (message.payload as any).text) || "";
+        const text = String(rawText).slice(0, 500);
+
+        // build snapshot from server (ignore any client-supplied dice)
+        const snapshot = await runtime.getTableSnapshot({ tableId });
+        const storedSnapshot = snapshot
+          ? { tableId: snapshot.tableId, seq: snapshot.seq, state: snapshot.state, meta: snapshot.meta }
+          : // fallback if no table/game found
+            { gameId: (message.payload as any)?.gameId ?? null, phase: "lobby" };
+
+        // persist chat_message if hook provided
+        const createdAt = new Date();
+        let chatMessageId: string | undefined;
+        if (typeof (deps as any).persistChatMessage === "function") {
+          try {
+            const res = await (deps as any).persistChatMessage({
+              tableId,
+              userId,
+              text,
+              snapshot: storedSnapshot,
+              createdAt,
+            });
+            chatMessageId = res.id;
+          } catch {
+            // swallow persist errors for now
+          }
+        }
+
+        // if a game row exists (we have server state), append game_event chat_sent if hook available
+        if (snapshot && snapshot.state != null && typeof (deps as any).appendGameEvent === "function") {
+          try {
+            await (deps as any).appendGameEvent({
+              tableId,
+              gameId: snapshot.meta.gameId,
+              payload: { chatMessageId, text },
+              actorId: userId,
+              createdAt,
+            });
+          } catch {
+            // ignore
+          }
+        }
+
+        // broadcast chat ServerMessage
+        publishToTable(tableId, {
+          type: "chat",
+          v: 1,
+          tableId,
+          actionId: message.actionId,
+          chat: {
+            id: chatMessageId,
+            userId,
+            text,
+            snapshot: storedSnapshot,
+            createdAt: createdAt.toISOString(),
+          },
+        } as unknown as ServerMessage);
+
         return;
       }
 
