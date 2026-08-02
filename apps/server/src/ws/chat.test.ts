@@ -7,7 +7,7 @@ import { createWsHandlers, type WsRuntime } from "./handlers";
 function makeRuntime(): WsRuntime {
   const tableId = "table-1";
   const playerIds = ["user-a", "user-b"];
-  const meta = {
+  const meta: any = {
     code: "ABC123",
     gameId: "yatzy",
     config: { ruleset: "yatzy", tableId },
@@ -15,7 +15,7 @@ function makeRuntime(): WsRuntime {
     hostUserId: "user-a",
     seatUserIds: playerIds,
     softSeatCap: 4,
-  } satisfies any;
+  };
 
   let seq = 0;
   let state = yatzyModule.createInitialState(meta.config, playerIds);

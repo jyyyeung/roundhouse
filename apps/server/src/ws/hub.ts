@@ -4,7 +4,11 @@ import { WebSocket, type RawData } from "ws";
 
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
 import { createWsHandlers } from "./handlers";
-
+import { db } from "../db/client";
+import type { Database } from "../db/client";
+import { chatMessage, game, gameEvent } from "../db/schema";
+import { desc, eq } from "drizzle-orm";
+import { persistChatMessageToDb, appendGameEventToDb } from "./persistence";
 type Session = { user?: { id: string } } | null;
 type GetSession = (headers: Headers) => Promise<Session> | Session;
 type HubSocket = WebSocket & { tableId?: string; userId?: string };
@@ -19,13 +23,32 @@ export function createWsHub(opts: {
   const socketsByTable = new Map<string, Set<HubSocket>>();
   const userIdsByTable = new Map<string, Set<string>>();
 
+  // wire persistence hooks (real DB)
+  const persistence = {
+    persistChatMessage: (input: {
+      tableId: string;
+      userId: string;
+      text: string;
+      snapshot: unknown;
+      createdAt: Date;
+    }) => persistChatMessageToDb(db, input),
+    appendGameEvent: (input: {
+      tableId: string;
+      gameId?: string;
+      payload: unknown;
+      actorId: string;
+      createdAt: Date;
+    }) => appendGameEventToDb(db, input),
+  };
+
   const handlers = createWsHandlers({
     runtime: opts.runtime,
+    publishToTable,
     isDuplicateAction(tableId, actionId) {
       pruneExpiredActions(tableId);
       return actionIdsByTable.get(tableId)?.has(actionId) ?? false;
     },
-    publishToTable,
+    ...persistence,
     rememberAction(tableId, actionId) {
       pruneExpiredActions(tableId);
       let actionIds = actionIdsByTable.get(tableId);

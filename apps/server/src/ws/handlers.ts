@@ -38,7 +38,7 @@ export function createWsHandlers(deps: {
   const rateLimits = new Map<string, Map<string, number[]>>();
 
   return {
-    async onMessage(connection: WsConnection, message: ClientMessage) {
+    async onMessage(connection: WsConnection, message: any) {
       if (message.type === "intent") {
         if (isDuplicateAction(message.tableId, message.actionId)) {
           return;
@@ -59,10 +59,7 @@ export function createWsHandlers(deps: {
           // clear the reservation so retries can proceed.
           if (result.code === "illegal_action") {
             // use forgetAction provided by the hub to remove reservation
-            // (ensure it's present on deps)
-            if (typeof (deps as any).forgetAction === "function") {
-              (deps as any).forgetAction(message.tableId, message.actionId);
-            }
+            forgetAction(message.tableId, message.actionId);
           }
 
           connection.send(
@@ -135,9 +132,9 @@ export function createWsHandlers(deps: {
         // persist chat_message if hook provided
         const createdAt = new Date();
         let chatMessageId: string | undefined;
-        if (typeof (deps as any).persistChatMessage === "function") {
+        if (typeof deps.persistChatMessage === "function") {
           try {
-            const res = await (deps as any).persistChatMessage({
+            const res = await deps.persistChatMessage({
               tableId,
               userId,
               text,
@@ -151,9 +148,9 @@ export function createWsHandlers(deps: {
         }
 
         // if a game row exists (we have server state), append game_event chat_sent if hook available
-        if (snapshot && snapshot.state != null && typeof (deps as any).appendGameEvent === "function") {
+        if (snapshot && snapshot.state != null && typeof deps.appendGameEvent === "function") {
           try {
-            await (deps as any).appendGameEvent({
+            await deps.appendGameEvent({
               tableId,
               gameId: snapshot.meta.gameId,
               payload: { chatMessageId, text },
