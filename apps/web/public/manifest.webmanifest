@@ -1,0 +1,20 @@
+{
+  "name": "Yatzy",
+  "short_name": "Yatzy",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#FFF8E7",
+  "theme_color": "#E4572E",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
