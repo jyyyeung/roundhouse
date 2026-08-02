@@ -19,7 +19,9 @@ app.use(
   }),
 );
 
-app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+app.on(["POST", "GET", "OPTIONS"], "/api/auth/*", (c) =>
+  auth.handler(c.req.raw),
+);
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Server listening on http://localhost:${info.port}`);
