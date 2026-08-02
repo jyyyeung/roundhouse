@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
+import { ChatDiceChips } from "./ChatDiceChips";
 import { readChatSnapshot, type TableChatMessage } from "./model";
 
 type ChatPanelProps = {
@@ -73,22 +74,8 @@ export function ChatPanel(props: ChatPanelProps) {
                         {new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                       </time>
                     </div>
+                    {snapshot.dice.length > 0 ? <ChatDiceChips dice={snapshot.dice} holds={snapshot.holds} /> : null}
                     <p className="mt-2 text-sm leading-6 text-slate-700">{message.text}</p>
-                    {snapshot.dice.length > 0 ? (
-                      <div className="mt-3 rounded-2xl bg-white/80 px-3 py-2 text-xs text-slate-600">
-                        <p className="font-semibold uppercase tracking-[0.16em] text-[var(--color-coral)]">Snapshot</p>
-                        <p className="mt-1 font-display text-lg tracking-[0.24em] text-[var(--color-ink)]">{snapshot.dice.join("")}</p>
-                        <p className="mt-1">
-                          Holds:{" "}
-                          {snapshot.holds.length > 0
-                            ? snapshot.holds.map((held) => (held ? "H" : "-")).join("")
-                            : "-----"}
-                        </p>
-                        <p className="mt-1">
-                          {snapshot.rollsLeft === 1 ? "1 roll left" : `${snapshot.rollsLeft ?? 0} rolls left`}
-                        </p>
-                      </div>
-                    ) : null}
                   </article>
                 );
               })}
