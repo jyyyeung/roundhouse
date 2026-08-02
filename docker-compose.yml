@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-yatzy}
+      POSTGRES_USER: ${POSTGRES_USER:-yatzy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yatzy}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://yatzy:yatzy@db:5432/yatzy}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-to-a-32+char-secret-value}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3001}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:8080}
+      PORT: ${PORT:-3001}
+    command:
+      - /bin/sh
+      - -c
+      - pnpm --filter @yatzy/server db:migrate && pnpm --filter @yatzy/server exec tsx src/index.ts
+    ports:
+      - "3001:3001"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_started
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres-data:

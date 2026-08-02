@@ -43,6 +43,11 @@ export default defineConfig(({ mode }) => {
           target: apiUrl,
           changeOrigin: true,
         },
+        "/ws": {
+          target: apiUrl,
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
     test: {
