@@ -10,4 +10,25 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
 });
 
-export const env = envSchema.parse(process.env);
+type Env = z.infer<typeof envSchema>;
+
+let cachedEnv: Env | undefined;
+
+const loadEnv = () => {
+  cachedEnv ??= envSchema.parse(process.env);
+  return cachedEnv;
+};
+
+export const env = new Proxy({} as Env, {
+  get: (_target, prop) => loadEnv()[prop as keyof Env],
+  has: (_target, prop) => prop in loadEnv(),
+  ownKeys: () => Reflect.ownKeys(loadEnv()),
+  getOwnPropertyDescriptor: (_target, prop) => ({
+    configurable: true,
+    enumerable: true,
+    value: loadEnv()[prop as keyof Env],
+    writable: false,
+  }),
+}) as Env;
+
+export const getEnv = loadEnv;
