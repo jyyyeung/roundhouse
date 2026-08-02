@@ -31,4 +31,19 @@ describe("DiceTray", () => {
     expect(screen.getByRole("button", { name: /hold die 1/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /release die 2/i })).toHaveAttribute("aria-pressed", "true");
   });
+
+  it("caps die buttons so they do not stretch full column width", () => {
+    render(<DiceTray {...baseProps} />);
+
+    const die = screen.getByRole("button", { name: /hold die 1/i });
+    expect(die.className).toMatch(/size-12/);
+    expect(die.className).toMatch(/md:size-14/);
+    expect(die.className).not.toMatch(/aspect-square/);
+  });
+
+  it("centers the dice row", () => {
+    const { container } = render(<DiceTray {...baseProps} />);
+    const row = container.querySelector(".dice-row");
+    expect(row?.className).toMatch(/justify-center/);
+  });
 });

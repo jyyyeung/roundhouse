@@ -32,7 +32,7 @@ export function DiceTray(props: DiceTrayProps) {
         </motion.button>
       </div>
 
-      <div className="mt-4 grid grid-cols-5 gap-3">
+      <div className="dice-row mt-4 flex flex-wrap justify-center gap-3">
         {props.dice.map((value, index) => {
           const held = props.holds[index];
 
@@ -42,7 +42,7 @@ export function DiceTray(props: DiceTrayProps) {
               type="button"
               layout
               className={[
-                "aspect-square overflow-hidden rounded-[1.4rem] border p-1.5 shadow-sm transition",
+                "size-12 overflow-hidden rounded-[1.4rem] border p-1.5 shadow-sm transition md:size-14",
                 held
                   ? "border-[var(--color-teal-deep)] bg-[var(--color-teal)] text-[var(--color-ink)]"
                   : "border-slate-200 bg-white text-[var(--color-ink)]",
