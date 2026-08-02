@@ -1,5 +1,7 @@
 import { motion } from "motion/react";
 
+import { DieFace } from "./DieFace";
+
 type DiceTrayProps = {
   dice: number[];
   holds: boolean[];
@@ -10,8 +12,6 @@ type DiceTrayProps = {
   onToggleHold: (index: number) => void;
   onRoll: () => void;
 };
-
-const DIE_FACES = ["-", "I", "II", "III", "IV", "V", "VI"];
 
 export function DiceTray(props: DiceTrayProps) {
   return (
@@ -42,7 +42,7 @@ export function DiceTray(props: DiceTrayProps) {
               type="button"
               layout
               className={[
-                "aspect-square rounded-[1.4rem] border px-0 text-center font-display text-3xl shadow-sm transition",
+                "aspect-square overflow-hidden rounded-[1.4rem] border p-1.5 shadow-sm transition",
                 held
                   ? "border-[var(--color-teal-deep)] bg-[var(--color-teal)] text-[var(--color-ink)]"
                   : "border-slate-200 bg-white text-[var(--color-ink)]",
@@ -59,7 +59,7 @@ export function DiceTray(props: DiceTrayProps) {
               aria-pressed={held}
               aria-label={held ? `Release die ${index + 1}` : `Hold die ${index + 1}`}
             >
-              {DIE_FACES[value] ?? value}
+              <DieFace value={value} />
             </motion.button>
           );
         })}
