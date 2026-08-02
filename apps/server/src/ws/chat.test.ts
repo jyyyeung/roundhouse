@@ -1,6 +1,6 @@
 import type { Json, ServerMessage } from "@yatzy/game-core";
 import { yatzyModule } from "@yatzy/game-yatzy";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createWsHandlers, type WsRuntime } from "./handlers";
 
@@ -75,6 +75,54 @@ describe("ws chat", () => {
     expect(persisted.snapshot.state).toEqual(serverSnapshot?.state);
     // published a chat ServerMessage
     expect(published.some((m) => (m as any).type === "chat")).toBe(true);
+  });
+
+  it("rejects chat from unseated users", async () => {
+    const published: ServerMessage[] = [];
+    const sent: ServerMessage[] = [];
+    const persistChatMessage = vi.fn();
+    const appendGameEvent = vi.fn();
+    const handlers = createWsHandlers({
+      runtime: makeRuntime(),
+      isDuplicateAction: () => false,
+      rememberAction: () => {},
+      forgetAction: () => {},
+      publishToTable: (_tableId, message) => {
+        published.push(message);
+      },
+      persistChatMessage,
+      appendGameEvent,
+    });
+
+    await handlers.onMessage(
+      {
+        send(message) {
+          sent.push(message);
+        },
+        userId: "user-c",
+      },
+      {
+        actionId: "action-chat",
+        payload: { text: "hello" },
+        tableId: "table-1",
+        type: "chat",
+        v: 1,
+      } as any,
+    );
+
+    expect(sent).toEqual([
+      expect.objectContaining({
+        actionId: "action-chat",
+        code: "not_seated",
+        message: "not_seated",
+        tableId: "table-1",
+        type: "error",
+        v: 1,
+      }),
+    ]);
+    expect(published).toEqual([]);
+    expect(persistChatMessage).not.toHaveBeenCalled();
+    expect(appendGameEvent).not.toHaveBeenCalled();
   });
 });
 

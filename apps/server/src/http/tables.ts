@@ -12,6 +12,9 @@ const createTableBodySchema = z.object({
   config: z.unknown(),
   softSeatCap: z.number().int().positive().optional(),
 });
+const yatzyConfigSchema = z.object({
+  ruleset: z.enum(["yatzy", "yahtzee"]),
+});
 
 const joinBodySchema = z.object({
   code: z.string().min(1),
@@ -27,6 +30,17 @@ function toTablesError(error: unknown) {
     return new TablesError("unknown_game", error.message);
   }
   return null;
+}
+
+function parseCreateTableBody(input: unknown) {
+  const body = createTableBodySchema.parse(input);
+  if (body.gameId === "yatzy") {
+    return {
+      ...body,
+      config: yatzyConfigSchema.parse(body.config),
+    };
+  }
+  return body;
 }
 
 async function requireSession(getSession: (headers: Headers) => Promise<Session> | Session, headers: Headers) {
@@ -47,6 +61,18 @@ export function createTablesRouter(opts: {
   const app = new Hono();
 
   const handleError = (error: unknown) => {
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({
+          code: "invalid_request",
+          message: error.issues[0]?.message ?? "invalid_request",
+        }),
+        {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    }
     const tableError = toTablesError(error);
     if (tableError) {
       return new Response(
@@ -64,7 +90,7 @@ export function createTablesRouter(opts: {
   app.post("/", async (c) => {
     try {
       const userId = await requireSession(getSession, c.req.raw.headers);
-      const body = createTableBodySchema.parse(await c.req.json());
+      const body = parseCreateTableBody(await c.req.json());
       const result = await runtime.createTable({
         userId,
         gameId: body.gameId,

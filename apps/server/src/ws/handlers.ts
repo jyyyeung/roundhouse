@@ -92,6 +92,31 @@ export function createWsHandlers(deps: {
         const actionId = message.actionId;
         const tableId = message.tableId!;
         const userId = connection.userId;
+        const snapshot = await runtime.getTableSnapshot({ tableId });
+
+        if (!snapshot) {
+          connection.send(
+            errorMessage({
+              actionId,
+              code: "table_missing",
+              message: "table_missing",
+              tableId,
+            }),
+          );
+          return;
+        }
+
+        if (!snapshot.meta.seatUserIds.includes(userId)) {
+          connection.send(
+            errorMessage({
+              actionId,
+              code: "not_seated",
+              message: "not_seated",
+              tableId,
+            }),
+          );
+          return;
+        }
 
         // rate-limit: ~5 msg / 10s / user / table
         const now = Date.now();
@@ -122,12 +147,12 @@ export function createWsHandlers(deps: {
         const rawText = (message.payload && (message.payload as any).text) || "";
         const text = String(rawText).slice(0, 500);
 
-        // build snapshot from server (ignore any client-supplied dice)
-        const snapshot = await runtime.getTableSnapshot({ tableId });
-        const storedSnapshot = snapshot
-          ? { tableId: snapshot.tableId, seq: snapshot.seq, state: snapshot.state, meta: snapshot.meta }
-          : // fallback if no table/game found
-            { gameId: (message.payload as any)?.gameId ?? null, phase: "lobby" };
+        const storedSnapshot = {
+          tableId: snapshot.tableId,
+          seq: snapshot.seq,
+          state: snapshot.state,
+          meta: snapshot.meta,
+        };
 
         // persist chat_message if hook provided
         const createdAt = new Date();
@@ -148,7 +173,7 @@ export function createWsHandlers(deps: {
         }
 
         // if a game row exists (we have server state), append game_event chat_sent if hook available
-        if (snapshot && snapshot.state != null && typeof deps.appendGameEvent === "function") {
+        if (snapshot.state != null && typeof deps.appendGameEvent === "function") {
           try {
             await deps.appendGameEvent({
               tableId,

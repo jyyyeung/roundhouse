@@ -14,18 +14,23 @@ function emptySheet(ruleset: Ruleset) {
   };
 }
 
+function normalizeRuleset(value: unknown): Ruleset {
+  return value === "yahtzee" ? "yahtzee" : "yatzy";
+}
+
 function createInitialState(config: Json, playerIds: string[]) {
   const { ruleset = "yatzy", tableId = "yatzy" } = (config as { ruleset?: Ruleset; tableId?: string }) ?? {};
+  const normalizedRuleset = normalizeRuleset(ruleset);
 
   return {
     tableId,
-    ruleset: ruleset as Ruleset,
+    ruleset: normalizedRuleset,
     playerIds,
     currentPlayerIndex: 0,
     rollsLeft: 3,
     dice: [0, 0, 0, 0, 0],
     holds: [false, false, false, false, false],
-    sheets: Object.fromEntries(playerIds.map((playerId) => [playerId, emptySheet(ruleset)])),
+    sheets: Object.fromEntries(playerIds.map((playerId) => [playerId, emptySheet(normalizedRuleset)])),
     phase: "playing" as const,
     winnerIds: [],
   } satisfies YatzyState;

@@ -131,6 +131,32 @@ describe("reduce", () => {
     });
   });
 
+  it("rejects invalid holds payloads", () => {
+    const shortHolds = reduce(
+      baseState({ rollsLeft: 2 }),
+      { type: "set_holds", payload: { holds: [true, false] } },
+      {
+        actorId: "p1",
+        now: () => new Date("2026-08-02T00:00:00.000Z"),
+        playerIds: ["p1", "p2"],
+        randomInt: vi.fn(),
+      }
+    );
+    const wrongTypeHolds = reduce(
+      baseState({ rollsLeft: 2 }),
+      { type: "set_holds", payload: { holds: [true, false, true, false, "x"] } },
+      {
+        actorId: "p1",
+        now: () => new Date("2026-08-02T00:00:00.000Z"),
+        playerIds: ["p1", "p2"],
+        randomInt: vi.fn(),
+      }
+    );
+
+    expect(shortHolds).toEqual({ ok: false, error: "illegal_holds" });
+    expect(wrongTypeHolds).toEqual({ ok: false, error: "illegal_holds" });
+  });
+
   it("rejects score before any roll", () => {
     const result = reduce(
       baseState(),

@@ -142,6 +142,16 @@ export function createWsHub(opts: {
       });
       return;
     }
+    if (!socket.userId || !snapshot.meta.seatUserIds.includes(socket.userId)) {
+      send(socket, {
+        code: "not_seated",
+        message: "not_seated",
+        tableId,
+        type: "error",
+        v: 1,
+      });
+      return;
+    }
 
     const previousTableId = socket.tableId;
     if (previousTableId && previousTableId !== tableId) {

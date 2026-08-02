@@ -75,6 +75,10 @@ function fail(error: string): ReduceResult {
   return { ok: false, error };
 }
 
+function isValidHolds(value: unknown): value is boolean[] {
+  return Array.isArray(value) && value.length === 5 && value.every((item) => typeof item === "boolean");
+}
+
 function isPlayerTurn(state: YatzyState, ctx: ReduceContext) {
   return ctx.actorId === currentPlayerId(state);
 }
@@ -157,7 +161,10 @@ export function reduce(state: unknown, intent: { type: string; payload: unknown 
   }
 
   if (intent.type === "set_holds") {
-    const holds = (intent.payload as { holds: boolean[] }).holds;
+    const holds = (intent.payload as { holds?: unknown }).holds;
+    if (!isValidHolds(holds)) {
+      return fail("illegal_holds");
+    }
 
     return success(
       {

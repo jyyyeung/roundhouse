@@ -59,4 +59,18 @@ describe("tables http api", () => {
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({ code: "table_full" });
   });
+
+  it("rejects invalid yatzy config when creating a table", async () => {
+    const runtime = makeRuntime();
+
+    const res = await makeApp(runtime).request("/api/tables", {
+      method: "POST",
+      body: JSON.stringify({ gameId: "yatzy", config: { ruleset: "poker" } }),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ code: "invalid_request" });
+    expect(runtime.createTable).not.toHaveBeenCalled();
+  });
 });

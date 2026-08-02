@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TablePage } from "./table";
 import { connectTableWs } from "../lib/ws";
-import { joinTable, startTable } from "../lib/tables";
+import { getRecentTables, joinTable, startTable } from "../lib/tables";
 
 vi.mock("../lib/ws", () => ({
   connectTableWs: vi.fn(),
@@ -16,6 +16,7 @@ vi.mock("../lib/tables", async () => {
   const actual = await vi.importActual<typeof import("../lib/tables")>("../lib/tables");
   return {
     ...actual,
+    getRecentTables: vi.fn(),
     joinTable: vi.fn(),
     startTable: vi.fn(),
     rematchTable: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("../lib/tables", async () => {
 });
 
 const mockedConnectTableWs = vi.mocked(connectTableWs);
+const mockedGetRecentTables = vi.mocked(getRecentTables);
 const mockedJoinTable = vi.mocked(joinTable);
 const mockedStartTable = vi.mocked(startTable);
 
@@ -68,6 +70,7 @@ describe("TablePage", () => {
     onMessage = undefined;
     send.mockReset();
     close.mockReset();
+    mockedGetRecentTables.mockResolvedValue([]);
     mockedJoinTable.mockResolvedValue({ tableId: "table-123" });
     mockedStartTable.mockResolvedValue({ tableId: "table-123", gameRowId: "game-1" });
     mockedConnectTableWs.mockImplementation((opts) => {
@@ -245,5 +248,38 @@ describe("TablePage", () => {
     expect(await screen.findByText("Nice roll")).toBeInTheDocument();
     expect(screen.getByText(/66642/i)).toBeInTheDocument();
     expect(screen.getByText(/1 roll left/i)).toBeInTheDocument();
+  });
+
+  it("does not open websocket when invite join fails", async () => {
+    mockedJoinTable.mockRejectedValue(new Error("unknown_table"));
+
+    renderTablePage({ user: { id: "user-a", name: "Alice" } }, "/t/table-123?code=abcd23");
+
+    await waitFor(() => expect(mockedJoinTable).toHaveBeenCalledWith({ code: "ABCD23" }));
+    await waitFor(() => expect(mockedConnectTableWs).not.toHaveBeenCalled());
+    expect(await screen.findByText("unknown_table")).toBeInTheDocument();
+  });
+
+  it("opens websocket after a harmless join failure when the user is already seated", async () => {
+    mockedJoinTable.mockRejectedValue(new Error("table_closed"));
+    mockedGetRecentTables.mockResolvedValue([
+      {
+        id: "table-123",
+        code: "ABCD23",
+        gameId: "yatzy",
+        config: { ruleset: "yatzy" },
+        status: "active",
+        hostUserId: "user-a",
+        softSeatCap: 4,
+        createdAt: "2026-08-02T08:00:00.000Z",
+        seatUserIds: ["user-a", "user-b"],
+      },
+    ]);
+
+    renderTablePage({ user: { id: "user-a", name: "Alice" } }, "/t/table-123?code=abcd23");
+
+    await waitFor(() => expect(mockedJoinTable).toHaveBeenCalledWith({ code: "ABCD23" }));
+    await waitFor(() => expect(mockedGetRecentTables).toHaveBeenCalled());
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
   });
 });

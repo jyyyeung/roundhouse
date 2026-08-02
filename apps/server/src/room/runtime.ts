@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { ClientIntent, EventEnvelope, Json, TableMeta } from "@yatzy/game-core";
 import { generateInviteCode } from "@yatzy/game-core";
 
@@ -9,7 +9,7 @@ import { getModule } from "../modules/registry";
 type TableRow = typeof gameTable.$inferSelect;
 type GameRow = typeof game.$inferSelect;
 type SeatRow = typeof tablePlayer.$inferSelect;
-type DbLike = Pick<Database, "select" | "insert" | "update" | "transaction">;
+type DbLike = Pick<Database, "select" | "insert" | "update" | "transaction" | "execute">;
 
 export class TablesError extends Error {
   constructor(
@@ -103,14 +103,16 @@ async function loadTableByCode(db: DbLike, code: string) {
   return loadTableById(db, row.id);
 }
 
-async function loadCurrentGame(db: DbLike, tableId: string) {
-  const [row] = await db
-    .select()
-    .from(game)
-    .where(eq(game.tableId, tableId))
-    .orderBy(desc(game.createdAt), desc(game.id))
-    .limit(1);
-  return row ?? null;
+async function lockTableById(db: DbLike, tableId: string) {
+  await db.execute(sql`select ${gameTable.id} from ${gameTable} where ${gameTable.id} = ${tableId} for update`);
+}
+
+async function lockTableByCode(db: DbLike, code: string) {
+  await db.execute(sql`select ${gameTable.id} from ${gameTable} where ${gameTable.code} = ${code} for update`);
+}
+
+function isUniqueViolation(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "23505";
 }
 
 function resolveTableStatus(table: TableSummary, currentGame: GameRow | null) {
@@ -209,6 +211,7 @@ export function createRoomRuntime(db: Database): TablesRuntime {
 
     async joinTable({ userId, code }) {
       return db.transaction(async (tx) => {
+        await lockTableByCode(tx, code);
         const table = await loadTableByCode(tx, code);
         if (!table) throw new TablesError("unknown_table", "unknown_table", 404);
         if (table.status !== "lobby") throw new TablesError("table_closed", "table_closed");
@@ -217,11 +220,23 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           throw new TablesError("table_full", "table_full");
         }
 
-        await tx.insert(tablePlayer).values({
-          tableId: table.id,
-          userId,
-          seatIndex: table.seatUserIds.length,
-        });
+        try {
+          await tx.insert(tablePlayer).values({
+            tableId: table.id,
+            userId,
+            seatIndex: table.seatUserIds.length,
+          });
+        } catch (error) {
+          if (!isUniqueViolation(error)) {
+            throw error;
+          }
+
+          const refreshedTable = await loadTableById(tx, table.id);
+          if (refreshedTable?.seatUserIds.includes(userId)) {
+            return { tableId: table.id };
+          }
+          throw new TablesError("table_full", "table_full");
+        }
 
         return { tableId: table.id };
       });
@@ -229,9 +244,13 @@ export function createRoomRuntime(db: Database): TablesRuntime {
 
     async startTable({ userId, tableId }) {
       return db.transaction(async (tx) => {
+        await lockTableById(tx, tableId);
         const table = await loadTableById(tx, tableId);
         if (!table) throw new TablesError("table_missing", "table_missing", 404);
         if (table.hostUserId !== userId) throw new TablesError("not_host", "not_host", 403);
+        if (table.currentGame?.status === "active") {
+          return { tableId, gameRowId: table.currentGame.id };
+        }
         if (table.status !== "lobby") throw new TablesError("table_not_lobby", "table_not_lobby");
         if (table.seatUserIds.length < 2) throw new TablesError("not_enough_players", "not_enough_players");
 
@@ -272,12 +291,14 @@ export function createRoomRuntime(db: Database): TablesRuntime {
 
     async rematchTable({ userId, tableId }) {
       return db.transaction(async (tx) => {
+        await lockTableById(tx, tableId);
         const table = await loadTableById(tx, tableId);
         if (!table) throw new TablesError("table_missing", "table_missing", 404);
         if (!table.seatUserIds.includes(userId)) throw new TablesError("not_a_player", "not_a_player", 403);
-
-        const currentGame = await loadCurrentGame(tx, tableId);
-        if (!currentGame || currentGame.status !== "finished") {
+        if (table.currentGame?.status === "active") {
+          return { tableId, gameRowId: table.currentGame.id };
+        }
+        if (!table.currentGame || resolveTableStatus(table, table.currentGame) !== "finished") {
           throw new TablesError("rematch_unavailable", "rematch_unavailable");
         }
 

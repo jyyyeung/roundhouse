@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { renderGameView } from "../games/registry";
 import type { TableChatMessage } from "../games/yatzy/model";
-import { rematchTable, joinTable, normalizeJoinCode, startTable } from "../lib/tables";
+import { getRecentTables, rematchTable, joinTable, normalizeJoinCode, startTable } from "../lib/tables";
 import { connectTableWs } from "../lib/ws";
 
 type SessionLike = {
@@ -21,6 +21,11 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
   return "Something went sideways. Try again.";
+}
+
+async function isUserSeated(tableId: string, userId: string) {
+  const tables = await getRecentTables();
+  return tables.some((table) => table.id === tableId && table.seatUserIds.includes(userId));
 }
 
 function normalizeChatMessage(message: ServerMessage) {
@@ -110,18 +115,26 @@ export function TablePage({ session }: { session: SessionLike }) {
     let disposed = false;
 
     async function connect() {
+      let shouldConnect = true;
+
       if (code) {
         try {
           await joinTable({ code: normalizeJoinCode(code) });
         } catch (caughtError) {
           const message = getErrorMessage(caughtError);
-          if (message !== "table_closed") {
+          const seated = currentUserId ? await isUserSeated(tableId, currentUserId) : false;
+          if (!seated) {
+            shouldConnect = false;
             setError(message);
           }
         }
       }
 
       if (disposed) return;
+      if (!shouldConnect) {
+        setLoading(false);
+        return;
+      }
 
       const connection = connectTableWs({
         apiUrl,
@@ -189,7 +202,7 @@ export function TablePage({ session }: { session: SessionLike }) {
       connectionRef.current?.close();
       connectionRef.current = null;
     };
-  }, [apiUrl, code, tableId]);
+  }, [apiUrl, code, currentUserId, tableId]);
 
   async function handleStart() {
     setBusyAction("start");
