@@ -323,8 +323,8 @@ function baseState(overrides: Partial<YatzyState> = {}): YatzyState {
         sixes: null,
         one_pair: null,
         two_pairs: null,
-        three_alike: null,
-        four_alike: null,
+        three_kind: null,
+        four_kind: null,
         small_straight: null,
         large_straight: null,
         full_house: null,
@@ -341,8 +341,8 @@ function baseState(overrides: Partial<YatzyState> = {}): YatzyState {
         sixes: null,
         one_pair: null,
         two_pairs: null,
-        three_alike: null,
-        four_alike: null,
+        three_kind: null,
+        four_kind: null,
         small_straight: null,
         large_straight: null,
         full_house: null,
@@ -413,7 +413,7 @@ describe("ScoreSheet", () => {
 });
 ```
 
-If category keys differ from the fixture (check `@yatzy/game-yatzy` `yatzyCategories`), align the sheet keys to that list — every category key must exist as `null` or a number.
+If the sheet shape needs `as YatzyState` because of index signatures, cast the fixture once at return — do not invent alternate category key names.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -522,4 +522,4 @@ Otherwise no commit — Tasks 1–3 already committed.
 - No TBD/placeholder steps.
 - `DieFace` / `DiceTray` / `ScoreSheet` prop names consistent across tasks.
 - Em dash character is `—` everywhere in tests and implementation.
-- Category fixture keys must match `yatzyCategories` from `@yatzy/game-yatzy` at implementation time — adjust if names differ (e.g. `three_of_a_kind` vs `three_alike`).
+- Category fixture keys match `yatzyCategories` (`three_kind` / `four_kind`, not alike/of-a-kind aliases).
