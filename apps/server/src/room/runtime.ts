@@ -244,7 +244,10 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           }
           throw error;
         }
-        const state = module.createInitialState(table.config as Json, table.seatUserIds);
+        const state = module.createInitialState(
+          { ...(table.config as object), tableId: table.id } as Json,
+          table.seatUserIds,
+        );
         const gameRowId = crypto.randomUUID();
         const createdAt = new Date();
 
@@ -287,7 +290,10 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           }
           throw error;
         }
-        const state = module.createInitialState(table.config as Json, table.seatUserIds);
+        const state = module.createInitialState(
+          { ...(table.config as object), tableId: table.id } as Json,
+          table.seatUserIds,
+        );
         const gameRowId = crypto.randomUUID();
         const createdAt = new Date();
 

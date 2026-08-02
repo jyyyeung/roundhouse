@@ -40,3 +40,9 @@ Passed:
 
 - Not verified here: websocket subscribe/play/chat, full live game completion, rematch, or PWA install/Add to Home Screen. Those still need browser-based acceptance.
 - Observed: `currentGame.state.tableId` falls back to `"yatzy"` instead of the concrete table UUID in both rulesets. The enclosing `currentGame.tableId` is correct, so the HTTP MVP path still passed, but this is worth checking before the browser/WS pass.
+
+### Fix (post-report)
+
+- `startTable` / `rematchTable` now pass `{ ...config, tableId: table.id }` into `createInitialState`.
+- Server typecheck + vitest: pass.
+- Commit: `fix(server): pass real tableId into game initial state`
