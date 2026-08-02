@@ -250,8 +250,9 @@ describe("TablePage", () => {
     await user.click(screen.getByRole("button", { name: /chat/i }));
 
     expect(await screen.findByText("Nice roll")).toBeInTheDocument();
-    expect(screen.getByText(/66642/i)).toBeInTheDocument();
-    expect(screen.getByText(/1 roll left/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Dice 6, 6, 6, 4, 2; held 1, 2, 3")).toBeInTheDocument();
+    expect(screen.queryByText(/1 roll left/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Snapshot/i)).not.toBeInTheDocument();
   });
 
   it("does not open websocket when invite join fails", async () => {
