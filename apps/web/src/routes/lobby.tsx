@@ -93,7 +93,7 @@ export function LobbyPage({ session }: { session: SessionLike }) {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-6">
+    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-6 md:max-w-5xl md:px-6">
       <header className="rounded-[2rem] bg-[linear-gradient(135deg,var(--color-coral),var(--color-mango))] p-6 text-white shadow-[0_20px_50px_rgba(238,108,77,0.35)]">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -114,67 +114,69 @@ export function LobbyPage({ session }: { session: SessionLike }) {
         </div>
       </header>
 
-      <section className="mt-5 rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Create table</p>
-        <label className="mt-4 block">
-          <span className="mb-2 block text-sm font-semibold text-slate-700">Ruleset</span>
-          <select
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-[var(--color-ink)]"
-            value={ruleset}
-            onChange={(event) => setRuleset(event.target.value as Ruleset)}
-          >
-            <option value="yatzy">Yatzy</option>
-            <option value="yahtzee">Yahtzee</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          className="mt-4 w-full rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)] shadow-[0_14px_30px_rgba(42,157,143,0.24)] disabled:cursor-wait disabled:opacity-70"
-          onClick={handleCreate}
-          disabled={busyAction === "create"}
-        >
-          {busyAction === "create" ? "Setting the table..." : "Create Yatzy table"}
-        </button>
-
-        {createdTable ? (
-          <div className="mt-4 rounded-3xl bg-[var(--color-cream)] p-4">
-            <p className="text-sm font-semibold text-[var(--color-ink)]">Invite link</p>
-            <p className="mt-2 break-all text-sm text-slate-600">
-              {buildShareUrl({ webBaseUrl, tableId: createdTable.tableId, code: createdTable.code })}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">Code: {createdTable.code}</p>
-            <button
-              type="button"
-              className="mt-4 rounded-2xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)]"
-              onClick={() => navigate(`/t/${createdTable.tableId}?code=${createdTable.code}`)}
+      <div className="lobby-actions mt-5 grid gap-5 md:grid-cols-2 md:items-stretch">
+        <section className="flex h-full flex-col rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Create table</p>
+          <label className="mt-4 block">
+            <span className="mb-2 block text-sm font-semibold text-slate-700">Ruleset</span>
+            <select
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-[var(--color-ink)]"
+              value={ruleset}
+              onChange={(event) => setRuleset(event.target.value as Ruleset)}
             >
-              Open table
-            </button>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="mt-5 rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Join by code</p>
-        <form className="mt-4 space-y-4" onSubmit={handleJoin}>
-          <input
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center font-display text-3xl uppercase tracking-[0.3em] text-[var(--color-ink)]"
-            value={joinCode}
-            onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
-            placeholder="ABC123"
-            inputMode="text"
-            autoCapitalize="characters"
-            required
-          />
+              <option value="yatzy">Yatzy</option>
+              <option value="yahtzee">Yahtzee</option>
+            </select>
+          </label>
           <button
-            type="submit"
-            className="w-full rounded-2xl bg-[var(--color-ink)] px-4 py-3 font-semibold text-white disabled:cursor-wait disabled:opacity-70"
-            disabled={busyAction === "join"}
+            type="button"
+            className="mt-auto w-full rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)] shadow-[0_14px_30px_rgba(42,157,143,0.24)] disabled:cursor-wait disabled:opacity-70"
+            onClick={handleCreate}
+            disabled={busyAction === "create"}
           >
-            {busyAction === "join" ? "Joining..." : "Join table"}
+            {busyAction === "create" ? "Setting the table..." : "Create Yatzy table"}
           </button>
-        </form>
-      </section>
+
+          {createdTable ? (
+            <div className="mt-4 rounded-3xl bg-[var(--color-cream)] p-4">
+              <p className="text-sm font-semibold text-[var(--color-ink)]">Invite link</p>
+              <p className="mt-2 break-all text-sm text-slate-600">
+                {buildShareUrl({ webBaseUrl, tableId: createdTable.tableId, code: createdTable.code })}
+              </p>
+              <p className="mt-2 text-sm text-slate-500">Code: {createdTable.code}</p>
+              <button
+                type="button"
+                className="mt-4 rounded-2xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)]"
+                onClick={() => navigate(`/t/${createdTable.tableId}?code=${createdTable.code}`)}
+              >
+                Open table
+              </button>
+            </div>
+          ) : null}
+        </section>
+
+        <section className="flex h-full flex-col rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Join by code</p>
+          <form className="mt-4 flex flex-1 flex-col space-y-4" onSubmit={handleJoin}>
+            <input
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center font-display text-3xl uppercase tracking-[0.3em] text-[var(--color-ink)]"
+              value={joinCode}
+              onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+              placeholder="ABC123"
+              inputMode="text"
+              autoCapitalize="characters"
+              required
+            />
+            <button
+              type="submit"
+              className="mt-auto w-full rounded-2xl bg-[var(--color-ink)] px-4 py-3 font-semibold text-white disabled:cursor-wait disabled:opacity-70"
+              disabled={busyAction === "join"}
+            >
+              {busyAction === "join" ? "Joining..." : "Join table"}
+            </button>
+          </form>
+        </section>
+      </div>
 
       <section className="mt-5 rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
         <div className="flex items-center justify-between gap-3">
