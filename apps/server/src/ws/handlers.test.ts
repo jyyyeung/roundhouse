@@ -71,6 +71,7 @@ describe("ws handlers", () => {
       runtime,
       isDuplicateAction: () => false,
       rememberAction: () => {},
+      forgetAction: () => {},
       publishToTable: (_tableId, message) => {
         published.push(message);
       },
@@ -107,5 +108,128 @@ describe("ws handlers", () => {
 
     const snapshot = await runtime.getTableSnapshot({ tableId: "table-1" });
     expect(snapshot?.seq).toBe(0);
+  });
+
+  it("dedupes second identical actionId when reserved", async () => {
+    const sent: ServerMessage[] = [];
+    const published: ServerMessage[] = [];
+    const runtimeBase = makeRuntime();
+    let applyCalls = 0;
+    const runtime: WsRuntime = {
+      ...runtimeBase,
+      async applyGameIntent(input) {
+        applyCalls++;
+        return await runtimeBase.applyGameIntent(input);
+      },
+    };
+
+    const actionIds = new Set<string>();
+    const handlers = createWsHandlers({
+      runtime,
+      isDuplicateAction: (_tableId, actionId) => actionIds.has(actionId),
+      rememberAction: (_tableId, actionId) => actionIds.add(actionId),
+      forgetAction: (_tableId, actionId) => actionIds.delete(actionId),
+      publishToTable: (_tableId, message) => {
+        published.push(message);
+      },
+    });
+
+    await handlers.onMessage(
+      {
+        send(message) {
+          sent.push(message);
+        },
+        userId: "user-a",
+      },
+      {
+        actionId: "action-dup",
+        intentType: "roll",
+        payload: {} satisfies Json,
+        tableId: "table-1",
+        type: "intent",
+        v: 1,
+      },
+    );
+
+    // second identical message should be ignored (deduped)
+    await handlers.onMessage(
+      {
+        send() {},
+        userId: "user-a",
+      },
+      {
+        actionId: "action-dup",
+        intentType: "roll",
+        payload: {} satisfies Json,
+        tableId: "table-1",
+        type: "intent",
+        v: 1,
+      },
+    );
+
+    expect(applyCalls).toBe(1);
+  });
+
+  it("clears reservation on illegal_action so retry can proceed", async () => {
+    const sent: ServerMessage[] = [];
+    const published: ServerMessage[] = [];
+    const runtimeBase = makeRuntime();
+    let calls = 0;
+    const runtime: WsRuntime = {
+      ...runtimeBase,
+      async applyGameIntent(input) {
+        calls++;
+        if (calls === 1) {
+          return { ok: false, code: "illegal_action", message: "not_your_turn", seq: 0 };
+        }
+        return await runtimeBase.applyGameIntent(input);
+      },
+    };
+
+    const actionIds = new Set<string>();
+    const handlers = createWsHandlers({
+      runtime,
+      isDuplicateAction: (_tableId, actionId) => actionIds.has(actionId),
+      rememberAction: (_tableId, actionId) => actionIds.add(actionId),
+      forgetAction: (_tableId, actionId) => actionIds.delete(actionId),
+      publishToTable: (_tableId, message) => {
+        published.push(message);
+      },
+    });
+
+    await handlers.onMessage(
+      {
+        send(message) {
+          sent.push(message);
+        },
+        userId: "user-b",
+      },
+      {
+        actionId: "action-retry",
+        intentType: "roll",
+        payload: {} satisfies Json,
+        tableId: "table-1",
+        type: "intent",
+        v: 1,
+      },
+    );
+
+    // after illegal_action the reservation should be cleared; retry should call apply again
+    await handlers.onMessage(
+      {
+        send() {},
+        userId: "user-b",
+      },
+      {
+        actionId: "action-retry",
+        intentType: "roll",
+        payload: {} satisfies Json,
+        tableId: "table-1",
+        type: "intent",
+        v: 1,
+      },
+    );
+
+    expect(calls).toBe(2);
   });
 });

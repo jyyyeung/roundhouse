@@ -10,3 +10,5 @@ Tests:
 Concerns:
 - no manual two-browser smoke was run in this task
 - subscribe/auth/presence flow is wired but only the illegal-action path is covered by automated tests so far
+Changes:
+- reserved actionId before applying intents; clear reservation on illegal_action so retries are allowed

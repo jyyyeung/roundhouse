@@ -35,6 +35,14 @@ export function createWsHub(opts: {
       }
       actionIds.set(actionId, Date.now() + ACTION_TTL_MS);
     },
+    forgetAction(tableId, actionId) {
+      const actionIds = actionIdsByTable.get(tableId);
+      if (!actionIds) return;
+      actionIds.delete(actionId);
+      if (actionIds.size === 0) {
+        actionIdsByTable.delete(tableId);
+      }
+    },
   });
 
   return {

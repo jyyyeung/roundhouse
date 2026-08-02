@@ -15,8 +15,9 @@ export function createWsHandlers(deps: {
   publishToTable: (tableId: string, message: ServerMessage) => void;
   isDuplicateAction: (tableId: string, actionId: string) => boolean;
   rememberAction: (tableId: string, actionId: string) => void;
+  forgetAction: (tableId: string, actionId: string) => void;
 }) {
-  const { isDuplicateAction, publishToTable, rememberAction, runtime } = deps;
+  const { isDuplicateAction, publishToTable, rememberAction, forgetAction, runtime } = deps;
 
   return {
     async onMessage(connection: WsConnection, message: ClientMessage) {
@@ -25,6 +26,10 @@ export function createWsHandlers(deps: {
           return;
         }
 
+        // Reserve the actionId immediately to avoid races where two identical
+        // intents are applied concurrently.
+        rememberAction(message.tableId, message.actionId);
+
         const result = await runtime.applyGameIntent({
           intent: intentFromClientMessage(message),
           tableId: message.tableId,
@@ -32,6 +37,16 @@ export function createWsHandlers(deps: {
         });
 
         if (!result.ok) {
+          // If the apply failed with a non-idempotent error (illegal_action),
+          // clear the reservation so retries can proceed.
+          if (result.code === "illegal_action") {
+            // use forgetAction provided by the hub to remove reservation
+            // (ensure it's present on deps)
+            if (typeof (deps as any).forgetAction === "function") {
+              (deps as any).forgetAction(message.tableId, message.actionId);
+            }
+          }
+
           connection.send(
             errorMessage({
               actionId: message.actionId,
@@ -43,7 +58,7 @@ export function createWsHandlers(deps: {
           return;
         }
 
-        rememberAction(message.tableId, message.actionId);
+        // Successful apply keeps the reservation (TTL managed by hub).
         broadcastEvents(message.tableId, result, publishToTable);
         if (result.finished) {
           publishToTable(message.tableId, {
