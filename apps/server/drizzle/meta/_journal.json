@@ -8,6 +8,13 @@
       "when": 1785655631965,
       "tag": "0000_fresh_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785655774574,
+      "tag": "0001_flippant_lilandra",
+      "breakpoints": true
     }
   ]
 }
