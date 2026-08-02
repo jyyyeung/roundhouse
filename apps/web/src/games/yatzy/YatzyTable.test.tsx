@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { TableMeta } from "@yatzy/game-core";
@@ -101,19 +101,22 @@ describe("YatzyTable", () => {
   it("starts with a collapsed mobile status strip and expands on toggle", async () => {
     const user = userEvent.setup();
     render(<YatzyTable {...defaultProps} />);
+    const details = screen.getByTestId("status-details");
 
-    expect(screen.queryByText(/your turn\. roll, hold/i)).not.toBeInTheDocument();
+    expect(details.className).toBe("hidden md:block");
+    expect(within(details).getByText(/your turn\. roll, hold/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /expand status/i }));
-    expect(screen.getByText(/your turn\. roll, hold/i)).toBeInTheDocument();
+    expect(details.className).toBe("block md:block");
 
     await user.click(screen.getByRole("button", { name: /collapse status/i }));
-    expect(screen.queryByText(/your turn\. roll, hold/i)).not.toBeInTheDocument();
+    expect(details.className).toBe("hidden md:block");
   });
 
   it("keeps desktop status details visible without requiring expand", () => {
     render(<YatzyTable {...defaultProps} />);
     const details = screen.getByTestId("status-details");
     expect(details.className).toMatch(/md:block/);
+    expect(within(details).getByText(/your turn\. roll, hold/i)).toBeInTheDocument();
   });
 });

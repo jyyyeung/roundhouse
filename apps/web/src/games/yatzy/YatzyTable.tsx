@@ -45,11 +45,6 @@ export function YatzyTable(props: YatzyTableProps) {
       : isCurrentPlayer
         ? "Your turn. Roll, hold, then lock in a category."
         : "Watch the dice, then pounce when your turn swings back.";
-  const showStatusDetails =
-    statusExpanded ||
-    (typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(min-width: 768px)").matches);
 
   return (
     <>
@@ -82,30 +77,26 @@ export function YatzyTable(props: YatzyTableProps) {
             </div>
 
             <div data-testid="status-details" className={[statusExpanded ? "block" : "hidden", "md:block"].join(" ")}>
-              {showStatusDetails ? (
-                <>
-                  <p className="mt-3 text-sm text-white/85">{statusHelper}</p>
-                  <div className="mt-4 flex flex-wrap gap-3 md:mt-5">
-                    {props.meta.seatUserIds.map((playerId) => {
-                      const online = props.onlineUserIds.includes(playerId);
-                      const active = playerId === currentPlayerId;
+              <p className="mt-3 text-sm text-white/85">{statusHelper}</p>
+              <div className="mt-4 flex flex-wrap gap-3 md:mt-5">
+                {props.meta.seatUserIds.map((playerId) => {
+                  const online = props.onlineUserIds.includes(playerId);
+                  const active = playerId === currentPlayerId;
 
-                      return (
-                        <div
-                          key={playerId}
-                          className={[
-                            "rounded-full px-4 py-2 text-sm font-semibold",
-                            active ? "bg-white text-[var(--color-ink)]" : "bg-white/15 text-white",
-                          ].join(" ")}
-                        >
-                          <span className={online ? "text-[var(--color-teal)]" : "text-white/40"}>●</span>{" "}
-                          {playerLabels[playerId] ?? playerId}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : null}
+                  return (
+                    <div
+                      key={playerId}
+                      className={[
+                        "rounded-full px-4 py-2 text-sm font-semibold",
+                        active ? "bg-white text-[var(--color-ink)]" : "bg-white/15 text-white",
+                      ].join(" ")}
+                    >
+                      <span className={online ? "text-[var(--color-teal)]" : "text-white/40"}>●</span>{" "}
+                      {playerLabels[playerId] ?? playerId}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </section>
 
