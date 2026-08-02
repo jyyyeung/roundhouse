@@ -1,10 +1,26 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TableMeta } from "@yatzy/game-core";
 import type { YatzyState } from "@yatzy/game-yatzy";
 
 import { YatzyTable } from "./YatzyTable";
+
+function mockMatchMedia(matches: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
 
 function baseMeta(overrides: Partial<TableMeta> = {}): TableMeta {
   return {
@@ -129,5 +145,62 @@ describe("YatzyTable", () => {
     expect(scoreSheetPanel?.className).toMatch(/min-w-0/);
     expect(scoreSheetPanel?.className).toMatch(/md:sticky/);
     expect(scoreSheetPanel?.className).toMatch(/md:h-\[calc\(100dvh-6rem\)\]/);
+  });
+});
+
+describe("YatzyTable chat layout", () => {
+  const defaultProps = {
+    meta: baseMeta(),
+    state: baseState(),
+    currentUserId: "user-a",
+    onlineUserIds: ["user-a", "user-b"],
+    messages: [],
+    onIntent: vi.fn(),
+    onSendChat: vi.fn(),
+    rollVersion: 0,
+  };
+
+  beforeEach(() => {
+    mockMatchMedia(false);
+  });
+
+  it("hides banner Chat at xl via class", () => {
+    render(<YatzyTable {...defaultProps} />);
+    const chatButton = screen.getByRole("button", { name: /^chat$/i });
+    expect(chatButton.className).toMatch(/xl:hidden/);
+  });
+
+  it("shows floating composer when overlay closed", () => {
+    render(<YatzyTable {...defaultProps} />);
+    expect(screen.getByTestId("chat-float-composer")).toBeInTheDocument();
+    expect(screen.getByTestId("chat-float-composer").className).toMatch(/md:hidden/);
+  });
+
+  it("hides floating composer when overlay is open", async () => {
+    const user = userEvent.setup();
+    render(<YatzyTable {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: /^chat$/i }));
+    expect(screen.queryByTestId("chat-float-composer")).not.toBeInTheDocument();
+  });
+
+  it("docks chat beside the board at xl and skips the float", () => {
+    mockMatchMedia(true);
+    const { container } = render(<YatzyTable {...defaultProps} />);
+    const shell = container.querySelector(".yatzy-chat-shell");
+    expect(shell?.className).toMatch(/xl:grid/);
+    expect(shell?.className).toMatch(/xl:grid-cols-\[minmax\(0,1fr\)_minmax\(18rem,22rem\)\]/);
+    expect(screen.getByTestId("chat-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("chat-float-composer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /close chat/i })).not.toBeInTheDocument();
+  });
+
+  it("shares draft between float and overlay composer", async () => {
+    const user = userEvent.setup();
+    render(<YatzyTable {...defaultProps} />);
+    const floatInput = screen.getByTestId("chat-float-composer").querySelector("input");
+    expect(floatInput).toBeTruthy();
+    await user.type(floatInput!, "banter");
+    await user.click(screen.getByRole("button", { name: /^chat$/i }));
+    expect(screen.getByRole("textbox", { name: /message/i })).toHaveValue("banter");
   });
 });
