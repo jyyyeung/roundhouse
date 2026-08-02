@@ -7,6 +7,7 @@ import { TablePage } from "./routes/table";
 
 type SessionLike = {
   user?: {
+    id?: string | null;
     email?: string | null;
     name?: string | null;
   };
@@ -47,7 +48,7 @@ export function App() {
       <Route element={<RequireAuth session={session} />}>
         <Route index element={<Navigate to="/lobby" replace />} />
         <Route path="/lobby" element={<LobbyPage session={session.data} />} />
-        <Route path="/t/:tableId" element={<TablePage />} />
+        <Route path="/t/:tableId" element={<TablePage session={session.data} />} />
       </Route>
       <Route path="*" element={<Navigate to={session.data ? "/lobby" : "/login"} replace />} />
     </Routes>

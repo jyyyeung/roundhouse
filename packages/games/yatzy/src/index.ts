@@ -10,3 +10,4 @@ export type {
   YahtzeeCategory,
   Category,
 } from "./types";
+export type { YatzyState, Sheet } from "./reduce";

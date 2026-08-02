@@ -42,8 +42,8 @@ describe("app routes", () => {
     expect(screen.getByRole("heading", { name: /sign in/i })).toBeInTheDocument();
   });
 
-  it("shows the table placeholder for signed-in players", () => {
-    mockSession({ user: { email: "player@example.com" } });
+  it("shows the live table loading screen for signed-in players", () => {
+    mockSession({ user: { id: "user-a", email: "player@example.com" } });
 
     render(
       <MemoryRouter initialEntries={["/t/table-123"]}>
@@ -51,7 +51,6 @@ describe("app routes", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("table-123")).toBeInTheDocument();
-    expect(screen.getByText(/table ui lands in task 11/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading table magic/i)).toBeInTheDocument();
   });
 });

@@ -66,3 +66,15 @@ export function joinTable(input: { code: string }) {
     body: JSON.stringify({ code: normalizeJoinCode(input.code) }),
   });
 }
+
+export function startTable(input: { tableId: string }) {
+  return fetchJson<{ tableId: string; gameRowId: string }>(`/api/tables/${input.tableId}/start`, {
+    method: "POST",
+  });
+}
+
+export function rematchTable(input: { tableId: string }) {
+  return fetchJson<{ tableId: string; gameRowId: string }>(`/api/tables/${input.tableId}/rematch`, {
+    method: "POST",
+  });
+}
