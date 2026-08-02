@@ -49,8 +49,9 @@ describe("LobbyPage layout", () => {
     expect(shell.className).toMatch(/md:max-w-5xl/);
 
     const actions = container.querySelector(".lobby-actions");
-    expect(actions?.className).toMatch(/md:grid/);
-    expect(actions?.className).toMatch(/md:grid-cols-2/);
+    const actionClasses = actions?.className.split(/\s+/) ?? [];
+    expect(actionClasses).toContain("md:grid");
+    expect(actionClasses).toContain("md:grid-cols-2");
 
     expect(screen.getByText(/create table/i)).toBeInTheDocument();
     expect(screen.getByText(/join by code/i)).toBeInTheDocument();
