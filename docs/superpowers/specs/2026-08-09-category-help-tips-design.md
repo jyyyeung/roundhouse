@@ -21,7 +21,7 @@ Establish a shared tip primitive so other surfaces (lobby, dice tray, settings, 
 | Scope | All categories for active ruleset + Upper total + Bonus + Total |
 | UI chrome | Shared `InfoTip` built on `@radix-ui/react-popover` |
 | Why Popover not Tooltip | Mobile needs click-to-toggle; Tooltip is hover-centric. Popover is the right primitive; hover-open is layered for fine pointers |
-| Copy location | Web-only `categoryHelp.ts` (not in `@roundhouse/game-yatzy`) |
+| Copy location | Structured help data in `@roundhouse/game-yatzy` (plain strings / pure lookup — no React). Web only renders. Future games export the same shape from their packages. |
 | Portal / positioning | Radix portal + collision (flip/shift) so sticky/overflow score sheet does not clip tips |
 
 ## Design
@@ -53,20 +53,24 @@ Dependency: add `@radix-ui/react-popover` to `@roundhouse/web`.
 
 ### Content shape
 
-Each help entry:
+Lives in the game package next to scoring (e.g. `packages/games/yatzy/src/help.ts`), exported from `@roundhouse/game-yatzy`:
 
 ```ts
-type CategoryHelp = {
+type ScoreHelp = {
   title: string;
   what: string;
   score: string;
   example: string;
 };
+
+type ScoreHelpKey = Category | "upper_total" | "bonus" | "total";
+
+function getScoreHelp(ruleset: Ruleset, key: ScoreHelpKey): ScoreHelp;
 ```
 
-Rendered in the tip as title + three short lines (What / Score / Example). No current-roll values.
+Plain data / pure functions only — no React, no Tailwind. Web renders title + What / Score / Example inside `InfoTip`. No current-roll values.
 
-Ruleset-aware: Yatzy and Yahtzee diverge where `packages/games/yatzy/src/score.ts` diverges (pairs only in Yatzy; kinds/straights/full house scoring differ). Upper faces share one template (“sum of all N faces”).
+Ruleset-aware: Yatzy and Yahtzee diverge where `score.ts` diverges (pairs only in Yatzy; kinds/straights/full house scoring differ). Upper faces share one template (“sum of all N faces”).
 
 Footer copy (static):
 
@@ -76,16 +80,19 @@ Footer copy (static):
 
 Examples for categories use a fixed dice line and resulting score consistent with `scoreCategory` for that ruleset (e.g. Ones: `1-1-1-2-3 → 3`).
 
+Convention for later games: each `@roundhouse/game-*` package owns its help lookup beside its rules; web UI never hardcodes game-specific scoring prose.
+
 ### Components & files
 
 | Piece | Path | Role |
 |---|---|---|
 | `InfoTip` | `apps/web/src/ui/InfoTip.tsx` | Shared Radix Popover tip: pointer-mode open, portal, collision |
-| Help map | `apps/web/src/games/yatzy/categoryHelp.ts` | Lookup by ruleset + key (`Category` \| `"upper_total"` \| `"bonus"` \| `"total"`) |
-| Sheet wiring | `apps/web/src/games/yatzy/ScoreSheet.tsx` | Place ⓘ/`InfoTip` on labels; pass `state.ruleset` into lookup |
+| Help data | `packages/games/yatzy/src/help.ts` (+ export from `index.ts`) | `getScoreHelp` / types; ruleset + key → strings |
+| Help tests | `packages/games/yatzy/src/help.test.ts` | Completeness vs category lists + footers |
+| Sheet wiring | `apps/web/src/games/yatzy/ScoreSheet.tsx` | Place ⓘ/`InfoTip` on labels; call `getScoreHelp(state.ruleset, key)` |
 | Dep | `apps/web/package.json` | `@radix-ui/react-popover` |
 
-No changes to scoring, reducer, or protocol.
+No changes to scoring formulas, reducer, or protocol — help is documentation of existing rules.
 
 ### Accessibility
 
@@ -94,7 +101,7 @@ No changes to scoring, reducer, or protocol.
 
 ### Completeness guard
 
-Unit test (or similar assert): for each ruleset, every id in `categoriesFor(ruleset)` plus `upper_total`, `bonus`, `total` has a help entry. Prevents shipping a missing tip.
+In `@roundhouse/game-yatzy`: for each ruleset, every id in `yatzyCategories` / `yahtzeeCategories` plus `upper_total`, `bonus`, `total` has a help entry (assert via `getScoreHelp`). Prevents shipping a missing tip when categories change.
 
 Smoke-test `InfoTip` open/close with Testing Library (click toggle; optional hover if reliable in jsdom).
 
@@ -103,7 +110,7 @@ Smoke-test `InfoTip` open/close with Testing Library (click toggle; optional hov
 - Live “with your dice” calculations inside the tip.
 - Adding `@radix-ui/react-tooltip` in this change (defer until a hover-only use case appears).
 - Wiring tips into lobby / dice tray / other routes beyond the score sheet (primitive is ready; call sites later).
-- Moving help strings into `@roundhouse/game-yatzy`.
+- Defining a cross-game help interface in `@roundhouse/game-core` (convention only for now; promote to core when a second game lands).
 - Explaining hold / roll / turn flow (dice tray UX).
 - Changing bonus threshold or scoring formulas.
 
@@ -112,6 +119,6 @@ Smoke-test `InfoTip` open/close with Testing Library (click toggle; optional hov
 - Manual desktop: hover ⓘ on a category and on Bonus; tip shows what/score/example; leave closes; score cell still scores.
 - Manual mobile / coarse: tap opens, tap outside or again closes; no accidental score from tip.
 - Switch ruleset (Yatzy vs Yahtzee): pair tips only on Yatzy; straight/full house/kind text matches that ruleset’s scoring.
-- Completeness unit test for help map coverage.
+- Package help completeness unit test.
 - `InfoTip` unit smoke test.
 - Existing score-sheet click-to-score tests still pass.
