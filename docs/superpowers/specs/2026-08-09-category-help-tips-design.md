@@ -9,6 +9,8 @@ Players looking at the Yatzy/Yahtzee score sheet have no in-product explanation 
 
 Add a compact ⓘ affordance next to each category label and the Upper total / Bonus / Total footers. On fine-pointer devices, hover (and focus) shows a static explanation including score calculation and a fixed example. On touch, tap toggles the same tip.
 
+Establish a shared tip primitive so other surfaces (lobby, dice tray, settings, etc.) can reuse the same interaction and styling later.
+
 ## Decisions
 
 | Topic | Choice |
@@ -17,18 +19,36 @@ Add a compact ⓘ affordance next to each category label and the Upper total / B
 | Content | Static only — what + how scored + fixed example |
 | Live dice preview | No (scoreboard cells already show current preview) |
 | Scope | All categories for active ruleset + Upper total + Bonus + Total |
-| UI chrome | Lightweight custom popover, no new deps |
+| UI chrome | Shared `InfoTip` built on `@radix-ui/react-popover` |
+| Why Popover not Tooltip | Mobile needs click-to-toggle; Tooltip is hover-centric. Popover is the right primitive; hover-open is layered for fine pointers |
 | Copy location | Web-only `categoryHelp.ts` (not in `@roundhouse/game-yatzy`) |
-| Portal | Tip portals to `document.body` to avoid sheet overflow clipping |
+| Portal / positioning | Radix portal + collision (flip/shift) so sticky/overflow score sheet does not clip tips |
 
 ## Design
 
-### Interaction
+### Shared `InfoTip` primitive
+
+Path: `apps/web/src/ui/InfoTip.tsx`
+
+App-wide reusable control (not Yatzy-specific):
+
+- Trigger: compact ⓘ (or optional custom trigger slot) — real `button` with caller-supplied `aria-label` / `label`.
+- Content: `ReactNode` (callers own copy layout).
+- Open behavior:
+  - Fine pointer (`matchMedia('(hover: hover) and (pointer: fine)')`): open on hover/focus; close on leave with ~100–150ms grace so pointer can enter the panel; Esc / outside dismiss.
+  - Coarse / touch: click toggles; no hover-open; Esc / outside / second click closes.
+- Controlled by Radix `Popover` (`Root` / `Trigger` / `Portal` / `Content`). Style content with existing Tailwind tokens (cream/ink/coral borders, rounded, shadow) so tips match the product.
+- Only one tip needs to feel exclusive in a dense sheet: prefer closing on outside interaction (Radix default); no global tip registry required for v1.
+- Export from a thin `apps/web/src/ui/` folder (add `index.ts` only if useful). First consumer is the score sheet; later routes import the same component.
+
+Optional later (out of scope for this feature): a hover-only `Tooltip` wrapper on `@radix-ui/react-tooltip` for non-interactive labels. Do not block score-sheet help on that.
+
+Dependency: add `@radix-ui/react-popover` to `@roundhouse/web`.
+
+### Score sheet interaction
 
 - Label cell layout: `[Name] [ⓘ]` for every category row and for Upper total, Bonus, Total.
-- Fine pointer: open on hover/focus of ⓘ; close on leave with a short (~100–150ms) grace so the pointer can enter the tip; Esc and outside click also close.
-- Coarse pointer / touch: tap ⓘ toggles; no hover-open.
-- At most one tip open. Opening another closes the previous. Second tap on the same ⓘ closes.
+- Each ⓘ wraps `InfoTip` with category/footer help body.
 - Score cells unchanged: still click-to-score when eligible.
 
 ### Content shape
@@ -60,26 +80,29 @@ Examples for categories use a fixed dice line and resulting score consistent wit
 
 | Piece | Path | Role |
 |---|---|---|
-| `InfoTip` | `apps/web/src/games/yatzy/InfoTip.tsx` | ⓘ + popover: pointer-mode behavior, one-open, Esc/outside dismiss, basic flip when clipped |
+| `InfoTip` | `apps/web/src/ui/InfoTip.tsx` | Shared Radix Popover tip: pointer-mode open, portal, collision |
 | Help map | `apps/web/src/games/yatzy/categoryHelp.ts` | Lookup by ruleset + key (`Category` \| `"upper_total"` \| `"bonus"` \| `"total"`) |
-| Sheet wiring | `apps/web/src/games/yatzy/ScoreSheet.tsx` | Place ⓘ on labels; pass `state.ruleset` into lookup |
+| Sheet wiring | `apps/web/src/games/yatzy/ScoreSheet.tsx` | Place ⓘ/`InfoTip` on labels; pass `state.ruleset` into lookup |
+| Dep | `apps/web/package.json` | `@radix-ui/react-popover` |
 
 No changes to scoring, reducer, or protocol.
 
 ### Accessibility
 
 - ⓘ is a real `button` with `aria-label` like `About Ones` / `About Bonus`.
-- Fine pointer: tip uses `role="tooltip"` associated via `aria-describedby` while open.
-- Coarse pointer: toggle with `aria-expanded`; tip uses `role="dialog"` (or equivalent toggle panel) so it stays open until dismissed.
+- Rely on Radix Popover a11y (`aria-expanded`, focus management, Esc). Fine-pointer hover-open is an enhancement on top of the same Popover content — do not dual-implement as `role="tooltip"` and `role="dialog"` for v1; one Popover panel is enough.
 
 ### Completeness guard
 
 Unit test (or similar assert): for each ruleset, every id in `categoriesFor(ruleset)` plus `upper_total`, `bonus`, `total` has a help entry. Prevents shipping a missing tip.
 
+Smoke-test `InfoTip` open/close with Testing Library (click toggle; optional hover if reliable in jsdom).
+
 ## Out of scope
 
 - Live “with your dice” calculations inside the tip.
-- New tooltip library / Radix / Headless UI.
+- Adding `@radix-ui/react-tooltip` in this change (defer until a hover-only use case appears).
+- Wiring tips into lobby / dice tray / other routes beyond the score sheet (primitive is ready; call sites later).
 - Moving help strings into `@roundhouse/game-yatzy`.
 - Explaining hold / roll / turn flow (dice tray UX).
 - Changing bonus threshold or scoring formulas.
@@ -90,4 +113,5 @@ Unit test (or similar assert): for each ruleset, every id in `categoriesFor(rule
 - Manual mobile / coarse: tap opens, tap outside or again closes; no accidental score from tip.
 - Switch ruleset (Yatzy vs Yahtzee): pair tips only on Yatzy; straight/full house/kind text matches that ruleset’s scoring.
 - Completeness unit test for help map coverage.
+- `InfoTip` unit smoke test.
 - Existing score-sheet click-to-score tests still pass.
