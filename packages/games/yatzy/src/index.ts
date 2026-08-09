@@ -2,8 +2,8 @@ export { scoreCategory } from "./score";
 export { reduce } from "./reduce";
 export { yatzyModule } from "./module";
 export { yatzyCategories, yahtzeeCategories } from "./categories";
-export { getScoreHelp } from "./help";
-export type { ScoreHelp, ScoreHelpKey } from "./help";
+export { getScoreHelp, getRulesetCompareHelp, getTurnHelp } from "./help";
+export type { ScoreHelp, ScoreHelpKey, SurfaceHelp } from "./help";
 export type {
   Ruleset,
   Dice,

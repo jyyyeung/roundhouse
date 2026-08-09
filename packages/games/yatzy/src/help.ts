@@ -10,6 +10,34 @@ export type ScoreHelp = {
 
 export type ScoreHelpKey = Category | "upper_total" | "bonus" | "total";
 
+export type SurfaceHelp = {
+  title: string;
+  body: string[];
+};
+
+export function getRulesetCompareHelp(): SurfaceHelp {
+  return {
+    title: "Yatzy vs Yahtzee",
+    body: [
+      "Yatzy includes One pair and Two pairs; Yahtzee does not.",
+      "Three / four of a kind: Yatzy scores face × N; Yahtzee scores the sum of all five dice.",
+      "Straights / full house: Yatzy uses exact sequences (small 15, large 20) and full house = sum of dice; Yahtzee uses any four-run small straight (30), either five-run large straight (40), and full house = 25.",
+      "Open a category ⓘ on the score sheet for full per-row detail.",
+    ],
+  };
+}
+
+export function getTurnHelp(): SurfaceHelp {
+  return {
+    title: "How a turn works",
+    body: [
+      "Up to 3 rolls per turn; “rolls left” is remaining rolls this turn.",
+      "Tap a die to hold or release (teal = held); holds unlock after the first roll of the turn.",
+      "After rolling, lock any open category on the sheet (including 0) to end the turn — you may score before using all rolls.",
+    ],
+  };
+}
+
 function upperHelp(face: number, title: string, exampleDice: string, exampleScore: number): ScoreHelp {
   return {
     title,
