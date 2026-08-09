@@ -10,6 +10,8 @@ import {
   type RecentTable,
   type Ruleset,
 } from "../lib/tables";
+import { getRulesetCompareHelp } from "@roundhouse/game-yatzy";
+import { InfoTip } from "../ui/InfoTip";
 
 type SessionLike = {
   user?: {
@@ -27,6 +29,7 @@ function getErrorMessage(error: unknown) {
 }
 
 export function LobbyPage({ session }: { session: SessionLike }) {
+  const rulesetHelp = getRulesetCompareHelp();
   const navigate = useNavigate();
   const [ruleset, setRuleset] = useState<Ruleset>("yatzy");
   const [joinCode, setJoinCode] = useState("");
@@ -118,7 +121,17 @@ export function LobbyPage({ session }: { session: SessionLike }) {
         <section className="flex h-full flex-col rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Create table</p>
           <label className="mt-4 block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">Ruleset</span>
+            <span className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+              Ruleset
+              <InfoTip label="About rulesets">
+                <div className="space-y-1">
+                  <p className="font-semibold">{rulesetHelp.title}</p>
+                  {rulesetHelp.body.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+              </InfoTip>
+            </span>
             <select
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-[var(--color-ink)]"
               value={ruleset}

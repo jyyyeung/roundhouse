@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 
 import { LobbyPage } from "./lobby";
 import * as tables from "../lib/tables";
@@ -36,7 +36,21 @@ describe("LobbyPage layout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getRecentTables.mockResolvedValue([]);
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation(() => ({
+        matches: false,
+        media: "",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+        onchange: null,
+      })),
+    );
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   it("widens the shell and grids create/join at md+", async () => {
     const { container } = renderLobby();
@@ -102,5 +116,21 @@ describe("LobbyPage layout", () => {
     await user.click(copy);
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("/t/table-1"));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("code=Z2YL8J"));
+  });
+
+  it("shows ruleset contrast help beside the picker", async () => {
+    const user = userEvent.setup();
+    const { getRulesetCompareHelp } = await vi.importActual("@roundhouse/game-yatzy");
+    const help = getRulesetCompareHelp();
+
+    renderLobby();
+    await waitFor(() => {
+      expect(getRecentTables).toHaveBeenCalled();
+    });
+
+    expect(screen.getByRole("button", { name: "About rulesets" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "About rulesets" }));
+    expect(screen.getByText(help.title)).toBeInTheDocument();
+    expect(screen.getByText(help.body[0]!)).toBeInTheDocument();
   });
 });
