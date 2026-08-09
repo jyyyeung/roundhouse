@@ -1,4 +1,6 @@
 import { motion } from "motion/react";
+import { getTurnHelp } from "@roundhouse/game-yatzy";
+import { InfoTip } from "../../ui/InfoTip";
 
 import { DieFace } from "./DieFace";
 
@@ -18,7 +20,25 @@ export function DiceTray(props: DiceTrayProps) {
     <section className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.1)] backdrop-blur">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">Dice tray</p>
+          {/*
+            Wire up the turn help tip. Keep visual/layout and roll/hold behavior unchanged.
+          */}
+          {(() => {
+            const turnHelp = getTurnHelp();
+            return (
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">Dice tray</p>
+                <InfoTip label="About the dice tray">
+                  <div className="space-y-1">
+                    <p className="font-semibold">{turnHelp.title}</p>
+                    {turnHelp.body.map((line) => (
+                      <p key={line}>{line}</p>
+                    ))}
+                  </div>
+                </InfoTip>
+              </div>
+            );
+          })()}
           <p className="mt-2 text-sm text-slate-600">{props.rollsLeft} rolls left</p>
         </div>
         <motion.button

@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { getTurnHelp } from "@roundhouse/game-yatzy";
 
 import { DiceTray } from "./DiceTray";
 
@@ -15,6 +17,38 @@ const baseProps = {
 };
 
 describe("DiceTray", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation(() => ({
+        matches: false,
+        media: "",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+        onchange: null,
+      })),
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows turn help without rolling or holding", async () => {
+    const user = userEvent.setup();
+    const onRoll = vi.fn();
+    const onToggleHold = vi.fn();
+    const help = getTurnHelp();
+
+    render(<DiceTray {...baseProps} onRoll={onRoll} onToggleHold={onToggleHold} />);
+
+    expect(screen.getByRole("button", { name: "About the dice tray" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "About the dice tray" }));
+    expect(screen.getByText(help.title)).toBeInTheDocument();
+    expect(screen.getByText(help.body[0]!)).toBeInTheDocument();
+    expect(onRoll).not.toHaveBeenCalled();
+    expect(onToggleHold).not.toHaveBeenCalled();
+  });
   it("renders DieFace for each die instead of roman numerals", () => {
     render(<DiceTray {...baseProps} />);
 
