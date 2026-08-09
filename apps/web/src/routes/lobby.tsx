@@ -120,19 +120,20 @@ export function LobbyPage({ session }: { session: SessionLike }) {
       <div className="lobby-actions mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 md:items-stretch">
         <section className="flex h-full flex-col rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Create table</p>
-          <label className="mt-4 block">
-            <span className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-              Ruleset
+          <div className="mt-4 block">
+            <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+              <label htmlFor="create-ruleset">Ruleset</label>
               <InfoTip label="About rulesets">
                 <div className="space-y-1">
                   <p className="font-semibold">{rulesetHelp.title}</p>
-                  {rulesetHelp.body.map((line) => (
-                    <p key={line}>{line}</p>
+                  {rulesetHelp.body.map((line, index) => (
+                    <p key={`line-${index}`}>{line}</p>
                   ))}
                 </div>
               </InfoTip>
-            </span>
+            </div>
             <select
+              id="create-ruleset"
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-[var(--color-ink)]"
               value={ruleset}
               onChange={(event) => setRuleset(event.target.value as Ruleset)}
@@ -140,7 +141,7 @@ export function LobbyPage({ session }: { session: SessionLike }) {
               <option value="yatzy">Yatzy</option>
               <option value="yahtzee">Yahtzee</option>
             </select>
-          </label>
+          </div>
           <button
             type="button"
             className="mt-auto w-full rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)] shadow-[0_14px_30px_rgba(42,157,143,0.24)] disabled:cursor-wait disabled:opacity-70"

@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 
 import { LobbyPage } from "./lobby";
+import { getRulesetCompareHelp } from "@roundhouse/game-yatzy";
 import * as tables from "../lib/tables";
 
 vi.mock("../lib/tables", async () => {
@@ -120,7 +121,6 @@ describe("LobbyPage layout", () => {
 
   it("shows ruleset contrast help beside the picker", async () => {
     const user = userEvent.setup();
-    const { getRulesetCompareHelp } = await vi.importActual("@roundhouse/game-yatzy");
     const help = getRulesetCompareHelp();
 
     renderLobby();
@@ -132,5 +132,9 @@ describe("LobbyPage layout", () => {
     await user.click(screen.getByRole("button", { name: "About rulesets" }));
     expect(screen.getByText(help.title)).toBeInTheDocument();
     expect(screen.getByText(help.body[0]!)).toBeInTheDocument();
+    // Ensure clicking the InfoTip does not change the select value or focus the select
+    const select = screen.getByRole("combobox", { name: /ruleset/i }) as HTMLSelectElement;
+    expect(select.value).toBe("yatzy");
+    expect(document.activeElement).not.toBe(select);
   });
 });
