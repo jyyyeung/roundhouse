@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
-import type { YatzyState } from "@roundhouse/game-yatzy";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getScoreHelp, type YatzyState } from "@roundhouse/game-yatzy";
 
 import { ScoreSheet } from "./ScoreSheet";
 
@@ -58,6 +58,26 @@ function baseState(overrides: Partial<YatzyState> = {}): YatzyState {
 }
 
 describe("ScoreSheet", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation(() => ({
+        matches: false,
+        media: "",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+        onchange: null,
+      })),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("shows preview score for clickable open cells and dash otherwise", () => {
     render(
       <ScoreSheet
@@ -130,5 +150,43 @@ describe("ScoreSheet", () => {
     const onesButton = screen.getByRole("button", { name: /score ones/i });
     expect(onesButton.className).toMatch(/py-2/);
     expect(onesButton.className).not.toMatch(/py-3/);
+  });
+
+  it("exposes help tips for categories and footers", () => {
+    render(
+      <ScoreSheet
+        state={baseState()}
+        playerLabels={{ "user-a": "You", "user-b": "Player 2" }}
+        currentUserId="user-a"
+        canScore
+        onScore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "About Ones" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Bonus" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Upper total" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Total" })).toBeInTheDocument();
+  });
+
+  it("opens category help without scoring", async () => {
+    const user = userEvent.setup();
+    const onScore = vi.fn();
+    const help = getScoreHelp("yatzy", "ones");
+
+    render(
+      <ScoreSheet
+        state={baseState()}
+        playerLabels={{ "user-a": "You", "user-b": "Player 2" }}
+        currentUserId="user-a"
+        canScore
+        onScore={onScore}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "About Ones" }));
+    expect(screen.getByText(help.what)).toBeInTheDocument();
+    expect(screen.getByText(help.example)).toBeInTheDocument();
+    expect(onScore).not.toHaveBeenCalled();
   });
 });
