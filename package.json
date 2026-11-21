@@ -6,7 +6,8 @@
     "dev": "pnpm -r --parallel run dev",
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
-    "check:projection": "node scripts/check-projection.mjs"
+    "check:projection": "node scripts/check-projection.mjs",
+    "test:integration": "pnpm --filter @roundhouse/server exec vitest run src/room/runtime.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

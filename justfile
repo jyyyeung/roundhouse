@@ -63,6 +63,13 @@ migrate:
 test:
     pnpm test
 
+# Integration suite: runs the real migrations and SQL, so it needs a throwaway
+# database whose name ends in _test (create it once):
+#   docker compose exec -T db createdb -U roundhouse roundhouse_test
+test-integration:
+    DATABASE_URL_TEST=postgres://roundhouse:roundhouse@localhost:5432/roundhouse_test \
+      pnpm test:integration
+
 typecheck:
     pnpm typecheck
 
