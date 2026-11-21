@@ -330,6 +330,21 @@ describe("yatzyModule", () => {
       you: 1,
     });
     expect(spectatorSnapshot).toMatchObject({ you: null });
+    // The projection is an allowlist, not a spread: adding an internal field to
+    // YatzyState must not put it on the wire (or into the web bundle's types).
+    expect(Object.keys(snapshot as Record<string, unknown>).sort()).toEqual([
+      "currentPlayerId",
+      "dice",
+      "gameId",
+      "holds",
+      "phase",
+      "playerIds",
+      "rollsLeft",
+      "ruleset",
+      "sheets",
+      "winnerIds",
+      "you",
+    ]);
     expect(yatzyModule.isFinished(state)).toBe(false);
   });
 });

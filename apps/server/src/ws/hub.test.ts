@@ -292,6 +292,10 @@ describe("ws hub snapshot projection", () => {
 
     expect(frameA.state.you).toBe(0);
     expect(frameB.state.you).toBe(1);
+    // Two players see the same board; only "you" distinguishes the projections.
+    const { you: _youA, ...boardA } = frameA.state;
+    const { you: _youB, ...boardB } = frameB.state;
+    expect(boardA).toEqual(boardB);
     // The internal shape must not cross the wire: only YatzyView fields do.
     expect(frameA.state.tableId).toBeUndefined();
     expect(frameA.state.currentPlayerIndex).toBeUndefined();
