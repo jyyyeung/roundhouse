@@ -14,13 +14,29 @@ export type ChatPanelProps = {
   onSend: (text: string) => void;
   draft: string;
   onDraftChange: (value: string) => void;
+  hasMoreChat: boolean;
+  loadingOlderChat: boolean;
+  onLoadOlderChat: () => void;
 };
 
-type MessageListProps = Pick<ChatPanelProps, "messages" | "playerLabels">;
+type MessageListProps = Pick<
+  ChatPanelProps,
+  "messages" | "playerLabels" | "hasMoreChat" | "loadingOlderChat" | "onLoadOlderChat"
+>;
 
 function MessageList(props: MessageListProps) {
   return (
     <div className="mt-5 flex-1 space-y-3 overflow-y-auto pr-1">
+      {props.hasMoreChat ? (
+        <button
+          type="button"
+          className="w-full rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-60"
+          onClick={props.onLoadOlderChat}
+          disabled={props.loadingOlderChat}
+        >
+          {props.loadingOlderChat ? "Loading…" : "Load earlier messages"}
+        </button>
+      ) : null}
       {props.messages.length === 0 ? (
         <p className="text-sm text-slate-500">No chat yet. Start the table banter.</p>
       ) : null}
@@ -70,7 +86,13 @@ export function ChatPanel(props: ChatPanelProps) {
             <p className="mt-1 text-sm text-slate-500">Dice talk stays in the room.</p>
           </div>
         </div>
-        <MessageList messages={props.messages} playerLabels={props.playerLabels} />
+        <MessageList
+          messages={props.messages}
+          playerLabels={props.playerLabels}
+          hasMoreChat={props.hasMoreChat}
+          loadingOlderChat={props.loadingOlderChat}
+          onLoadOlderChat={props.onLoadOlderChat}
+        />
         {composer}
       </aside>
     );
@@ -110,7 +132,13 @@ export function ChatPanel(props: ChatPanelProps) {
                 Close
               </button>
             </div>
-            <MessageList messages={props.messages} playerLabels={props.playerLabels} />
+            <MessageList
+          messages={props.messages}
+          playerLabels={props.playerLabels}
+          hasMoreChat={props.hasMoreChat}
+          loadingOlderChat={props.loadingOlderChat}
+          onLoadOlderChat={props.onLoadOlderChat}
+        />
             {composer}
           </motion.aside>
         </>

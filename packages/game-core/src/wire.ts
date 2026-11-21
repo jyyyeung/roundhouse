@@ -63,69 +63,146 @@ export const eventEnvelopeSchema: z.ZodType<EventEnvelope> = z.object({
 export type TableMeta = z.infer<typeof tableMetaSchema>;
 export type ChatWire = z.infer<typeof chatWireSchema>;
 
+/** Protocol revision. A v1 client is refused by the parser, not tolerated. */
+export const PROTOCOL_VERSION = 2 as const;
+
+/** Game progress is a monotonic counter, so it can never be negative. */
+const seqSchema = z.number().int().min(0);
+
 /** Client → server over WS. */
 export const clientMessageSchema = z.discriminatedUnion("type", [
-  z.object({ tableId: idSchema, type: z.literal("subscribe"), v: z.literal(1) }),
+  // `sinceSeq` lets a reconnecting client ask for only what it missed: the hub
+  // answers with `events` when the gap is small enough to replay, else `snapshot`.
+  z.object({
+    sinceSeq: seqSchema.optional(),
+    tableId: idSchema,
+    type: z.literal("subscribe"),
+    v: z.literal(PROTOCOL_VERSION),
+  }),
+  // The repair path. A client that notices a seq gap asks for the frames it
+  // missed instead of reloading the table.
+  z.object({
+    sinceSeq: seqSchema,
+    tableId: idSchema,
+    type: z.literal("sync"),
+    v: z.literal(PROTOCOL_VERSION),
+  }),
+  // Chat is paged: the newest page on first paint, older pages by cursor.
+  z.object({
+    beforeId: idSchema.optional(),
+    tableId: idSchema,
+    type: z.literal("chatPage"),
+    v: z.literal(PROTOCOL_VERSION),
+  }),
   z.object({
     actionId: idSchema,
     intentType: z.string().min(1).max(64),
     payload: jsonSchema,
     tableId: idSchema,
     type: z.literal("intent"),
-    v: z.literal(1),
+    v: z.literal(PROTOCOL_VERSION),
   }),
   z.object({
     actionId: idSchema,
     tableId: idSchema,
     text: chatTextSchema,
     type: z.literal("chat"),
-    v: z.literal(1),
+    v: z.literal(PROTOCOL_VERSION),
   }),
 ]);
 
-/** Server → client over WS. #14 replaces the event-by-event `event` frame. */
+/**
+ * Server → client over WS.
+ *
+ * `applied` and `events` both carry the authoritative state for their `seq`, so
+ * a client never reconstructs state from events; the events ride along for
+ * animation and history only.
+ */
 export const serverMessageSchema = z.discriminatedUnion("type", [
   z.object({
     meta: tableMetaSchema,
-    seq: z.number().int(),
+    seq: seqSchema,
     state: jsonSchema,
     tableId: idSchema,
     type: z.literal("snapshot"),
-    v: z.literal(1),
+    v: z.literal(PROTOCOL_VERSION),
   }),
-  z.object({ event: eventEnvelopeSchema, tableId: idSchema, type: z.literal("event"), v: z.literal(1) }),
-  z.object({ message: chatWireSchema, tableId: idSchema, type: z.literal("chat"), v: z.literal(1) }),
+  z.object({
+    events: z.array(eventEnvelopeSchema),
+    meta: tableMetaSchema,
+    seq: seqSchema,
+    state: jsonSchema,
+    tableId: idSchema,
+    type: z.literal("applied"),
+    v: z.literal(PROTOCOL_VERSION),
+  }),
+  z.object({
+    events: z.array(eventEnvelopeSchema),
+    fromSeq: seqSchema,
+    meta: tableMetaSchema,
+    state: jsonSchema,
+    tableId: idSchema,
+    toSeq: seqSchema,
+    type: z.literal("events"),
+    v: z.literal(PROTOCOL_VERSION),
+  }),
+  z.object({
+    message: chatWireSchema,
+    tableId: idSchema,
+    type: z.literal("chat"),
+    v: z.literal(PROTOCOL_VERSION),
+  }),
+  // Sender-only echo of a chat message, so the author sees their line without
+  // being told it came from the table broadcast.
+  z.object({
+    message: chatWireSchema,
+    tableId: idSchema,
+    type: z.literal("spoke"),
+    v: z.literal(PROTOCOL_VERSION),
+  }),
+  // Answer to `chatPage`. A bounded page needs one frame: N `chat` frames would
+  // leave the client unable to tell "page ended" from "more is coming".
+  z.object({
+    hasMore: z.boolean(),
+    messages: z.array(chatWireSchema),
+    tableId: idSchema,
+    type: z.literal("chatPage"),
+    v: z.literal(PROTOCOL_VERSION),
+  }),
+  z.object({
+    onlineUserIds: z.array(z.string()),
+    tableId: idSchema,
+    type: z.literal("presence"),
+    v: z.literal(PROTOCOL_VERSION),
+  }),
   z.object({
     actionId: idSchema.optional(),
     code: z.string(),
     message: z.string(),
     tableId: idSchema.optional(),
     type: z.literal("error"),
-    v: z.literal(1),
-  }),
-  z.object({
-    onlineUserIds: z.array(z.string()),
-    tableId: idSchema,
-    type: z.literal("presence"),
-    v: z.literal(1),
+    v: z.literal(PROTOCOL_VERSION),
   }),
 ]);
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
 
-/** The two frames a table handler acts on; `subscribe` is the hub's own business. */
+export type ClientSubscribeMessage = Extract<ClientMessage, { type: "subscribe" }>;
+export type ClientSyncMessage = Extract<ClientMessage, { type: "sync" }>;
+export type ClientChatPageMessage = Extract<ClientMessage, { type: "chatPage" }>;
 export type ClientIntentMessage = Extract<ClientMessage, { type: "intent" }>;
 export type ClientChatMessage = Extract<ClientMessage, { type: "chat" }>;
-export type ClientTableMessage = ClientIntentMessage | ClientChatMessage;
 
+/** Frames the table handlers act on; subscribe/sync/chatPage are the hub's business. */
+export type ClientTableMessage = ClientIntentMessage | ClientChatMessage;
 export type ClientMessageErrorCode = "bad_message" | "unknown_message_type";
 
 export type ParseClientMessageResult =
   | { ok: true; message: ClientMessage }
   | { ok: false; code: ClientMessageErrorCode; detail: string };
 
-const KNOWN_TYPES: readonly string[] = ["subscribe", "intent", "chat"];
+const KNOWN_TYPES: readonly string[] = ["subscribe", "sync", "chatPage", "intent", "chat"];
 
 /**
  * Parses one inbound frame. Never throws and never returns `any`: the caller

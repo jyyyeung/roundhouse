@@ -1,5 +1,5 @@
-import type { RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
-import { parseClientMessage } from "@roundhouse/game-core";
+import type { ChatWire, EventEnvelope, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import { parseClientMessage, PROTOCOL_VERSION } from "@roundhouse/game-core";
 import type { IncomingMessage } from "node:http";
 import { WebSocket, type RawData } from "ws";
 
@@ -8,7 +8,12 @@ import { projectSnapshot, viewerForUser } from "../room/projection";
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
 import { createWsHandlers } from "./handlers";
 import { db } from "../db/client";
-import { persistChatMessageToDb, appendGameEventToDb, listChatMessagesForTable } from "./persistence";
+import {
+  type ChatPage,
+  persistChatMessageToDb,
+  appendGameEventToDb,
+  listChatMessagesForTable,
+} from "./persistence";
 type Session = { user?: { id: string } } | null;
 type GetSession = (headers: Headers) => Promise<Session> | Session;
 type HubSocket = WebSocket & { tableId?: string; userId?: string };
@@ -21,10 +26,18 @@ const MAX_FRAME_BYTES = 64 * 1024;
 export function createWsHub(opts: {
   runtime: TablesRuntime;
   getSessionFromHeaders: GetSession;
+  /** Chat paging is read-only and side-effect free, so tests inject it. */
+  listChatPage?: (input: { tableId: string; beforeId?: string }) => Promise<ChatPage>;
 }) {
+  const listChatPage =
+    opts.listChatPage ?? ((input) => listChatMessagesForTable(db, input.tableId, { beforeId: input.beforeId }));
+
   const actionIdsByTable = new Map<string, Map<string, number>>();
   const socketsByTable = new Map<string, Set<HubSocket>>();
   const userIdsByTable = new Map<string, Set<string>>();
+  // Last presence roster broadcast per table, so a socket joining an already
+  // online roster does not make every other socket re-render the same list.
+  const presenceByTable = new Map<string, string>();
 
   // wire persistence hooks (real DB)
   const persistence = {
@@ -47,7 +60,7 @@ export function createWsHub(opts: {
   const handlers = createWsHandlers({
     runtime: opts.runtime,
     publishToTable,
-    publishSnapshot,
+    publishApplied,
     isDuplicateAction(tableId, actionId) {
       pruneExpiredActions(tableId);
       return actionIdsByTable.get(tableId)?.has(actionId) ?? false;
@@ -73,6 +86,8 @@ export function createWsHub(opts: {
   });
 
   return {
+    /** Called after an HTTP mutation so sockets see the new state immediately. */
+    publishTableState,
     async handleConnection(ws: WebSocket, request: IncomingMessage) {
       const socket = ws as HubSocket;
       // Register listeners before awaiting auth — clients send subscribe on open and
@@ -87,7 +102,7 @@ export function createWsHub(opts: {
             code: "not_authenticated",
             message: "not_authenticated",
             type: "error",
-            v: 1,
+            v: PROTOCOL_VERSION,
           });
           return;
         }
@@ -101,7 +116,7 @@ export function createWsHub(opts: {
             code: "frame_too_large",
             message: `frame_too_large:${bytes}`,
             type: "error",
-            v: 1,
+            v: PROTOCOL_VERSION,
           });
           socket.close(1009, "frame_too_large");
           return;
@@ -114,14 +129,24 @@ export function createWsHub(opts: {
               code: parsed.code,
               message: parsed.detail,
               type: "error",
-              v: 1,
+              v: PROTOCOL_VERSION,
             });
             return;
           }
           const message = parsed.message;
 
           if (message.type === "subscribe") {
-            await subscribe(socket, message.tableId);
+            await subscribe(socket, message.tableId, message.sinceSeq);
+            return;
+          }
+
+          if (message.type === "sync") {
+            await syncTable(socket, message.tableId, message.sinceSeq);
+            return;
+          }
+
+          if (message.type === "chatPage") {
+            await sendChatPage(socket, message.tableId, message.beforeId);
             return;
           }
 
@@ -146,7 +171,7 @@ export function createWsHub(opts: {
             message: error instanceof Error ? error.message : "internal_error",
             tableId: socket.tableId,
             type: "error",
-            v: 1,
+            v: PROTOCOL_VERSION,
           });
         }
       }
@@ -172,7 +197,7 @@ export function createWsHub(opts: {
           code: "not_authenticated",
           message: "not_authenticated",
           type: "error",
-          v: 1,
+          v: PROTOCOL_VERSION,
         });
         socket.close(4401, "not_authenticated");
         return;
@@ -186,29 +211,24 @@ export function createWsHub(opts: {
     },
   };
 
-  async function subscribe(socket: HubSocket, tableId: string) {
+  /**
+   * Attaches the socket to a table and answers with authoritative state.
+   *
+   * A reconnect can pass `sinceSeq` to replay only what it missed; the chat page
+   * is asked for separately by the client, so a resubscribe never drags history
+   * with it.
+   */
+  async function subscribe(socket: HubSocket, tableId: string, sinceSeq?: number) {
     const snapshot = await opts.runtime.getTableSnapshot({
       asUserId: socket.userId ?? null,
       tableId,
     });
     if (!snapshot) {
-      send(socket, {
-        code: "table_missing",
-        message: "table_missing",
-        tableId,
-        type: "error",
-        v: 1,
-      });
+      sendError(socket, "table_missing", "table_missing", tableId);
       return;
     }
     if (!socket.userId || !snapshot.meta.seatUserIds.includes(socket.userId)) {
-      send(socket, {
-        code: "not_seated",
-        message: "not_seated",
-        tableId,
-        type: "error",
-        v: 1,
-      });
+      sendError(socket, "not_seated", "not_seated", tableId);
       return;
     }
 
@@ -219,33 +239,81 @@ export function createWsHub(opts: {
 
     socket.tableId = tableId;
     addSocket(tableId, socket);
-    sendSnapshot(socket, snapshot);
-    await sendChatHistory(socket, tableId);
+
+    if (sinceSeq !== undefined) {
+      await sendSyncFrame(socket, tableId, sinceSeq);
+    } else {
+      sendSnapshot(socket, snapshot);
+    }
 
     if (previousTableId && previousTableId !== tableId) {
       await publishPresence(previousTableId);
     }
-    await publishPresence(tableId);
+    // Broadcast only on a real change; a socket (re)joining this table still
+    // learns the roster, but nobody else is told the same roster twice.
+    await publishPresence(tableId, { only: socket });
   }
 
-  async function sendChatHistory(socket: HubSocket, tableId: string) {
-    const history = await listChatMessagesForTable(db, tableId);
-    for (const row of history) {
-      send(socket, {
-        v: 1,
-        type: "chat",
-        tableId,
-        message: {
-          id: row.id,
-          userId: row.userId,
-          text: row.text,
-          snapshot: row.snapshot as never,
-          createdAt: row.createdAt.toISOString(),
-        },
-      });
+  /**
+   * Gap repair: replay the missed events when the log covers them, else send a
+   * snapshot. Both answers carry state, so the client ends up correct either way.
+   */
+  async function syncTable(socket: HubSocket, tableId: string, sinceSeq: number) {
+    if (socket.tableId !== tableId) {
+      // A sync for a table this socket never subscribed to is a fresh subscribe
+      // with a stale seq: treat it as one rather than erroring the client out.
+      await subscribe(socket, tableId, sinceSeq);
+      return;
     }
+    await sendSyncFrame(socket, tableId, sinceSeq);
   }
 
+  async function sendSyncFrame(socket: HubSocket, tableId: string, sinceSeq: number) {
+    const result = await opts.runtime.getTableSync({
+      asUserId: socket.userId ?? null,
+      sinceSeq,
+      tableId,
+    });
+    if (!result) {
+      sendError(socket, "table_missing", "table_missing", tableId);
+      return;
+    }
+
+    if (result.kind === "snapshot") {
+      sendSnapshot(socket, result);
+      return;
+    }
+
+    send(socket, {
+      events: result.events,
+      fromSeq: result.fromSeq,
+      meta: result.meta,
+      state: result.state,
+      tableId,
+      toSeq: result.toSeq,
+      type: "events",
+      v: PROTOCOL_VERSION,
+    });
+  }
+
+  /** One bounded page of chat, newest-first page by default, older by cursor. */
+  async function sendChatPage(socket: HubSocket, tableId: string, beforeId?: string) {
+    // Seating was established by `subscribe`, which is what set `socket.tableId`,
+    // so no second database round-trip is needed to authorise a read.
+    if (socket.tableId !== tableId) {
+      sendError(socket, "not_subscribed", "not_subscribed", tableId);
+      return;
+    }
+
+    const page = await listChatPage({ beforeId, tableId });
+    send(socket, {
+      hasMore: page.hasMore,
+      messages: page.messages,
+      tableId,
+      type: "chatPage",
+      v: PROTOCOL_VERSION,
+    });
+  }
   async function unsubscribe(socket: HubSocket) {
     const tableId = socket.tableId;
     if (!tableId) return;
@@ -305,13 +373,14 @@ export function createWsHub(opts: {
   }
 
   /**
-   * Fan one authoritative state out to the table, projected separately for every
-   * socket. This is the only place game state becomes a `snapshot` frame, so a
-   * viewer only ever receives what its own projection allows.
+   * Fan one applied intent out to the table, projected separately for every
+   * socket. This is the only place game state becomes an `applied` frame, so a
+   * viewer only ever receives what its own projection allows, and every client
+   * gets authoritative state for the seq it just advanced to.
    */
-  function publishSnapshot(
+  function publishApplied(
     tableId: string,
-    input: { seq: number; state: RawGameState; meta: TableMeta },
+    input: { seq: number; state: RawGameState; meta: TableMeta; events: EventEnvelope[] },
   ) {
     const sockets = socketsByTable.get(tableId);
     if (!sockets) return;
@@ -322,22 +391,63 @@ export function createWsHub(opts: {
     for (const socket of sockets) {
       const viewer = viewerForUser(input.meta.seatUserIds, socket.userId ?? null);
       send(socket, {
+        events: input.events,
         meta: input.meta,
         seq: input.seq,
         state: projectSnapshot(module, input.state, viewer),
         tableId,
-        type: "snapshot",
-        v: 1,
+        type: "applied",
+        v: PROTOCOL_VERSION,
       });
     }
   }
-  function publishPresence(tableId: string) {
-    publishToTable(tableId, {
-      onlineUserIds: [...(userIdsByTable.get(tableId) ?? [])].sort(),
+
+  /**
+   * Push a fresh snapshot after a mutation that did not come over the socket
+   * (start/rematch are HTTP). Without this, everyone but the host would keep
+   * rendering the finished game until they reloaded.
+   */
+  async function publishTableState(tableId: string) {
+    const live = await opts.runtime.getTableLiveState({ tableId });
+    if (!live) return;
+
+    const sockets = socketsByTable.get(tableId);
+    if (!sockets) return;
+
+    const module = live.state === null ? null : moduleOrNull(live.meta.gameId);
+    for (const socket of sockets) {
+      const viewer = viewerForUser(live.meta.seatUserIds, socket.userId ?? null);
+      send(socket, {
+        meta: live.meta,
+        seq: live.seq,
+        state: live.state === null || !module ? null : projectSnapshot(module, live.state, viewer),
+        tableId,
+        type: "snapshot",
+        v: PROTOCOL_VERSION,
+      });
+    }
+  }
+  /**
+   * Presence follows membership changes, not traffic: a socket joining a table
+   * whose roster it is already part of gets the roster itself, but the table is
+   * not told the same list again.
+   */
+  function publishPresence(tableId: string, options: { only?: HubSocket } = {}) {
+    const onlineUserIds = [...(userIdsByTable.get(tableId) ?? [])].sort();
+    const frame: ServerMessage = {
+      onlineUserIds,
       tableId,
       type: "presence",
-      v: 1,
-    });
+      v: PROTOCOL_VERSION,
+    };
+
+    if (presenceByTable.get(tableId) !== presenceKey(onlineUserIds)) {
+      presenceByTable.set(tableId, presenceKey(onlineUserIds));
+      publishToTable(tableId, frame);
+      return;
+    }
+
+    if (options.only) send(options.only, frame);
   }
 
   function pruneExpiredActions(tableId: string) {
@@ -362,6 +472,21 @@ function send(socket: WebSocket, message: ServerMessage) {
   socket.send(JSON.stringify(message));
 }
 
+function sendError(socket: WebSocket, code: string, message: string, tableId?: string) {
+  send(socket, {
+    code,
+    message,
+    ...(tableId === undefined ? {} : { tableId }),
+    type: "error",
+    v: PROTOCOL_VERSION,
+  });
+}
+
+/** Stable identity for a presence roster, so an unchanged set compares equal. */
+function presenceKey(onlineUserIds: string[]) {
+  return onlineUserIds.join("\u0000");
+}
+
 function sendSnapshot(socket: WebSocket, snapshot: TableSnapshot) {
   send(socket, {
     meta: snapshot.meta,
@@ -369,7 +494,7 @@ function sendSnapshot(socket: WebSocket, snapshot: TableSnapshot) {
     state: snapshot.state,
     tableId: snapshot.tableId,
     type: "snapshot",
-    v: 1,
+    v: PROTOCOL_VERSION,
   });
 }
 

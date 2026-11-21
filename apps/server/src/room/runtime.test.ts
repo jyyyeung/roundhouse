@@ -1,7 +1,7 @@
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it } from "vitest";
 
-import { createRoomRuntime } from "./runtime";
+import { createRoomRuntime, SYNC_REPLAY_LIMIT } from "./runtime";
 import { createFakeDb } from "./test-support/fake-db";
 
 const tableId = "table-1";
@@ -150,5 +150,91 @@ describe("room runtime intent boundary", () => {
     });
 
     expect(rolled.ok).toBe(true);
+  });
+});
+
+describe("room runtime sync", () => {
+  function syncSeed(input: { seq: number; events?: Record<string, unknown>[] }) {
+    const seed = makeSeed();
+    return {
+      ...seed,
+      game: { ...seed.game, seq: input.seq },
+      gameEvents: input.events ?? [],
+    };
+  }
+
+  function eventRow(seq: number) {
+    return {
+      actorId: "user-a",
+      createdAt: new Date("2026-08-02T00:00:00.000Z"),
+      gameId: "game-1",
+      gameRowId: "game-1",
+      id: `event-${seq}`,
+      payload: { seq },
+      seq,
+      tableId,
+      type: "dice_rolled",
+    };
+  }
+
+  it("replays exactly the events a client missed", async () => {
+    const { runtime } = makeRuntime(
+      syncSeed({ events: [eventRow(1), eventRow(2)], seq: 2 }) as never,
+    );
+
+    const sync = await runtime.getTableSync({ asUserId: "user-a", sinceSeq: 0, tableId });
+
+    expect(sync).toMatchObject({
+      fromSeq: 0,
+      kind: "events",
+      toSeq: 2,
+    });
+    expect(sync?.kind === "events" && sync.events.map((event) => event.seq)).toEqual([1, 2]);
+  });
+
+  it("answers a current client with no events at all", async () => {
+    const { runtime } = makeRuntime(syncSeed({ seq: 2 }) as never);
+
+    const sync = await runtime.getTableSync({ asUserId: "user-a", sinceSeq: 2, tableId });
+
+    expect(sync).toMatchObject({ events: [], fromSeq: 2, kind: "events", toSeq: 2 });
+  });
+
+  it("falls back to a snapshot when the gap exceeds the replay budget", async () => {
+    const { runtime } = makeRuntime(syncSeed({ seq: SYNC_REPLAY_LIMIT + 1 }) as never);
+
+    const sync = await runtime.getTableSync({ asUserId: "user-a", sinceSeq: 0, tableId });
+
+    expect(sync).toMatchObject({ kind: "snapshot", seq: SYNC_REPLAY_LIMIT + 1, tableId });
+  });
+
+  it("falls back to a snapshot when the replay has a hole in it", async () => {
+    // seq says three events happened, the log only holds two: replaying would
+    // leave the client silently misaligned, so it gets the state instead.
+    const { runtime } = makeRuntime(
+      syncSeed({ events: [eventRow(1), eventRow(2)], seq: 3 }) as never,
+    );
+
+    const sync = await runtime.getTableSync({ asUserId: "user-a", sinceSeq: 0, tableId });
+
+    expect(sync?.kind).toBe("snapshot");
+  });
+
+  it("reports a missing table as null rather than inventing state", async () => {
+    const { runtime } = makeRuntime({ game: null, seats: [], table: null } as never);
+
+    const sync = await runtime.getTableSync({ asUserId: "user-a", sinceSeq: 0, tableId: "nope" });
+
+    expect(sync).toBeNull();
+  });
+
+  it("exposes live state so an HTTP mutation can push a snapshot", async () => {
+    const { runtime } = makeRuntime(syncSeed({ seq: 4 }) as never);
+
+    const live = await runtime.getTableLiveState({ tableId });
+
+    expect(live).toMatchObject({ seq: 4, tableId });
+    expect(live?.state).not.toBeNull();
+    expect(live?.meta.seatUserIds).toEqual(playerIds);
   });
 });

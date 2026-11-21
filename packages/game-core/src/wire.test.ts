@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   clientMessageSchema,
   parseClientMessage,
+  PROTOCOL_VERSION,
   serverMessageSchema,
 } from "./wire";
 
@@ -12,22 +13,22 @@ const validIntent = {
   payload: {},
   tableId: "table-1",
   type: "intent",
-  v: 1,
+  v: 2,
 };
 
 describe("parseClientMessage", () => {
   it("accepts each client frame variant", () => {
-    expect(parseClientMessage(JSON.stringify({ tableId: "table-1", type: "subscribe", v: 1 }))).toEqual({
-      message: { tableId: "table-1", type: "subscribe", v: 1 },
+    expect(parseClientMessage(JSON.stringify({ tableId: "table-1", type: "subscribe", v: 2 }))).toEqual({
+      message: { tableId: "table-1", type: "subscribe", v: 2 },
       ok: true,
     });
     expect(parseClientMessage(JSON.stringify(validIntent))).toEqual({ message: validIntent, ok: true });
     expect(
       parseClientMessage(
-        JSON.stringify({ actionId: "action-2", tableId: "table-1", text: "hi", type: "chat", v: 1 }),
+        JSON.stringify({ actionId: "action-2", tableId: "table-1", text: "hi", type: "chat", v: 2 }),
       ),
     ).toEqual({
-      message: { actionId: "action-2", tableId: "table-1", text: "hi", type: "chat", v: 1 },
+      message: { actionId: "action-2", tableId: "table-1", text: "hi", type: "chat", v: 2 },
       ok: true,
     });
   });
@@ -43,7 +44,7 @@ describe("parseClientMessage", () => {
         text: "hi",
         type: "chat",
         actionId: "action-2",
-        v: 1,
+        v: 2,
       }),
     );
 
@@ -53,7 +54,7 @@ describe("parseClientMessage", () => {
       tableId: "table-1",
       text: "hi",
       type: "chat",
-      v: 1,
+      v: 2,
     });
   });
 
@@ -66,12 +67,12 @@ describe("parseClientMessage", () => {
   });
 
   it("distinguishes an unknown type from a malformed frame", () => {
-    expect(parseClientMessage(JSON.stringify({ type: "teleport", v: 1 }))).toMatchObject({
+    expect(parseClientMessage(JSON.stringify({ type: "teleport", v: 2 }))).toMatchObject({
       code: "unknown_message_type",
       ok: false,
     });
     // A type that isn't even a string is a malformed frame, not an unknown one.
-    expect(parseClientMessage(JSON.stringify({ type: 5, v: 1 }))).toMatchObject({
+    expect(parseClientMessage(JSON.stringify({ type: 5, v: 2 }))).toMatchObject({
       code: "bad_message",
       ok: false,
     });
@@ -85,14 +86,14 @@ describe("parseClientMessage", () => {
     expect(missingActionId).toMatchObject({ code: "bad_message", ok: false });
     expect(missingActionId.ok === false && missingActionId.detail).toContain("actionId");
 
-    const emptyTableId = parseClientMessage(JSON.stringify({ tableId: "", type: "subscribe", v: 1 }));
+    const emptyTableId = parseClientMessage(JSON.stringify({ tableId: "", type: "subscribe", v: 2 }));
     expect(emptyTableId).toMatchObject({ code: "bad_message", ok: false });
     expect(emptyTableId.ok === false && emptyTableId.detail).toContain("tableId");
   });
 
   it("rejects identifier and chat text caps", () => {
     expect(
-      parseClientMessage(JSON.stringify({ tableId: "t".repeat(65), type: "subscribe", v: 1 })),
+      parseClientMessage(JSON.stringify({ tableId: "t".repeat(65), type: "subscribe", v: 2 })),
     ).toMatchObject({ code: "bad_message", ok: false });
     expect(
       parseClientMessage(
@@ -101,7 +102,7 @@ describe("parseClientMessage", () => {
           tableId: "table-1",
           text: "x".repeat(4001),
           type: "chat",
-          v: 1,
+          v: 2,
         }),
       ),
     ).toMatchObject({ code: "bad_message", ok: false });
@@ -120,37 +121,41 @@ describe("server frames", () => {
   };
 
   it("round-trips every server frame variant", () => {
+    const event = {
+      actorId: "user-a",
+      createdAt: "2026-08-02T00:00:00.000Z",
+      gameId: "yatzy",
+      id: "event-1",
+      payload: {},
+      seq: 1,
+      tableId: "table-1",
+      type: "dice_rolled",
+    };
+    const chat = {
+      createdAt: "2026-08-02T00:00:00.000Z",
+      id: "chat-1",
+      snapshot: {},
+      text: "hi",
+      userId: "user-a",
+    };
     const frames = [
-      { meta, seq: 0, state: null, tableId: "table-1", type: "snapshot", v: 1 },
+      { meta, seq: 0, state: null, tableId: "table-1", type: "snapshot", v: 2 },
+      { events: [event], meta, seq: 1, state: { dice: [1, 2, 3, 4, 5] }, tableId: "table-1", type: "applied", v: 2 },
       {
-        event: {
-          actorId: "user-a",
-          createdAt: "2026-08-02T00:00:00.000Z",
-          gameId: "yatzy",
-          id: "event-1",
-          payload: {},
-          seq: 1,
-          tableId: "table-1",
-          type: "dice_rolled",
-        },
+        events: [event],
+        fromSeq: 0,
+        meta,
+        state: { dice: [1, 2, 3, 4, 5] },
         tableId: "table-1",
-        type: "event",
-        v: 1,
+        toSeq: 1,
+        type: "events",
+        v: 2,
       },
-      {
-        message: {
-          createdAt: "2026-08-02T00:00:00.000Z",
-          id: "chat-1",
-          snapshot: {},
-          text: "hi",
-          userId: "user-a",
-        },
-        tableId: "table-1",
-        type: "chat",
-        v: 1,
-      },
-      { code: "not_seated", message: "not_seated", tableId: "table-1", type: "error", v: 1 },
-      { onlineUserIds: ["user-a"], tableId: "table-1", type: "presence", v: 1 },
+      { message: chat, tableId: "table-1", type: "chat", v: 2 },
+      { message: chat, tableId: "table-1", type: "spoke", v: 2 },
+      { hasMore: true, messages: [chat], tableId: "table-1", type: "chatPage", v: 2 },
+      { code: "not_seated", message: "not_seated", tableId: "table-1", type: "error", v: 2 },
+      { onlineUserIds: ["user-a"], tableId: "table-1", type: "presence", v: 2 },
     ];
 
     for (const frame of frames) {
@@ -159,15 +164,32 @@ describe("server frames", () => {
   });
 
   it("rejects a snapshot whose status is not a real table status", () => {
-    const frame = { meta: { ...meta, status: "paused" }, seq: 0, state: null, tableId: "table-1", type: "snapshot", v: 1 };
+    const frame = { meta: { ...meta, status: "paused" }, seq: 0, state: null, tableId: "table-1", type: "snapshot", v: 2 };
     expect(serverMessageSchema.safeParse(frame).success).toBe(false);
   });
 });
 
 describe("clientMessageSchema", () => {
-  it("requires protocol version 1", () => {
-    expect(clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: 2 }).success).toBe(
-      false,
+  it("requires the current protocol version", () => {
+    expect(clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: PROTOCOL_VERSION }).success).toBe(
+      true,
     );
+    expect(clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: 1 }).success).toBe(false);
+  });
+
+  it("accepts a resync request and a chat page request", () => {
+    expect(
+      clientMessageSchema.safeParse({ sinceSeq: 4, tableId: "table-1", type: "sync", v: PROTOCOL_VERSION })
+        .success,
+    ).toBe(true);
+    expect(
+      clientMessageSchema.safeParse({ beforeId: "chat-1", tableId: "table-1", type: "chatPage", v: PROTOCOL_VERSION })
+        .success,
+    ).toBe(true);
+    expect(clientMessageSchema.safeParse({ tableId: "table-1", type: "sync", v: PROTOCOL_VERSION }).success).toBe(false);
+  });
+
+  it("ignores a protocol version from the future", () => {
+    expect(clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: 99 }).success).toBe(false);
   });
 });

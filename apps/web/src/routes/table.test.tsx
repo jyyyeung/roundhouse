@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import type { ServerMessage, TableMeta } from "@roundhouse/game-core";
+import type { ClientMessage, ServerMessage, TableMeta } from "@roundhouse/game-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TablePage } from "./table";
@@ -59,9 +59,45 @@ function baseMeta(overrides?: Partial<TableMeta>): TableMeta {
   };
 }
 
+function emptySheet() {
+  return {
+    ones: null,
+    twos: null,
+    threes: null,
+    fours: null,
+    fives: null,
+    sixes: null,
+    one_pair: null,
+    two_pairs: null,
+    three_kind: null,
+    four_kind: null,
+    small_straight: null,
+    large_straight: null,
+    full_house: null,
+    chance: null,
+    yatzy: null,
+    bonus: null,
+  };
+}
+
+function activeState(overrides: Record<string, unknown> = {}) {
+  return {
+    ruleset: "yatzy",
+    playerIds: ["user-a", "user-b"],
+    currentPlayerId: "user-a",
+    rollsLeft: 3,
+    dice: [1, 2, 3, 4, 5],
+    holds: [false, false, false, false, false],
+    sheets: { "user-a": emptySheet(), "user-b": emptySheet() },
+    phase: "playing",
+    winnerIds: [],
+    ...overrides,
+  };
+}
+
 describe("TablePage", () => {
   let onMessage: ((message: ServerMessage) => void) | undefined;
-  const send = vi.fn(() => true);
+  const send = vi.fn((_frame: ClientMessage) => true);
   const close = vi.fn();
   const isOpen = vi.fn(() => true);
   const originalCrypto = globalThis.crypto;
@@ -104,7 +140,7 @@ describe("TablePage", () => {
 
     act(() => {
       onMessage?.({
-        v: 1,
+        v: 2,
         type: "snapshot",
         tableId: "table-123",
         seq: 0,
@@ -125,7 +161,7 @@ describe("TablePage", () => {
 
     act(() => {
       onMessage?.({
-        v: 1,
+        v: 2,
         type: "snapshot",
         tableId: "table-123",
         seq: 0,
@@ -185,7 +221,7 @@ describe("TablePage", () => {
 
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
-        v: 1,
+        v: 2,
         type: "intent",
         tableId: "table-123",
         actionId: "action-123",
@@ -202,7 +238,7 @@ describe("TablePage", () => {
 
     act(() => {
       onMessage?.({
-        v: 1,
+        v: 2,
         type: "snapshot",
         tableId: "table-123",
         seq: 0,
@@ -223,7 +259,7 @@ describe("TablePage", () => {
         },
       });
       onMessage?.({
-        v: 1,
+        v: 2,
         type: "chat",
         tableId: "table-123",
         message: {
@@ -262,7 +298,7 @@ describe("TablePage", () => {
 
     act(() => {
       onMessage?.({
-        v: 1,
+        v: 2,
         type: "snapshot",
         tableId: "table-123",
         seq: 0,
@@ -352,5 +388,178 @@ describe("TablePage", () => {
     await waitFor(() => expect(mockedJoinTable).toHaveBeenCalledWith({ code: "ABCD23" }));
     await waitFor(() => expect(mockedGetRecentTables).toHaveBeenCalled());
     await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+  });
+
+  it("applies an applied frame without ever re-subscribing", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta({ status: "active" }),
+        state: activeState(),
+      });
+    });
+    send.mockClear();
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "applied",
+        tableId: "table-123",
+        seq: 1,
+        meta: baseMeta({ status: "active" }),
+        state: activeState({ dice: [6, 6, 1, 2, 3], rollsLeft: 2 }),
+        events: [
+          {
+            id: "event-1",
+            tableId: "table-123",
+            gameId: "game-1",
+            seq: 1,
+            type: "dice_rolled",
+            actorId: "user-a",
+            payload: {},
+            createdAt: "2026-08-02T08:00:00.000Z",
+          },
+        ],
+      });
+    });
+
+    expect(send.mock.calls.map(([frame]) => frame.type)).toEqual([]);
+    expect(await screen.findByText(/2 rolls left/i)).toBeInTheDocument();
+  });
+
+  it("asks for the missing range instead of rendering a state it cannot place", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 1,
+        meta: baseMeta({ status: "active" }),
+        state: activeState(),
+      });
+    });
+    send.mockClear();
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "applied",
+        tableId: "table-123",
+        seq: 4,
+        meta: baseMeta({ status: "active" }),
+        state: activeState({ dice: [6, 6, 6, 6, 6] }),
+        events: [],
+      });
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ v: 2, type: "sync", tableId: "table-123", sinceSeq: 1 }),
+    );
+    expect(screen.queryByText(/roll dice/i)).toBeInTheDocument();
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "events",
+        tableId: "table-123",
+        fromSeq: 1,
+        toSeq: 4,
+        meta: baseMeta({ status: "active" }),
+        state: activeState({ dice: [6, 5, 4, 3, 2] }),
+        events: [],
+      });
+    });
+
+    expect(await screen.findByText(/2 rolls left|3 rolls left/i)).toBeInTheDocument();
+  });
+
+  it("pulls one bounded chat page per snapshot and pages older history on demand", async () => {
+    const user = userEvent.setup();
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta({ status: "active" }),
+        state: activeState(),
+      });
+    });
+
+    expect(send.mock.calls.map(([frame]) => frame.type)).toEqual(["chatPage"]);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ v: 2, type: "chatPage", tableId: "table-123" }),
+    );
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "chatPage",
+        tableId: "table-123",
+        hasMore: true,
+        messages: [
+          {
+            id: "chat-2",
+            userId: "user-b",
+            text: "Second message",
+            createdAt: "2026-08-02T08:01:00.000Z",
+            snapshot: null,
+          },
+          {
+            id: "chat-3",
+            userId: "user-a",
+            text: "Third message",
+            createdAt: "2026-08-02T08:02:00.000Z",
+            snapshot: null,
+          },
+        ],
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: /chat/i }));
+    await user.click(await screen.findByRole("button", { name: /load earlier messages/i }));
+
+    expect(send).toHaveBeenLastCalledWith(
+      expect.objectContaining({ v: 2, type: "chatPage", tableId: "table-123", beforeId: "chat-2" }),
+    );
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "chatPage",
+        tableId: "table-123",
+        hasMore: false,
+        messages: [
+          {
+            id: "chat-1",
+            userId: "user-b",
+            text: "First message",
+            createdAt: "2026-08-02T08:00:00.000Z",
+            snapshot: null,
+          },
+        ],
+      });
+    });
+
+    expect(await screen.findByText("First message")).toBeInTheDocument();
+    expect(screen.getByText("Third message")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /load earlier messages/i })).not.toBeInTheDocument(),
+    );
   });
 });

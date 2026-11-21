@@ -11,6 +11,8 @@ export type FakeDbSeed = {
   table?: Record<string, unknown> | null;
   seats?: Record<string, unknown>[];
   game?: Record<string, unknown> | null;
+  /** Rows the next `select` on game_event returns, in whatever order seeded. */
+  gameEvents?: Record<string, unknown>[];
 };
 
 const tableNames = new Map<unknown, string>([
@@ -56,6 +58,7 @@ export function createFakeDb(seed: FakeDbSeed) {
     if (table === gameTable) return seed.table ? [seed.table] : [];
     if (table === tablePlayer) return seed.seats ?? [];
     if (table === game) return seed.game ? [seed.game] : [];
+    if (table === gameEvent) return seed.gameEvents ?? [];
     return [];
   };
 

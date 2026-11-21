@@ -13,6 +13,9 @@ type GameViewProps = {
   onIntent: (type: string, payload: Json) => void;
   onSendChat: (text: string) => void;
   rollVersion: number;
+  hasMoreChat: boolean;
+  loadingOlderChat: boolean;
+  onLoadOlderChat: () => void;
 };
 
 export function renderGameView(props: GameViewProps) {
@@ -27,6 +30,9 @@ export function renderGameView(props: GameViewProps) {
         onIntent={props.onIntent}
         onSendChat={props.onSendChat}
         rollVersion={props.rollVersion}
+        hasMoreChat={props.hasMoreChat}
+        loadingOlderChat={props.loadingOlderChat}
+        onLoadOlderChat={props.onLoadOlderChat}
       />
     );
   }

@@ -12,6 +12,9 @@ const baseProps = {
   onSend: vi.fn(),
   draft: "",
   onDraftChange: vi.fn(),
+  hasMoreChat: false,
+  loadingOlderChat: false,
+  onLoadOlderChat: vi.fn(),
 };
 
 describe("ChatPanel", () => {

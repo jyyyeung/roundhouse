@@ -18,6 +18,9 @@ type YatzyTableProps = {
   onIntent: (type: string, payload: Json) => void;
   onSendChat: (text: string) => void;
   rollVersion: number;
+  hasMoreChat: boolean;
+  loadingOlderChat: boolean;
+  onLoadOlderChat: () => void;
 };
 
 function useXlChatDock() {
@@ -185,6 +188,9 @@ export function YatzyTable(props: YatzyTableProps) {
             onSend={handleSendChat}
             draft={draft}
             onDraftChange={setDraft}
+            hasMoreChat={props.hasMoreChat}
+            loadingOlderChat={props.loadingOlderChat}
+            onLoadOlderChat={props.onLoadOlderChat}
           />
         </div>
       </div>

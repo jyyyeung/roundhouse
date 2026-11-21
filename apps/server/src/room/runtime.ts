@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import type { ClientIntent, EventEnvelope, Json, RawGameState, TableMeta, ViewerView } from "@roundhouse/game-core";
 import { generateInviteCode, parseIntent } from "@roundhouse/game-core";
 
@@ -10,6 +10,7 @@ import { projectSnapshot, rawGameState, viewerForUser } from "./projection";
 type TableRow = typeof gameTable.$inferSelect;
 type GameRow = typeof game.$inferSelect;
 type SeatRow = typeof tablePlayer.$inferSelect;
+type GameEventRow = typeof gameEvent.$inferSelect;
 type DbLike = Pick<Database, "select" | "insert" | "update" | "transaction" | "execute">;
 
 /**
@@ -60,6 +61,8 @@ export type TablesRuntime = {
   rematchTable(input: { userId: string; tableId: string }): Promise<{ tableId: string; gameRowId: string }>;
   getMine(input: { userId: string }): Promise<TableSummary[]>;
   getTableSnapshot(input: { tableId: string; asUserId: string | null }): Promise<TableSnapshot | null>;
+  getTableSync(input: { tableId: string; asUserId: string | null; sinceSeq: number }): Promise<TableSync | null>;
+  getTableLiveState(input: { tableId: string }): Promise<TableLiveState | null>;
   applyGameIntent(input: {
     tableId: string;
     userId: string;
@@ -75,6 +78,30 @@ export type TableSnapshot = {
   state: Json;
   meta: TableMeta;
 };
+
+/** Events a `sync` may replay before the hub falls back to a full snapshot. */
+export const SYNC_REPLAY_LIMIT = 200;
+
+/**
+ * Answer to a gap repair (ADR 0003). Either the missed frames are replayed from
+ * the event log, or the gap is too big (or the log too holey) and the caller
+ * starts over from `snapshot`. Both branches carry authoritative state, so a
+ * client can never end up "synced" on invented state.
+ */
+export type TableSync =
+  | {
+      kind: "events";
+      tableId: string;
+      fromSeq: number;
+      toSeq: number;
+      state: Json;
+      meta: TableMeta;
+      events: EventEnvelope[];
+    }
+  | { kind: "snapshot"; tableId: string; seq: number; state: Json; meta: TableMeta };
+
+/** Unprojected live state: the hub projects it per socket after an HTTP mutation. */
+export type TableLiveState = { tableId: string; seq: number; state: RawGameState | null; meta: TableMeta };
 
 export type ApplyGameIntentResult =
   | {
@@ -130,6 +157,20 @@ async function lockTableById(db: DbLike, tableId: string) {
 
 async function lockTableByCode(db: DbLike, code: string) {
   await db.execute(sql`select ${gameTable.id} from ${gameTable} where ${gameTable.code} = ${code} for update`);
+}
+
+/** Stored event row → wire envelope. The inverse of nothing yet: #13 adds fold. */
+function toEventEnvelope(row: GameEventRow): EventEnvelope {
+  return {
+    actorId: row.actorId,
+    createdAt: row.createdAt.toISOString(),
+    gameId: row.gameId,
+    id: row.id,
+    payload: row.payload as Json,
+    seq: row.seq,
+    tableId: row.tableId,
+    type: row.type,
+  };
 }
 
 function isUniqueViolation(error: unknown) {
@@ -375,6 +416,79 @@ export function createRoomRuntime(db: Database): TablesRuntime {
         seq: currentGame?.seq ?? 0,
         state: projectForViewer(currentGame, viewerForUser(table.seatUserIds, asUserId)),
       };
+    },
+
+    async getTableLiveState({ tableId }) {
+      const table = await loadTableById(db, tableId);
+      if (!table) return null;
+      const currentGame = table.currentGame;
+
+      return {
+        meta: toTableMeta(table, currentGame),
+        seq: currentGame?.seq ?? 0,
+        state: currentGame ? rawGameState(currentGame.state) : null,
+        tableId,
+      };
+    },
+
+    async getTableSync({ tableId, asUserId, sinceSeq }) {
+      const table = await loadTableById(db, tableId);
+      if (!table) return null;
+
+      const currentGame = table.currentGame;
+      const meta = toTableMeta(table, currentGame);
+      const viewer = viewerForUser(table.seatUserIds, asUserId);
+      const toSeq = currentGame?.seq ?? 0;
+      const snapshot: TableSync = {
+        kind: "snapshot",
+        meta,
+        seq: toSeq,
+        state: projectForViewer(currentGame, viewer),
+        tableId,
+      };
+
+      // No game yet, or nothing missed: answer with the current state and no
+      // events, so "sync" always terminates even when the client is ahead.
+      if (!currentGame || sinceSeq >= toSeq) {
+        return {
+          events: [],
+          fromSeq: Math.min(sinceSeq, toSeq),
+          kind: "events",
+          meta,
+          state: projectForViewer(currentGame, viewer),
+          tableId,
+          toSeq,
+        } satisfies TableSync;
+      }
+
+      // A gap wider than the replay budget is cheaper to answer with one snapshot
+      // than with a page of events the client would have to fold.
+      if (toSeq - sinceSeq > SYNC_REPLAY_LIMIT) {
+        return snapshot;
+      }
+
+      const rows = await db
+        .select()
+        .from(gameEvent)
+        .where(and(eq(gameEvent.gameRowId, currentGame.id), gt(gameEvent.seq, sinceSeq)))
+        .orderBy(asc(gameEvent.seq))
+        .limit(SYNC_REPLAY_LIMIT);
+
+      // The replay has to cover the whole gap. A pruned or half-written log would
+      // leave a hole the client cannot detect, so fall back to the snapshot.
+      if (rows.length !== toSeq - sinceSeq) {
+        return snapshot;
+      }
+
+      return {
+        events: rows.map(toEventEnvelope),
+        fromSeq: sinceSeq,
+        kind: "events",
+        meta,
+        state: projectForViewer(currentGame, viewer),
+        tableId,
+        toSeq,
+      } satisfies TableSync;
     },
 
     async applyGameIntent({ tableId, userId, intent, randomInt = defaultRandomInt, now = () => new Date() }) {

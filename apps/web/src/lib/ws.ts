@@ -1,4 +1,5 @@
 import type { ClientMessage, ServerMessage } from "@roundhouse/game-core";
+import { PROTOCOL_VERSION } from "@roundhouse/game-core";
 
 function toWebSocketUrl(apiUrl: string) {
   const url = new URL("/ws", apiUrl);
@@ -34,7 +35,7 @@ export function connectTableWs(opts: {
     if (socket.readyState !== WebSocket.OPEN) return;
     socket.send(
       JSON.stringify({
-        v: 1,
+        v: PROTOCOL_VERSION,
         type: "subscribe",
         tableId: opts.tableId,
       } satisfies ClientMessage),

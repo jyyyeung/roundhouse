@@ -6,11 +6,15 @@
 export type {
   ChatWire,
   ClientChatMessage,
+  ClientChatPageMessage,
   ClientIntentMessage,
   ClientMessage,
   ClientMessageErrorCode,
+  ClientSubscribeMessage,
+  ClientSyncMessage,
   ClientTableMessage,
   ParseClientMessageResult,
   ServerMessage,
   TableMeta,
 } from "./wire";
+export { PROTOCOL_VERSION } from "./wire";

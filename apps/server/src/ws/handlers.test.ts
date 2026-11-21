@@ -76,7 +76,7 @@ describe("ws handlers", () => {
     const runtime = makeRuntime();
     const handlers = createWsHandlers({
       runtime,
-      publishSnapshot: () => {},
+      publishApplied: () => {},
       isDuplicateAction: () => false,
       rememberAction: () => {},
       forgetAction: () => {},
@@ -98,7 +98,7 @@ describe("ws handlers", () => {
         payload: {} satisfies Json,
         tableId: "table-1",
         type: "intent",
-        v: 1,
+        v: 2,
       },
     );
 
@@ -109,7 +109,7 @@ describe("ws handlers", () => {
         message: "not_your_turn",
         tableId: "table-1",
         type: "error",
-        v: 1,
+        v: 2,
       },
     ]);
     expect(published).toEqual([]);
@@ -134,7 +134,7 @@ describe("ws handlers", () => {
     const actionIds = new Set<string>();
     const handlers = createWsHandlers({
       runtime,
-      publishSnapshot: () => {},
+      publishApplied: () => {},
       isDuplicateAction: (_tableId, actionId) => actionIds.has(actionId),
       rememberAction: (_tableId, actionId) => actionIds.add(actionId),
       forgetAction: (_tableId, actionId) => actionIds.delete(actionId),
@@ -156,7 +156,7 @@ describe("ws handlers", () => {
         payload: {} satisfies Json,
         tableId: "table-1",
         type: "intent",
-        v: 1,
+        v: 2,
       },
     );
 
@@ -172,7 +172,7 @@ describe("ws handlers", () => {
         payload: {} satisfies Json,
         tableId: "table-1",
         type: "intent",
-        v: 1,
+        v: 2,
       },
     );
 
@@ -198,7 +198,7 @@ describe("ws handlers", () => {
     const actionIds = new Set<string>();
     const handlers = createWsHandlers({
       runtime,
-      publishSnapshot: () => {},
+      publishApplied: () => {},
       isDuplicateAction: (_tableId, actionId) => actionIds.has(actionId),
       rememberAction: (_tableId, actionId) => actionIds.add(actionId),
       forgetAction: (_tableId, actionId) => actionIds.delete(actionId),
@@ -220,7 +220,7 @@ describe("ws handlers", () => {
         payload: {} satisfies Json,
         tableId: "table-1",
         type: "intent",
-        v: 1,
+        v: 2,
       },
     );
 
@@ -236,7 +236,7 @@ describe("ws handlers", () => {
         payload: {} satisfies Json,
         tableId: "table-1",
         type: "intent",
-        v: 1,
+        v: 2,
       },
     );
 
@@ -259,7 +259,7 @@ describe("ws handlers action reservations", () => {
     const actionIds = new Set<string>();
     const handlers = createWsHandlers({
       runtime,
-      publishSnapshot: () => {},
+      publishApplied: () => {},
       isDuplicateAction: (_tableId, actionId) => actionIds.has(actionId),
       rememberAction: (_tableId, actionId) => actionIds.add(actionId),
       forgetAction: (_tableId, actionId) => actionIds.delete(actionId),
@@ -272,7 +272,7 @@ describe("ws handlers action reservations", () => {
       payload: {} satisfies Json,
       tableId: "table-other",
       type: "intent",
-      v: 1,
+      v: 2,
     } satisfies ClientTableMessage;
 
     await handlers.onMessage({ send() {}, userId: "user-a" }, message);

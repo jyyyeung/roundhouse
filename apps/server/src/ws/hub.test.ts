@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "node:http";
-import type { RawGameState, TableMeta } from "@roundhouse/game-core";
+import type { ChatWire, RawGameState, TableMeta } from "@roundhouse/game-core";
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,11 +21,40 @@ function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
     applyGameIntent: vi.fn(),
     createTable: vi.fn(),
     getMine: vi.fn(),
+    getTableLiveState: vi.fn(),
     getTableSnapshot: vi.fn(),
+    getTableSync: vi.fn(),
     joinTable: vi.fn(),
     rematchTable: vi.fn(),
     startTable: vi.fn(),
     ...overrides,
+  };
+}
+
+function lobbySnapshot(seatUserIds: string[]): TableSnapshot {
+  return {
+    tableId: "table-1",
+    seq: 1,
+    state: null,
+    meta: {
+      code: "ABCD23",
+      config: { ruleset: "yatzy" },
+      gameId: "yatzy",
+      hostUserId: seatUserIds[0],
+      seatUserIds,
+      softSeatCap: 4,
+      status: "lobby",
+    },
+  };
+}
+
+function chatWire(id: string, text: string): ChatWire {
+  return {
+    createdAt: "2026-08-02T08:00:00.000Z",
+    id,
+    snapshot: { tableId: "table-1" },
+    text,
+    userId: "user-a",
   };
 }
 
@@ -116,14 +145,14 @@ describe("ws hub access control", () => {
 
     await hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
     await socket.emitMessage({
-      v: 1,
+      v: 2,
       type: "subscribe",
       tableId: "table-1",
     });
 
     expect(socket.sent.map((message) => JSON.parse(message))).toEqual([
       expect.objectContaining({
-        v: 1,
+        v: 2,
         type: "error",
         code: "not_seated",
         message: "not_seated",
@@ -163,7 +192,7 @@ describe("ws hub access control", () => {
 
     const connected = hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
     await socket.emitMessage({
-      v: 1,
+      v: 2,
       type: "subscribe",
       tableId: "table-1",
     });
@@ -175,7 +204,7 @@ describe("ws hub access control", () => {
     expect(socket.sent.map((message) => JSON.parse(message))).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          v: 1,
+          v: 2,
           type: "snapshot",
           tableId: "table-1",
           seq: 2,
@@ -184,67 +213,96 @@ describe("ws hub access control", () => {
     );
   });
 
-  it("replays persisted chat history on subscribe", async () => {
-    const snapshot: TableSnapshot = {
-      tableId: "table-1",
-      seq: 1,
-      state: null,
-      meta: {
-        code: "ABCD23",
-        config: { ruleset: "yatzy" },
-        gameId: "yatzy",
-        hostUserId: "user-a",
-        seatUserIds: ["user-a"],
-        softSeatCap: 4,
-        status: "lobby",
-      },
-    };
-    vi.mocked(listChatMessagesForTable).mockResolvedValueOnce([
-      {
-        id: "chat-1",
-        userId: "user-a",
-        text: "hello again",
-        snapshot: { tableId: "table-1" },
-        createdAt: new Date("2026-08-02T08:00:00.000Z"),
-      },
-    ]);
-
+  it("never replays chat history as a side effect of subscribing", async () => {
     const hub = createWsHub({
       runtime: makeRuntime({
-        getTableSnapshot: vi.fn().mockResolvedValue(snapshot),
+        getTableSnapshot: vi.fn().mockResolvedValue(lobbySnapshot(["user-a"])),
       }),
       getSessionFromHeaders: async () => ({ user: { id: "user-a" } }),
     });
     const socket = new MockSocket();
 
     await hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
-    await socket.emitMessage({
-      v: 1,
-      type: "subscribe",
-      tableId: "table-1",
-    });
+    await socket.emitMessage({ v: 2, type: "subscribe", tableId: "table-1" });
 
-    expect(listChatMessagesForTable).toHaveBeenCalledWith(expect.anything(), "table-1");
-    expect(socket.sent.map((message) => JSON.parse(message))).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: "snapshot", tableId: "table-1" }),
-        expect.objectContaining({
-          type: "chat",
-          tableId: "table-1",
-          message: expect.objectContaining({
-            id: "chat-1",
-            text: "hello again",
-            userId: "user-a",
-            createdAt: "2026-08-02T08:00:00.000Z",
-          }),
-        }),
-      ]),
-    );
+    const frames = socket.sent.map((message) => JSON.parse(message));
+    expect(frames.map((frame) => frame.type)).toEqual(["snapshot", "presence"]);
+    expect(listChatMessagesForTable).not.toHaveBeenCalled();
+  });
+
+  it("serves the newest chat page on request", async () => {
+    const hub = createWsHub({
+      runtime: makeRuntime({
+        getTableSnapshot: vi.fn().mockResolvedValue(lobbySnapshot(["user-a"])),
+      }),
+      getSessionFromHeaders: async () => ({ user: { id: "user-a" } }),
+      listChatPage: vi.fn().mockResolvedValue({
+        hasMore: true,
+        messages: [chatWire("chat-1", "hello again")],
+      }),
+    });
+    const socket = new MockSocket();
+
+    await hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
+    await socket.emitMessage({ v: 2, type: "subscribe", tableId: "table-1" });
+    await socket.emitMessage({ v: 2, type: "chatPage", tableId: "table-1" });
+
+    const frame = socket
+      .frames()
+      .find((candidate) => candidate.type === "chatPage");
+
+    expect(frame).toEqual({
+      hasMore: true,
+      messages: [chatWire("chat-1", "hello again")],
+      tableId: "table-1",
+      type: "chatPage",
+      v: 2,
+    });
+  });
+
+  it("asks for older chat with a cursor", async () => {
+    const listChatPage = vi
+      .fn()
+      .mockResolvedValue({ hasMore: false, messages: [chatWire("chat-0", "older")] });
+    const hub = createWsHub({
+      runtime: makeRuntime({
+        getTableSnapshot: vi.fn().mockResolvedValue(lobbySnapshot(["user-a"])),
+      }),
+      getSessionFromHeaders: async () => ({ user: { id: "user-a" } }),
+      listChatPage,
+    });
+    const socket = new MockSocket();
+
+    await hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
+    await socket.emitMessage({ v: 2, type: "subscribe", tableId: "table-1" });
+    await socket.emitMessage({ v: 2, type: "chatPage", tableId: "table-1", beforeId: "chat-1" });
+
+    expect(listChatPage).toHaveBeenLastCalledWith({ beforeId: "chat-1", tableId: "table-1" });
+  });
+
+  it("refuses a chat page for a table the socket never subscribed to", async () => {
+    const listChatPage = vi.fn();
+    const hub = createWsHub({
+      runtime: makeRuntime({
+        getTableSnapshot: vi.fn().mockResolvedValue(lobbySnapshot(["user-a"])),
+      }),
+      getSessionFromHeaders: async () => ({ user: { id: "user-a" } }),
+      listChatPage,
+    });
+    const socket = new MockSocket();
+
+    await hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
+    await socket.emitMessage({ v: 2, type: "chatPage", tableId: "table-1" });
+
+    expect(listChatPage).not.toHaveBeenCalled();
+    expect(socket.frames()).toEqual([
+      expect.objectContaining({ code: "not_subscribed", type: "error" }),
+    ]);
   });
 });
 
 describe("ws hub snapshot projection", () => {
-  it("projects game state separately for each connected viewer", async () => {
+  it("carries authoritative state to every viewer on an applied intent", async () => {
     const meta: TableMeta = {
       code: "ABCD23",
       config: { ruleset: "yatzy" },
@@ -274,12 +332,12 @@ describe("ws hub snapshot projection", () => {
 
     const socketA = new MockSocket();
     await hub.handleConnection(socketA as any, { headers: {} } as IncomingMessage);
-    await socketA.emitMessage({ tableId: "table-1", type: "subscribe", v: 1 });
+    await socketA.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
 
     nextUserId = "user-b";
     const socketB = new MockSocket();
     await hub.handleConnection(socketB as any, { headers: {} } as IncomingMessage);
-    await socketB.emitMessage({ tableId: "table-1", type: "subscribe", v: 1 });
+    await socketB.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
 
     socketA.sent.length = 0;
     socketB.sent.length = 0;
@@ -290,13 +348,13 @@ describe("ws hub snapshot projection", () => {
       payload: {},
       tableId: "table-1",
       type: "intent",
-      v: 1,
+      v: 2,
     });
 
     const snapshotFor = (socket: MockSocket) =>
       socket.sent
         .map((message) => JSON.parse(message))
-        .find((message) => message.type === "snapshot");
+        .find((message) => message.type === "applied");
 
     const frameA = snapshotFor(socketA);
     const frameB = snapshotFor(socketB);
@@ -345,19 +403,19 @@ describe("ws hub message boundary", () => {
     await socket.emitRaw("{not json");
 
     expect(socket.frames()).toEqual([
-      expect.objectContaining({ code: "bad_message", type: "error", v: 1 }),
+      expect.objectContaining({ code: "bad_message", type: "error", v: 2 }),
     ]);
     expect(socket.closed).toBeNull();
 
     // The connection still works afterwards: a bad frame must not wedge the stream.
-    await socket.emitMessage({ tableId: "table-1", type: "subscribe", v: 1 });
+    await socket.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
     expect(socket.frames().some((frame) => frame.type === "snapshot")).toBe(true);
   });
 
   it("reports an unknown message type without closing", async () => {
     const socket = await connect(makeHub());
 
-    await socket.emitRaw(JSON.stringify({ type: "teleport", v: 1 }));
+    await socket.emitRaw(JSON.stringify({ type: "teleport", v: 2 }));
 
     expect(socket.frames()).toEqual([
       expect.objectContaining({ code: "unknown_message_type", type: "error" }),
@@ -368,12 +426,12 @@ describe("ws hub message boundary", () => {
   it("reports a frame that fails the schema with the field that failed", async () => {
     const socket = await connect(makeHub());
 
-    await socket.emitRaw(JSON.stringify({ tableId: "table-1", type: "subscribe", v: 1, extra: true }));
+    await socket.emitRaw(JSON.stringify({ tableId: "table-1", type: "subscribe", v: 2, extra: true }));
 
     // Unknown keys are stripped rather than rejected, so this one still works.
     expect(socket.frames().some((frame) => frame.type === "snapshot")).toBe(true);
 
-    await socket.emitRaw(JSON.stringify({ tableId: "", type: "subscribe", v: 1 }));
+    await socket.emitRaw(JSON.stringify({ tableId: "", type: "subscribe", v: 2 }));
     const errors = socket.frames().filter((frame) => frame.type === "error");
     expect(errors).toHaveLength(1);
     expect(errors[0].code).toBe("bad_message");
@@ -383,7 +441,7 @@ describe("ws hub message boundary", () => {
   it("refuses an oversized frame and closes with 1009", async () => {
     const socket = await connect(makeHub());
 
-    await socket.emitRaw(JSON.stringify({ text: "x".repeat(70 * 1024), type: "chat", v: 1 }));
+    await socket.emitRaw(JSON.stringify({ text: "x".repeat(70 * 1024), type: "chat", v: 2 }));
 
     expect(socket.frames()).toEqual([
       expect.objectContaining({ code: "frame_too_large", type: "error" }),
@@ -398,5 +456,128 @@ describe("ws hub message boundary", () => {
       expect.objectContaining({ code: "not_authenticated", type: "error" }),
     ]);
     expect(socket.closed).toEqual({ code: 4401, reason: "not_authenticated" });
+  });
+});
+
+describe("ws hub sync v2", () => {
+  const meta: TableMeta = {
+    code: "ABCD23",
+    config: { ruleset: "yatzy" },
+    gameId: "yatzy",
+    hostUserId: "user-a",
+    seatUserIds: ["user-a", "user-b"],
+    softSeatCap: 4,
+    status: "active",
+  };
+  const activeState = yatzyModule.createInitialState({ ruleset: "yatzy" }, meta.seatUserIds) as unknown as
+    RawGameState;
+
+  function makeHub(overrides: Partial<TablesRuntime> = {}, userId = "user-a") {
+    let seq = 0;
+    return createWsHub({
+      runtime: makeRuntime({
+        applyGameIntent: vi.fn().mockImplementation(async () => {
+          seq += 1;
+          return { events: [], finished: false, meta, ok: true, seq, state: activeState };
+        }),
+        getTableSnapshot: vi.fn().mockResolvedValue({ meta, seq: 0, state: activeState, tableId: "table-1" }),
+        ...overrides,
+      }),
+      getSessionFromHeaders: async () => ({ user: { id: userId } }),
+    });
+  }
+
+  async function subscribe(hub: ReturnType<typeof createWsHub>) {
+    const socket = new MockSocket();
+    await hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
+    await socket.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+    socket.sent.length = 0;
+    return socket;
+  }
+
+  it("answers every intent with one applied frame and no chat re-reads", async () => {
+    const hub = makeHub();
+    const socket = await subscribe(hub);
+
+    for (let roll = 0; roll < 50; roll += 1) {
+      await socket.emitMessage({
+        actionId: `action-${roll}`,
+        intentType: "roll",
+        payload: {},
+        tableId: "table-1",
+        type: "intent",
+        v: 2,
+      });
+    }
+
+    const frames = socket.frames();
+    expect(frames).toHaveLength(50);
+    expect(frames.every((frame) => frame.type === "applied")).toBe(true);
+    expect(frames.map((frame) => frame.seq)).toEqual(Array.from({ length: 50 }, (_, i) => i + 1));
+    // The v1 storm: every event re-subscribed, which re-read 200 chat rows.
+    expect(listChatMessagesForTable).not.toHaveBeenCalled();
+  });
+
+  it("replays the gap on sync instead of resending the table", async () => {
+    const hub = makeHub({
+      getTableSync: vi.fn().mockResolvedValue({
+        events: [
+          {
+            actorId: "user-b",
+            createdAt: "2026-08-02T00:00:00.000Z",
+            gameId: "game-1",
+            id: "event-2",
+            payload: {},
+            seq: 2,
+            tableId: "table-1",
+            type: "dice_held",
+          },
+        ],
+        fromSeq: 1,
+        kind: "events",
+        meta,
+        state: activeState,
+        tableId: "table-1",
+        toSeq: 2,
+      }),
+    });
+    const socket = await subscribe(hub);
+
+    await socket.emitMessage({ sinceSeq: 1, tableId: "table-1", type: "sync", v: 2 });
+
+    expect(socket.frames()).toEqual([
+      expect.objectContaining({ fromSeq: 1, toSeq: 2, type: "events" }),
+    ]);
+  });
+
+  it("falls back to a snapshot when the replay is too old", async () => {
+    const hub = makeHub({
+      getTableSync: vi.fn().mockResolvedValue({
+        kind: "snapshot",
+        meta,
+        seq: 900,
+        state: activeState,
+        tableId: "table-1",
+      }),
+    });
+    const socket = await subscribe(hub);
+
+    await socket.emitMessage({ sinceSeq: 1, tableId: "table-1", type: "sync", v: 2 });
+
+    expect(socket.frames()).toEqual([expect.objectContaining({ seq: 900, type: "snapshot" })]);
+  });
+
+  it("does not rebroadcast presence for a second socket of an online user", async () => {
+    const hub = makeHub();
+    const first = await subscribe(hub);
+    // Same user, second tab: the roster did not change for anyone else.
+    const secondSocket = new MockSocket();
+    await hub.handleConnection(secondSocket as any, { headers: {} } as IncomingMessage);
+    await secondSocket.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+
+    expect(first.frames().filter((frame) => frame.type === "presence")).toEqual([]);
+    expect(secondSocket.frames()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: "presence" })]),
+    );
   });
 });

@@ -1,7 +1,15 @@
-import type { ClientTableMessage, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
-import { intentFromClientMessage } from "@roundhouse/game-core";
+import type {
+  ClientTableMessage,
+  EventEnvelope,
+  RawGameState,
+  ServerMessage,
+  TableMeta,
+} from "@roundhouse/game-core";
+import { intentFromClientMessage, PROTOCOL_VERSION } from "@roundhouse/game-core";
 
-import type { ApplyGameIntentResult, TablesRuntime } from "../room/runtime";
+import type { TablesRuntime } from "../room/runtime";
+import { toChatWire } from "./persistence";
+
 
 export type WsRuntime = Pick<TablesRuntime, "applyGameIntent" | "getTableSnapshot">;
 
@@ -18,7 +26,10 @@ export function createWsHandlers(deps: {
    * Broadcasts projection-safe game state. The hub fans this out per socket,
    * projecting for each viewer; handlers never build a state frame themselves.
    */
-  publishSnapshot: (tableId: string, input: { seq: number; state: RawGameState; meta: TableMeta }) => void;
+  publishApplied: (
+    tableId: string,
+    input: { seq: number; state: RawGameState; meta: TableMeta; events: EventEnvelope[] },
+  ) => void;
   isDuplicateAction: (tableId: string, actionId: string) => boolean;
   rememberAction: (tableId: string, actionId: string) => void;
   forgetAction: (tableId: string, actionId: string) => void;
@@ -38,7 +49,7 @@ export function createWsHandlers(deps: {
     createdAt: Date;
   }) => Promise<{ id: string }>;
 }) {
-  const { isDuplicateAction, publishSnapshot, publishToTable, rememberAction, forgetAction, runtime } = deps;
+  const { isDuplicateAction, publishApplied, publishToTable, rememberAction, forgetAction, runtime } = deps;
 
   // rate limit state: tableId -> userId -> timestamps (ms)
   const rateLimits = new Map<string, Map<string, number[]>>();
@@ -76,11 +87,10 @@ export function createWsHandlers(deps: {
           return;
         }
 
-        // Successful apply keeps the reservation (TTL managed by hub).
-        broadcastEvents(message.tableId, result, publishToTable);
-        if (result.finished) {
-          publishSnapshot(message.tableId, result);
-        }
+        // Successful apply keeps the reservation (TTL managed by hub). Every applied
+        // intent is broadcast with its authoritative state: a client renders the
+        // state it is given and never reconstructs one from events.
+        publishApplied(message.tableId, result);
         return;
       }
 
@@ -185,18 +195,20 @@ export function createWsHandlers(deps: {
           }
         }
 
-        // broadcast chat ServerMessage
+        // One frame, every socket. The author's own socket is included so a
+        // second tab of the same user stays consistent; the client merges by
+        // message id, so nothing is rendered twice.
         publishToTable(tableId, {
-          type: "chat",
-          v: 1,
-          tableId,
-          message: {
+          message: toChatWire({
+            createdAt,
             id: chatMessageId ?? crypto.randomUUID(),
-            userId,
-            text,
             snapshot: storedSnapshot,
-            createdAt: createdAt.toISOString(),
-          },
+            text,
+            userId,
+          }),
+          tableId,
+          type: "chat",
+          v: PROTOCOL_VERSION,
         });
 
         return;
@@ -211,20 +223,6 @@ export function createWsHandlers(deps: {
   };
 }
 
-function broadcastEvents(
-  tableId: string,
-  result: Extract<ApplyGameIntentResult, { ok: true }>,
-  publishToTable: (tableId: string, message: ServerMessage) => void,
-) {
-  for (const event of result.events) {
-    publishToTable(tableId, {
-      event,
-      tableId,
-      type: "event",
-      v: 1,
-    });
-  }
-}
 
 function errorMessage(input: {
   code: string;
@@ -238,6 +236,6 @@ function errorMessage(input: {
     message: input.message,
     tableId: input.tableId,
     type: "error",
-    v: 1,
+    v: PROTOCOL_VERSION,
   };
 }

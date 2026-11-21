@@ -83,6 +83,27 @@ initial-connect guard; reconnect backoff is kept as-is.
   deliberate: replay is an optimisation, not a correctness requirement.
 - `v: 1` frames are not accepted. Single deployment, no published client — hard cutover.
 
+## Implementation notes (M0-4, #14)
+
+Recorded when the protocol shipped, so the next reader does not have to re-derive these calls:
+
+- **No self-echo frame.** The client does not render optimistically, so a chat message the author
+  sent arrives through the same `chat` broadcast as everyone else's and the client merges by id.
+  `spoke` stays in the schema — and the client handles it like `chat` — but nothing emits it; it
+  exists for the day an optimistic send path wants its own ack.
+- **Chat is pulled, never pushed.** `snapshot` carries no history. The client asks for one page
+  (`chatPage` with no cursor) on every snapshot and pages backwards with `beforeId`. The server
+  answers with `hasMore`, so the UI can stop offering "load earlier" exactly when history runs out.
+- **Ids, not offsets, are chat cursors.** `(createdAt, id)` ordering with a tuple comparison keeps
+  paging stable when two messages share a timestamp.
+- **A hole in the event log forces a snapshot.** `getTableSync` falls back unless it read exactly
+  `toSeq - sinceSeq` rows; replaying a log with a gap would hand the client a state it cannot
+  reconcile, and `seq` continuity is the one thing the client trusts.
+- **One push after HTTP mutations.** `start` and `rematch` are HTTP, so the router calls
+  `onTableChanged` and the hub broadcasts a fresh `snapshot` to the room. The client's
+  `subscribe`-after-`event` workaround is gone; a lost push is repaired by the next `sync` or
+  reconnect, and the client's 4s snapshot watchdog only guards the initial connection.
+
 ## Alternatives considered
 
 - **Send state on every `event` frame and drop `applied`.** Tempting (one message fewer) but conflates

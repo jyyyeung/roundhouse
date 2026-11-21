@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientMessage, Json, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import { PROTOCOL_VERSION } from "@roundhouse/game-core";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { renderGameView } from "../games/registry";
@@ -28,8 +29,7 @@ async function isUserSeated(tableId: string, userId: string) {
   return tables.some((table) => table.id === tableId && table.seatUserIds.includes(userId));
 }
 
-function normalizeChatMessage(message: ServerMessage) {
-  const payload = "message" in message ? message.message : (message as { chat?: unknown }).chat;
+function normalizeChatMessage(payload: unknown): TableChatMessage | null {
   if (!payload || typeof payload !== "object") return null;
 
   const candidate = payload as Partial<TableChatMessage>;
@@ -51,6 +51,27 @@ function normalizeChatMessage(message: ServerMessage) {
   } satisfies TableChatMessage;
 }
 
+function normalizeChatWire(payload: unknown) {
+  const chat = normalizeChatMessage(payload);
+  return chat ? [chat] : [];
+}
+
+/**
+ * Chat arrives from three places (broadcast, a page of history, an older page),
+ * so every insert goes through one merge: newest state per id, oldest first.
+ */
+function mergeChat(current: TableChatMessage[], incoming: TableChatMessage[]) {
+  if (incoming.length === 0) return current;
+  const byId = new Map(current.map((message) => [message.id, message]));
+  for (const message of incoming) {
+    byId.set(message.id, message);
+  }
+  return [...byId.values()].sort((left, right) => {
+    if (left.createdAt === right.createdAt) return left.id.localeCompare(right.id);
+    return left.createdAt.localeCompare(right.createdAt);
+  });
+}
+
 function readDice(value: unknown) {
   if (!Array.isArray(value)) return null;
   if (!value.every((item) => typeof item === "number")) return null;
@@ -67,6 +88,9 @@ export function TablePage({ session }: { session: SessionLike }) {
   currentUserIdRef.current = currentUserId;
   const connectionRef = useRef<TableWsConnection | null>(null);
   const hasSnapshotRef = useRef(false);
+  // The last seq this view is known to be correct for. Every server frame carries
+  // one, so this is the only progress signal the client needs.
+  const lastSeqRef = useRef(0);
   const previousDiceRef = useRef<number[] | null>(null);
   const [meta, setMeta] = useState<TableMeta | null>(null);
   const [state, setState] = useState<unknown>(null);
@@ -76,6 +100,8 @@ export function TablePage({ session }: { session: SessionLike }) {
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<"start" | "rematch" | null>(null);
   const [rollVersion, setRollVersion] = useState(0);
+  const [hasMoreChat, setHasMoreChat] = useState(false);
+  const [loadingOlderChat, setLoadingOlderChat] = useState(false);
 
   const rulesetLabel = useMemo(() => {
     return meta?.config && typeof meta.config === "object" && "ruleset" in meta.config && meta.config.ruleset === "yahtzee"
@@ -91,7 +117,7 @@ export function TablePage({ session }: { session: SessionLike }) {
 
   function refreshSnapshot() {
     sendOrFlag({
-      v: 1,
+      v: PROTOCOL_VERSION,
       type: "subscribe",
       tableId,
     });
@@ -99,7 +125,7 @@ export function TablePage({ session }: { session: SessionLike }) {
 
   function sendIntent(intentType: string, payload: Json) {
     sendOrFlag({
-      v: 1,
+      v: PROTOCOL_VERSION,
       type: "intent",
       tableId,
       actionId: crypto.randomUUID(),
@@ -110,12 +136,29 @@ export function TablePage({ session }: { session: SessionLike }) {
 
   function sendChat(text: string) {
     sendOrFlag({
-      v: 1,
+      v: PROTOCOL_VERSION,
       type: "chat",
       tableId,
       actionId: crypto.randomUUID(),
       text,
     } satisfies ClientMessage);
+  }
+
+  /** One bounded page of history. `beforeId` asks for the page older than it. */
+  function requestChatPage(beforeId?: string) {
+    return sendOrFlag({
+      v: PROTOCOL_VERSION,
+      type: "chatPage",
+      tableId,
+      ...(beforeId === undefined ? {} : { beforeId }),
+    } satisfies ClientMessage);
+  }
+
+  function loadOlderChat() {
+    const oldest = messages[0];
+    if (!oldest || loadingOlderChat) return;
+    setLoadingOlderChat(true);
+    if (!requestChatPage(oldest.id)) setLoadingOlderChat(false);
   }
 
   useEffect(() => {
@@ -182,6 +225,36 @@ export function TablePage({ session }: { session: SessionLike }) {
       }
     }
 
+    /**
+     * The one place a game state from the server becomes view state. Every frame
+     * that carries state (snapshot, applied, events) lands here, so the local view
+     * is always a function of the last seq the server sent.
+     */
+    function applyServerState(next: { meta: TableMeta; state: unknown; seq: number }) {
+      const nextDice =
+        next.state && typeof next.state === "object" && "dice" in next.state
+          ? readDice((next.state as { dice: unknown }).dice)
+          : null;
+
+      if (
+        nextDice &&
+        previousDiceRef.current &&
+        nextDice.length === previousDiceRef.current.length &&
+        nextDice.some((value, index) => value !== previousDiceRef.current?.[index])
+      ) {
+        setRollVersion((version) => version + 1);
+      }
+
+      previousDiceRef.current = nextDice ? [...nextDice] : null;
+      lastSeqRef.current = next.seq;
+      hasSnapshotRef.current = true;
+      setMeta(next.meta);
+      setState(next.state);
+      setLoading(false);
+      setError(null);
+      attempt = 0;
+    }
+
     function attachSocket() {
       if (!alive) return;
 
@@ -197,27 +270,41 @@ export function TablePage({ session }: { session: SessionLike }) {
           if (message.type === "snapshot") {
             gotSnapshot = true;
             clearSnapshotWatch();
-            const nextDice =
-              message.state && typeof message.state === "object" && "dice" in message.state
-                ? readDice(message.state.dice)
-                : null;
+            applyServerState(message);
+            // Chat is not part of a snapshot any more: one bounded page is pulled
+            // here, and older pages only when the reader asks for them.
+            requestChatPage();
+            return;
+          }
 
-            if (
-              nextDice &&
-              previousDiceRef.current &&
-              nextDice.length === previousDiceRef.current.length &&
-              nextDice.some((value, index) => value !== previousDiceRef.current?.[index])
-            ) {
-              setRollVersion((version) => version + 1);
+          if (message.type === "applied") {
+            const lastSeq = lastSeqRef.current;
+            if (message.seq <= lastSeq) return;
+            if (message.seq > lastSeq + 1) {
+              // A frame went missing between the server and here. Ask for the gap
+              // instead of rendering state whose history we never saw.
+              connectionRef.current?.send({
+                v: PROTOCOL_VERSION,
+                type: "sync",
+                tableId,
+                sinceSeq: lastSeq,
+              } satisfies ClientMessage);
+              return;
             }
+            applyServerState(message);
+            return;
+          }
 
-            previousDiceRef.current = nextDice ? [...nextDice] : null;
-            hasSnapshotRef.current = true;
-            setMeta(message.meta);
-            setState(message.state);
-            setLoading(false);
-            setError(null);
-            attempt = 0;
+          if (message.type === "events") {
+            applyServerState({ meta: message.meta, seq: message.toSeq, state: message.state });
+            return;
+          }
+
+          if (message.type === "chatPage") {
+            const page = message.messages.flatMap(normalizeChatWire);
+            setMessages((current) => mergeChat(current, page));
+            setHasMoreChat(message.hasMore);
+            setLoadingOlderChat(false);
             return;
           }
 
@@ -226,28 +313,17 @@ export function TablePage({ session }: { session: SessionLike }) {
             return;
           }
 
-          if (message.type === "chat") {
-            const chat = normalizeChatMessage(message);
+          if (message.type === "chat" || message.type === "spoke") {
+            const chat = normalizeChatMessage(message.message);
             if (!chat) return;
-            setMessages((current) => {
-              if (current.some((item) => item.id === chat.id)) return current;
-              return [...current, chat];
-            });
-            return;
-          }
-
-          if (message.type === "event") {
-            connectionRef.current?.send({
-              v: 1,
-              type: "subscribe",
-              tableId,
-            });
+            setMessages((current) => mergeChat(current, [chat]));
             return;
           }
 
           if (message.type === "error") {
             clearSnapshotWatch();
             setLoading(false);
+            setLoadingOlderChat(false);
             setError(message.message);
           }
         },
@@ -405,6 +481,9 @@ export function TablePage({ session }: { session: SessionLike }) {
             onIntent: sendIntent,
             onSendChat: sendChat,
             rollVersion,
+            hasMoreChat,
+            loadingOlderChat,
+            onLoadOlderChat: loadOlderChat,
           })}
           {meta.status === "finished" ? (
             <div className="mt-5 flex flex-wrap gap-3">

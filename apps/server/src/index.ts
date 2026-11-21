@@ -47,6 +47,11 @@ app.route(
   createTablesRouter({
     runtime,
     getSessionFromHeaders,
+    onTableChanged: (tableId) => {
+      // Fire and forget: the HTTP response must not wait on socket fan-out, and a
+      // failed push is repaired by the client's next `sync`.
+      void wsHub.publishTableState(tableId);
+    },
   }),
 );
 

@@ -64,7 +64,7 @@ describe("connectTableWs", () => {
 
     expect(MockWebSocket.instances[0]?.sent).toEqual([
       JSON.stringify({
-        v: 1,
+        v: 2,
         type: "subscribe",
         tableId: "table-123",
       }),
@@ -85,7 +85,7 @@ describe("connectTableWs", () => {
 
     instance?.onmessage?.({
       data: JSON.stringify({
-        v: 1,
+        v: 2,
         type: "presence",
         tableId: "table-456",
         onlineUserIds: ["user-a"],
@@ -93,7 +93,7 @@ describe("connectTableWs", () => {
     } as MessageEvent<string>);
 
     expect(onMessage).toHaveBeenCalledWith({
-      v: 1,
+      v: 2,
       type: "presence",
       tableId: "table-456",
       onlineUserIds: ["user-a"],
@@ -101,7 +101,7 @@ describe("connectTableWs", () => {
 
     expect(
       ws.send({
-        v: 1,
+        v: 2,
         type: "intent",
         tableId: "table-456",
         actionId: "action-1",
@@ -112,7 +112,7 @@ describe("connectTableWs", () => {
 
     expect(instance?.sent.at(-1)).toBe(
       JSON.stringify({
-        v: 1,
+        v: 2,
         type: "intent",
         tableId: "table-456",
         actionId: "action-1",
@@ -136,7 +136,7 @@ describe("connectTableWs", () => {
 
     expect(
       ws.send({
-        v: 1,
+        v: 2,
         type: "chat",
         tableId: "table-456",
         actionId: "action-1",

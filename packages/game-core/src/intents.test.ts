@@ -47,7 +47,7 @@ describe("intentFromClientMessage", () => {
         payload: {},
         tableId: "table-1",
         type: "intent",
-        v: 1,
+        v: 2,
       }),
     ).toEqual({ payload: {}, type: "roll" });
   });

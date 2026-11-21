@@ -8,7 +8,9 @@ function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
   return {
     applyGameIntent: vi.fn(),
     createTable: vi.fn(),
+    getTableLiveState: vi.fn(),
     getTableSnapshot: vi.fn(),
+    getTableSync: vi.fn(),
     joinTable: vi.fn(),
     startTable: vi.fn(),
     rematchTable: vi.fn(),

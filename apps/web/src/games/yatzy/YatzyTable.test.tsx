@@ -99,6 +99,9 @@ describe("YatzyTable", () => {
     onIntent: vi.fn(),
     onSendChat: vi.fn(),
     rollVersion: 0,
+    hasMoreChat: false,
+    loadingOlderChat: false,
+    onLoadOlderChat: vi.fn(),
   };
 
   it("uses a two-column playboard grid on md+", () => {
@@ -160,6 +163,9 @@ describe("YatzyTable chat layout", () => {
     onIntent: vi.fn(),
     onSendChat: vi.fn(),
     rollVersion: 0,
+    hasMoreChat: false,
+    loadingOlderChat: false,
+    onLoadOlderChat: vi.fn(),
   };
 
   beforeEach(() => {

@@ -38,7 +38,7 @@ describe("ws chat", () => {
     let persisted: any = null;
     const handlers = createWsHandlers({
       runtime,
-      publishSnapshot: () => {},
+      publishApplied: () => {},
       isDuplicateAction: () => false,
       rememberAction: () => {},
       forgetAction: () => {},
@@ -62,7 +62,7 @@ describe("ws chat", () => {
         tableId: "table-1",
         text: "hello",
         type: "chat",
-        v: 1,
+        v: 2,
       } satisfies ClientTableMessage,
     );
 
@@ -92,7 +92,7 @@ describe("ws chat", () => {
     const appendGameEvent = vi.fn();
     const handlers = createWsHandlers({
       runtime: makeRuntime(),
-      publishSnapshot: () => {},
+      publishApplied: () => {},
       isDuplicateAction: () => false,
       rememberAction: () => {},
       forgetAction: () => {},
@@ -115,7 +115,7 @@ describe("ws chat", () => {
         tableId: "table-1",
         text: "hello",
         type: "chat",
-        v: 1,
+        v: 2,
       } satisfies ClientTableMessage,
     );
 
@@ -126,7 +126,7 @@ describe("ws chat", () => {
         message: "not_seated",
         tableId: "table-1",
         type: "error",
-        v: 1,
+        v: 2,
       }),
     ]);
     expect(published).toEqual([]);

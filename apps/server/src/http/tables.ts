@@ -55,6 +55,12 @@ async function requireSession(getSession: (headers: Headers) => Promise<Session>
 export function createTablesRouter(opts: {
   runtime: TablesRuntime;
   getSessionFromHeaders: GetSession;
+  /**
+   * Start/rematch are HTTP, so the sockets in that room would otherwise keep
+   * rendering the pre-mutation state until they resubscribed. The server wires
+   * this to the hub's state push.
+   */
+  onTableChanged?: (tableId: string) => void;
 }) {
   const runtime = opts.runtime;
   const getSession = opts.getSessionFromHeaders;
@@ -119,6 +125,7 @@ export function createTablesRouter(opts: {
       const userId = await requireSession(getSession, c.req.raw.headers);
       const { id } = tableIdSchema.parse({ id: c.req.param("id") });
       const result = await runtime.startTable({ userId, tableId: id });
+      opts.onTableChanged?.(id);
       return c.json(result);
     } catch (error) {
       return handleError(error);
@@ -130,6 +137,7 @@ export function createTablesRouter(opts: {
       const userId = await requireSession(getSession, c.req.raw.headers);
       const { id } = tableIdSchema.parse({ id: c.req.param("id") });
       const result = await runtime.rematchTable({ userId, tableId: id });
+      opts.onTableChanged?.(id);
       return c.json(result);
     } catch (error) {
       return handleError(error);
