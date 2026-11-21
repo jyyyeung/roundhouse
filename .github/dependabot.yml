@@ -1,0 +1,67 @@
+version: 2
+
+# Dependabot was already running on this repo without a committed config, which
+# means: no grouping (one PR per transitive bump), default versioning strategy,
+# and no label discipline. This file makes the policy explicit.
+#
+# The rule of thumb: patch/minor arrive batched and green-CI-gated, majors
+# arrive alone. Anything that touches more than one workspace package at once is
+# easier to review as one PR than as twelve.
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    versioning-strategy: "increase"
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      # Security fixes are not batched with routine bumps: they need to be
+      # reviewable and deployable on their own.
+      security:
+        applies-to: "security-updates"
+        patterns: ["*"]
+      dev-minor-patch:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+      prod-minor-patch:
+        dependency-type: "production"
+        update-types: ["minor", "patch"]
+    ignore:
+      # Type definitions must track the runtime, and the runtime is pinned by the
+      # Dockerfile; a major bump here only creates noise.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  # Base images for apps/server (node:22-alpine) and apps/web (nginx:1.27-alpine).
+  - package-ecosystem: "docker"
+    directory: "/apps/server"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    labels: ["dependencies", "infra"]
+    commit-message:
+      prefix: "chore(docker)"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    labels: ["dependencies", "infra"]
+    commit-message:
+      prefix: "chore(docker)"
+
+  # No github-actions entry yet: there are no workflows. Add one together with
+  # the first workflow in M0-6, or Dependabot silently updates nothing.
