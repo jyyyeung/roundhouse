@@ -1,4 +1,4 @@
-import type { Json, RawGameState, ServerMessage } from "@roundhouse/game-core";
+import type { ClientTableMessage, RawGameState, ServerMessage } from "@roundhouse/game-core";
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it, vi } from "vitest";
 
@@ -59,15 +59,11 @@ describe("ws chat", () => {
       },
       {
         actionId: "action-chat",
-        payload: {
-          // client tries to supply fake dice in snapshot - should be ignored
-          text: "hello",
-          snapshot: { state: { fake: "client" } } as Json,
-        } as any,
         tableId: "table-1",
+        text: "hello",
         type: "chat",
         v: 1,
-      } as any,
+      } satisfies ClientTableMessage,
     );
 
     expect(persisted).not.toBeNull();
@@ -116,11 +112,11 @@ describe("ws chat", () => {
       },
       {
         actionId: "action-chat",
-        payload: { text: "hello" },
         tableId: "table-1",
+        text: "hello",
         type: "chat",
         v: 1,
-      } as any,
+      } satisfies ClientTableMessage,
     );
 
     expect(sent).toEqual([

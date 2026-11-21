@@ -1,4 +1,11 @@
-import type { EventEnvelope, Json, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import type {
+  ClientTableMessage,
+  EventEnvelope,
+  Json,
+  RawGameState,
+  ServerMessage,
+  TableMeta,
+} from "@roundhouse/game-core";
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it } from "vitest";
 
@@ -266,7 +273,7 @@ describe("ws handlers action reservations", () => {
       tableId: "table-other",
       type: "intent",
       v: 1,
-    };
+    } satisfies ClientTableMessage;
 
     await handlers.onMessage({ send() {}, userId: "user-a" }, message);
     // A transient failure must not wedge the action for ACTION_TTL_MS: the retry applies.

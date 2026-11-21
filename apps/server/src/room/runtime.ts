@@ -1,6 +1,6 @@
 import { asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { ClientIntent, EventEnvelope, Json, RawGameState, TableMeta, ViewerView } from "@roundhouse/game-core";
-import { generateInviteCode } from "@roundhouse/game-core";
+import { generateInviteCode, parseIntent } from "@roundhouse/game-core";
 
 import type { Database } from "../db/client";
 import { game, gameEvent, gameTable, tablePlayer } from "../db/schema";
@@ -421,7 +421,19 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           throw error;
         }
 
-        const reduced = module.reduce(currentGame.state as Json, intent, {
+        // Reject anything the module never declared before reduce can touch state:
+        // the wire carries an arbitrary intent name and payload shape otherwise.
+        const parsedIntent = parseIntent(module.intents, intent);
+        if (!parsedIntent.ok) {
+          return {
+            ok: false,
+            code: parsedIntent.code,
+            message: parsedIntent.detail,
+            seq: currentGame.seq,
+          } satisfies ApplyGameIntentResult;
+        }
+
+        const reduced = module.reduce(currentGame.state as Json, parsedIntent.intent, {
           actorId: userId,
           now,
           playerIds: table.seatUserIds,

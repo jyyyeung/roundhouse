@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 export type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
 
 export type EventEnvelope = {
@@ -42,6 +44,13 @@ export type RawGameState = { readonly [rawGameStateBrand]: true };
 export interface GameModule {
   id: string;
   displayName: string;
+  /**
+   * Every intent the module accepts, keyed by `intent.type`, with the schema its
+   * payload must satisfy. The server rejects anything absent from this map before
+   * `reduce` runs, so a seated client cannot reach module code with an intent (or
+   * a payload shape) the module never declared.
+   */
+  intents: Readonly<Record<string, z.ZodType>>;
   createInitialState(config: Json, playerIds: string[]): Json;
   reduce(state: Json, intent: { type: string; payload: Json }, ctx: ReduceContext): ReduceResult;
   /**

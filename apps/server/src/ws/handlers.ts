@@ -1,10 +1,5 @@
-import {
-  intentFromClientMessage,
-  type ClientMessage,
-  type RawGameState,
-  type ServerMessage,
-  type TableMeta,
-} from "@roundhouse/game-core";
+import type { ClientTableMessage, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import { intentFromClientMessage } from "@roundhouse/game-core";
 
 import type { ApplyGameIntentResult, TablesRuntime } from "../room/runtime";
 
@@ -49,7 +44,7 @@ export function createWsHandlers(deps: {
   const rateLimits = new Map<string, Map<string, number[]>>();
 
   return {
-    async onMessage(connection: WsConnection, message: any) {
+    async onMessage(connection: WsConnection, message: ClientTableMessage) {
       if (message.type === "intent") {
         if (isDuplicateAction(message.tableId, message.actionId)) {
           return;
@@ -91,7 +86,7 @@ export function createWsHandlers(deps: {
 
       if (message.type === "chat") {
         const actionId = message.actionId;
-        const tableId = message.tableId!;
+        const tableId = message.tableId;
         const userId = connection.userId;
         // The chat snapshot is shared by every reader, so it is projected for no
         // particular viewer rather than for the author.
@@ -147,11 +142,8 @@ export function createWsHandlers(deps: {
         tableMap.set(userId, recent);
 
         // truncate text to 500 chars
-        const rawText =
-          typeof message.text === "string"
-            ? message.text
-            : (message.payload && (message.payload as { text?: unknown }).text) || "";
-        const text = String(rawText).slice(0, 500);
+        // 500 chars keeps a single message readable on a phone-sized chat panel.
+        const text = message.text.slice(0, 500);
 
         const storedSnapshot = {
           tableId: snapshot.tableId,
@@ -210,15 +202,11 @@ export function createWsHandlers(deps: {
         return;
       }
 
-      const actionId = message.type === "chat" ? message.actionId : undefined;
-      connection.send(
-        errorMessage({
-          actionId,
-          code: "unsupported_message",
-          message: "unsupported_message",
-          tableId: message.tableId,
-        }),
-      );
+      // Both table-scoped frame kinds are handled above. Typing the parameter as
+      // ClientTableMessage makes this a compile-time exhaustiveness check, so a new
+      // client frame type cannot reach the handlers and be silently ignored.
+      const unhandled: never = message;
+      throw new Error(`unhandled client message: ${JSON.stringify(unhandled)}`);
     },
   };
 }

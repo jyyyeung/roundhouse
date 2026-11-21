@@ -75,6 +75,24 @@ in the client instead of at runtime in a browser tab.
 - `intents`, `seatLimits`, and `applyEvent` land with M0-1 and M0-3; the yatzy module keeps its
   current `reduce` signature until M0-3 changes the event payloads.
 
+### What M0-1 shipped (implementation notes)
+
+- `packages/game-core/src/wire.ts` is now the source of the wire types: `clientMessageSchema` and
+  `serverMessageSchema` are the schemas, and `protocol.ts` re-exports `z.infer` results so no
+  hand-written union sits beside them. `parseClientMessage(raw: string)` returns a result union and
+  never throws.
+- `intents: Readonly<Record<string, z.ZodType>>` on `GameModule` replaced the issue's proposed
+  `readonly string[]` allowlist. One declaration now carries both "which intents exist" and "what
+  shape each payload has", and `parseIntent` (`packages/game-core/src/intents.ts`) is the only
+  place an inbound payload is validated against a module's own schema. Modules keep the right to
+  reject again inside `reduce` with a game-specific error.
+- The boundary refuses rather than drops: a malformed frame gets an `error` reply naming the field
+  (`bad_message` / `unknown_message_type`), an oversized frame (> 64 KiB) gets
+  `frame_too_large` and a 1009 close, and an unauthenticated upgrade now sends
+  `not_authenticated` before closing 4401, because a browser WebSocket cannot read a close reason.
+- `apps/server/src/ws/handlers.ts` takes `ClientTableMessage` instead of `any`, and the trailing
+  branch is a `never` assignment, so a new client frame type cannot be silently ignored.
+
 ## Consequences
 
 **Positive**

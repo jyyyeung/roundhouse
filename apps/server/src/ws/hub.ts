@@ -1,4 +1,5 @@
-import type { ClientMessage, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import type { RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import { parseClientMessage } from "@roundhouse/game-core";
 import type { IncomingMessage } from "node:http";
 import { WebSocket, type RawData } from "ws";
 
@@ -13,6 +14,9 @@ type GetSession = (headers: Headers) => Promise<Session> | Session;
 type HubSocket = WebSocket & { tableId?: string; userId?: string };
 
 const ACTION_TTL_MS = 5 * 60 * 1000;
+// A yatzy intent or chat message is a few hundred bytes; 64 KiB is generous and
+// still small enough that a hostile frame costs one Buffer.byteLength call.
+const MAX_FRAME_BYTES = 64 * 1024;
 
 export function createWsHub(opts: {
   runtime: TablesRuntime;
@@ -78,18 +82,43 @@ export function createWsHub(opts: {
       let userId: string | undefined;
 
       async function handleRaw(raw: RawData) {
-        if (!userId) return;
+        if (!userId) {
+          send(socket, {
+            code: "not_authenticated",
+            message: "not_authenticated",
+            type: "error",
+            v: 1,
+          });
+          return;
+        }
+
+        const text = rawToString(raw);
+        const bytes = Buffer.byteLength(text);
+        if (bytes > MAX_FRAME_BYTES) {
+          // Refuse oversized frames before parsing them: a 10 MB chat payload should
+          // cost one comparison, not a JSON parse. 1009 is "message too big".
+          send(socket, {
+            code: "frame_too_large",
+            message: `frame_too_large:${bytes}`,
+            type: "error",
+            v: 1,
+          });
+          socket.close(1009, "frame_too_large");
+          return;
+        }
+
         try {
-          const message = parseClientMessage(raw);
-          if (!message) {
+          const parsed = parseClientMessage(text);
+          if (!parsed.ok) {
             send(socket, {
-              code: "bad_message",
-              message: "bad_message",
+              code: parsed.code,
+              message: parsed.detail,
               type: "error",
               v: 1,
             });
             return;
           }
+          const message = parsed.message;
 
           if (message.type === "subscribe") {
             await subscribe(socket, message.tableId);
@@ -137,6 +166,14 @@ export function createWsHub(opts: {
       const session = await opts.getSessionFromHeaders(toHeaders(request));
       userId = session?.user?.id;
       if (!userId) {
+        // Say why before closing: a browser WebSocket cannot read the close reason,
+        // only the listener on the page can see the frame.
+        send(socket, {
+          code: "not_authenticated",
+          message: "not_authenticated",
+          type: "error",
+          v: 1,
+        });
         socket.close(4401, "not_authenticated");
         return;
       }
@@ -344,14 +381,6 @@ function moduleOrNull(gameId: string) {
   }
 }
 
-
-function parseClientMessage(raw: RawData): ClientMessage | null {
-  try {
-    return JSON.parse(rawToString(raw)) as ClientMessage;
-  } catch {
-    return null;
-  }
-}
 
 function rawToString(raw: RawData) {
   if (typeof raw === "string") return raw;

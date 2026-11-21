@@ -115,8 +115,7 @@ export function TablePage({ session }: { session: SessionLike }) {
       tableId,
       actionId: crypto.randomUUID(),
       text,
-      payload: { text },
-    } as ClientMessage);
+    } satisfies ClientMessage);
   }
 
   useEffect(() => {

@@ -32,6 +32,7 @@ function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
 class MockSocket {
   readyState = 1;
   sent: string[] = [];
+  closed: { code?: number; reason?: string } | null = null;
   private handlers: Record<string, ((value?: unknown) => unknown) | undefined> = {};
 
   on(event: string, handler: (value?: unknown) => unknown) {
@@ -44,10 +45,20 @@ class MockSocket {
   }
 
   async emitMessage(payload: unknown) {
-    await this.handlers.message?.(Buffer.from(JSON.stringify(payload)));
+    await this.emitRaw(JSON.stringify(payload));
   }
 
-  close() {}
+  async emitRaw(raw: string) {
+    await this.handlers.message?.(Buffer.from(raw));
+  }
+
+  close(code?: number, reason?: string) {
+    this.closed = { code, reason };
+  }
+
+  frames() {
+    return this.sent.map((message) => JSON.parse(message));
+  }
 }
 
 describe("hub persistence helpers", () => {
@@ -299,5 +310,93 @@ describe("ws hub snapshot projection", () => {
     // The internal shape must not cross the wire: only YatzyView fields do.
     expect(frameA.state.tableId).toBeUndefined();
     expect(frameA.state.currentPlayerIndex).toBeUndefined();
+  });
+});
+
+describe("ws hub message boundary", () => {
+  const meta: TableMeta = {
+    code: "ABCD23",
+    config: { ruleset: "yatzy" },
+    gameId: "yatzy",
+    hostUserId: "user-a",
+    seatUserIds: ["user-a", "user-b"],
+    softSeatCap: 4,
+    status: "active",
+  };
+
+  function makeHub(userId: string | null = "user-a") {
+    return createWsHub({
+      runtime: makeRuntime({
+        getTableSnapshot: vi.fn().mockResolvedValue({ meta, seq: 0, state: null, tableId: "table-1" }),
+      }),
+      getSessionFromHeaders: async () => (userId ? { user: { id: userId } } : null),
+    });
+  }
+
+  async function connect(hub: ReturnType<typeof createWsHub>) {
+    const socket = new MockSocket();
+    await hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
+    return socket;
+  }
+
+  it("reports malformed JSON and keeps the socket open", async () => {
+    const socket = await connect(makeHub());
+
+    await socket.emitRaw("{not json");
+
+    expect(socket.frames()).toEqual([
+      expect.objectContaining({ code: "bad_message", type: "error", v: 1 }),
+    ]);
+    expect(socket.closed).toBeNull();
+
+    // The connection still works afterwards: a bad frame must not wedge the stream.
+    await socket.emitMessage({ tableId: "table-1", type: "subscribe", v: 1 });
+    expect(socket.frames().some((frame) => frame.type === "snapshot")).toBe(true);
+  });
+
+  it("reports an unknown message type without closing", async () => {
+    const socket = await connect(makeHub());
+
+    await socket.emitRaw(JSON.stringify({ type: "teleport", v: 1 }));
+
+    expect(socket.frames()).toEqual([
+      expect.objectContaining({ code: "unknown_message_type", type: "error" }),
+    ]);
+    expect(socket.closed).toBeNull();
+  });
+
+  it("reports a frame that fails the schema with the field that failed", async () => {
+    const socket = await connect(makeHub());
+
+    await socket.emitRaw(JSON.stringify({ tableId: "table-1", type: "subscribe", v: 1, extra: true }));
+
+    // Unknown keys are stripped rather than rejected, so this one still works.
+    expect(socket.frames().some((frame) => frame.type === "snapshot")).toBe(true);
+
+    await socket.emitRaw(JSON.stringify({ tableId: "", type: "subscribe", v: 1 }));
+    const errors = socket.frames().filter((frame) => frame.type === "error");
+    expect(errors).toHaveLength(1);
+    expect(errors[0].code).toBe("bad_message");
+    expect(errors[0].message).toContain("tableId");
+  });
+
+  it("refuses an oversized frame and closes with 1009", async () => {
+    const socket = await connect(makeHub());
+
+    await socket.emitRaw(JSON.stringify({ text: "x".repeat(70 * 1024), type: "chat", v: 1 }));
+
+    expect(socket.frames()).toEqual([
+      expect.objectContaining({ code: "frame_too_large", type: "error" }),
+    ]);
+    expect(socket.closed).toEqual({ code: 1009, reason: "frame_too_large" });
+  });
+
+  it("explains an unauthenticated connection before closing it", async () => {
+    const socket = await connect(makeHub(null));
+
+    expect(socket.frames()).toEqual([
+      expect.objectContaining({ code: "not_authenticated", type: "error" }),
+    ]);
+    expect(socket.closed).toEqual({ code: 4401, reason: "not_authenticated" });
   });
 });

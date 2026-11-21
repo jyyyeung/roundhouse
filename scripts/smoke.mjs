@@ -73,19 +73,32 @@ async function checkUnauthenticatedUpgrade() {
     check("ws upgrade without a session is refused", false, "global WebSocket missing (needs Node 22+)");
     return;
   }
-  const outcome = await new Promise((resolve) => {
-    const timer = setTimeout(() => resolve("timeout"), 5000);
+  // The server answers with an `error` frame and then closes 4401. Both matter: the
+  // frame is what a client can actually read, the close code is what a proxy sees.
+  const seen = { close: null, frame: null };
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, 5000);
     const socket = new WebSocket(url);
-    const settle = (value) => {
+    const done = () => {
       clearTimeout(timer);
       socket.close();
-      resolve(value);
+      resolve();
     };
-    socket.addEventListener("message", () => settle("frame-received"));
-    socket.addEventListener("error", () => settle("error"));
-    socket.addEventListener("close", (event) => settle(`close:${event.code}:${event.reason}`));
+    socket.addEventListener("message", (event) => {
+      seen.frame = JSON.parse(String(event.data).slice(0, 200));
+      if (seen.close) done();
+    });
+    socket.addEventListener("error", () => {});
+    socket.addEventListener("close", (event) => {
+      seen.close = `${event.code}:${event.reason}`;
+      if (seen.frame) done();
+    });
   });
-  check("ws upgrade without a session is refused", outcome === "close:4401:not_authenticated", outcome);
+  check(
+    "ws upgrade without a session is refused",
+    seen.frame?.type === "error" && seen.frame?.code === "not_authenticated" && seen.close === "4401:not_authenticated",
+    `frame=${JSON.stringify(seen.frame)} close=${seen.close}`,
+  );
 }
 
 async function main() {

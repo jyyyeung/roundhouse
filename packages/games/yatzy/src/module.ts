@@ -2,6 +2,7 @@ import { GameModule, Json, RawGameState, ViewerView } from "@roundhouse/game-cor
 import { yahtzeeCategories, yatzyCategories } from "./categories";
 import { reduce, type YatzyState } from "./reduce";
 import { Ruleset } from "./types";
+import { yatzyIntents } from "./intents";
 import { projectYatzyView } from "./view";
 function categoriesFor(ruleset: Ruleset) {
   return ruleset === "yatzy" ? yatzyCategories : yahtzeeCategories;
@@ -47,6 +48,7 @@ function isFinished(state: Json) {
 export const yatzyModule: GameModule = {
   id: "yatzy",
   displayName: "Yatzy",
+  intents: yatzyIntents,
   createInitialState,
   reduce,
   projectStateFor,

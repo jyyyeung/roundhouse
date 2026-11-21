@@ -95,3 +95,60 @@ describe("room runtime applyGameIntent", () => {
     expect(calls.some((call) => call.op === "insert" || call.op === "update")).toBe(false);
   });
 });
+describe("room runtime intent boundary", () => {
+  it("rejects an intent the module never declared", async () => {
+    const { runtime, calls } = makeRuntime();
+
+    const result = await runtime.applyGameIntent({
+      intent: { payload: {}, type: "dance" },
+      now: () => new Date("2026-11-21T00:00:00.000Z"),
+      randomInt: () => 0,
+      tableId,
+      userId: "user-a",
+    });
+
+    expect(result).toEqual({ code: "unknown_intent", message: "dance", ok: false, seq: 0 });
+    // Nothing was written: the rejection happens before reduce and before any insert.
+    expect(calls.some((call) => call.op === "insert" || call.op === "update")).toBe(false);
+  });
+
+  it("rejects a declared intent whose payload does not match its schema", async () => {
+    const { runtime, calls } = makeRuntime();
+
+    const result = await runtime.applyGameIntent({
+      intent: { payload: {}, type: "score" },
+      now: () => new Date("2026-11-21T00:00:00.000Z"),
+      randomInt: () => 0,
+      tableId,
+      userId: "user-a",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.code).toBe("invalid_payload");
+    expect(result.ok === false && result.message).toContain("category");
+    expect(result.ok === false && result.seq).toBe(0);
+    expect(calls.some((call) => call.op === "insert" || call.op === "update")).toBe(false);
+  });
+
+  it("still applies a well-formed intent after a rejected one (table not stuck)", async () => {
+    const { runtime } = makeRuntime();
+
+    await runtime.applyGameIntent({
+      intent: { payload: {}, type: "dance" },
+      now: () => new Date("2026-11-21T00:00:00.000Z"),
+      randomInt: () => 0,
+      tableId,
+      userId: "user-a",
+    });
+
+    const rolled = await runtime.applyGameIntent({
+      intent: { payload: {}, type: "roll" },
+      now: () => new Date("2026-11-21T00:00:00.000Z"),
+      randomInt: () => 0,
+      tableId,
+      userId: "user-a",
+    });
+
+    expect(rolled.ok).toBe(true);
+  });
+});
