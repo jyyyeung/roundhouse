@@ -23,6 +23,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          # setup-node@v5 caches the package manager's store by default, which
+          # needs pnpm installed. This job has no install step on purpose.
+          package-manager-cache: false
 
       # No install step: the guard reads source files, it does not run the app.
       - name: Projection guard
