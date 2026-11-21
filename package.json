@@ -7,6 +7,14 @@
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck"
   },
-  "engines": { "node": ">=22" },
+  "pnpm": {
+    "overrides": {
+      "undici": "^8.12.2",
+      "source-map-js": "^1.2.2"
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "pnpm@9.15.0"
 }
