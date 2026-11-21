@@ -76,18 +76,30 @@ or produces an ADR amendment saying what must change.
 
 ## M1 — Usable by humans who are not you
 
-**Why now:** the MVP cannot actually be handed to friends. There is no way to leave a table,
+**Why now:** the MVP cannot actually be handed to friends. There is no way to leave a table, so a
+guest who joins the wrong one is stuck in it and a host who closes the tab strands everyone;
 and a friend who forgets a password is permanently locked out (`apps/server/src/auth.ts` is
-`emailAndPassword` only, no reset flow, no verification).
+`emailAndPassword` only, no reset flow, no verification). Both are broken flows, not rough edges.
 
-- **M1-1** Google OAuth + email verification + password reset (SMTP or token flow).
-- **M1-2** Leave / kick / host transfer — `POST /:id/leave`, host reassignment to next seated
-  player on host departure (spec edge case currently unimplemented).
-- **M1-3** Abuse limits: auth rate limiting, intent rate limit alongside the existing chat limit.
-- **M1-4** Feel + failure UX: sound/haptics on roll/hold/score, seat avatars, clear
-  "table full / closed / finished" states, turn timer display.
-- **M1-5** Self-host docs a non-dev operator can follow: env reference, backup/restore, TLS
-  reverse-proxy sample.
+| ID                   | Issue                                                                                                                                                     | Depends on |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| [M1-1](../issues/43) | Account recovery: password reset, email verification, Google OAuth — mail behind a `Mailer` interface, `log` transport by default so dev needs no mailbox | —          |
+| [M1-2](../issues/44) | Leave, kick, host transfer: `POST /:id/leave` and `/:id/kick`, contiguous seat compaction, host moves to the lowest seat, empty lobby deleted             | —          |
+| [M1-3](../issues/45) | Abuse limits: extract the chat limiter, add an intent budget and better-auth rate limits, explicit `TRUST_PROXY`                                          | M1-1, M1-2 |
+| [M1-4](../issues/46) | Feel and failure UX: `feedback` (sound/haptics, muted by default), one seat-label implementation, `TableNotice` per error kind, "your turn" from the view | M1-2       |
+| [M1-5](../issues/47) | Self-hosting docs an operator can follow, with `scripts/check-env-docs.mjs` keeping the env reference true                                                | M1-1       |
+
+Notes on the shape of this milestone:
+
+- **M1-2 first.** It is the only item where the current behaviour loses a player's game: seats are
+  permanent, so an invite link leads to a table nobody can leave or take over.
+- **M1-4 has no timer.** A turn-timer display needs `deadlineAt` from M3-1; the milestone is
+  otherwise feel-only, and each piece is a small testable module instead of an animation layer.
+- **M1-5's real deliverable is the check, not the document.** A hand-written env table drifts within
+  two releases; a script that fails CI when `apps/server/src/env.ts` grows an undocumented variable
+  does not.
+- M1-1, M1-2 and M1-5 are independent and can land in any order; M1-3 and M1-4 follow the routes
+  they modify.
 
 **Exit criteria:** a stranger with an invite link can sign up, play, leave, come back, and
 recover a password, without reading source.
