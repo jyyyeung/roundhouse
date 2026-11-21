@@ -66,5 +66,10 @@ test:
 typecheck:
     pnpm typecheck
 
+# End-to-end smoke test against a running server. Override SMOKE_BASE_URL /
+# SMOKE_WEB_ORIGIN for a Compose stack (web on :8080).
+smoke:
+    node scripts/smoke.mjs
+
 build:
     pnpm build

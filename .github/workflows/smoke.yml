@@ -1,0 +1,80 @@
+name: smoke
+
+# The unit suites fake the database, the socket layer, and the auth provider.
+# This job runs the real stack once and drives it with scripts/smoke.mjs, so a
+# broken migration, a rejected cookie, or a route that only 500s against real
+# Postgres fails here instead of in someone's browser.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: roundhouse
+          POSTGRES_PASSWORD: roundhouse
+          POSTGRES_USER: roundhouse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U roundhouse -d roundhouse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://roundhouse:roundhouse@localhost:5432/roundhouse
+      # Any 32+ character value: this stack is thrown away after the run.
+      BETTER_AUTH_SECRET: ci-smoke-secret-0123456789abcdef0123456789
+      BETTER_AUTH_URL: http://localhost:3001
+      PUBLIC_WEB_URL: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Migrate
+        run: pnpm --filter @roundhouse/server db:migrate
+
+      - name: Start server
+        run: |
+          pnpm --filter @roundhouse/server exec tsx src/index.ts > /tmp/server.log 2>&1 &
+          node -e '
+            const deadline = Date.now() + 60_000;
+            (async () => {
+              while (Date.now() < deadline) {
+                try {
+                  const response = await fetch("http://localhost:3001/health");
+                  if (response.ok) process.exit(0);
+                } catch {}
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              }
+              console.error("server never became healthy");
+              process.exit(1);
+            })();
+          '
+
+      - name: Smoke
+        run: node scripts/smoke.mjs
+
+      - name: Server log
+        if: failure()
+        run: tail -100 /tmp/server.log
