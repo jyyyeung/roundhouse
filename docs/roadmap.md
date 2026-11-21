@@ -7,9 +7,9 @@ Plan of record. Complements `docs/superpowers/specs/2026-08-02-yatzy-online-desi
 Status as of this revision: the live Yatzy/Yahtzee MVP is shipped, and the M0
 contracts are largely in place — per-viewer projections, a replayable event log, seq-based
 sync, shared wire schemas, runtime tests against real Postgres, and the CI to keep all of
-it honest (`pnpm typecheck` clean, 171 unit tests, 22 Postgres-backed integration tests, a
-13-check end-to-end smoke, a projection guard). M0-1 through M0-6 and M0-9 are closed;
-M0-7 and M0-8 remain.
+it honest (`pnpm typecheck` clean, 192 unit tests, 22 Postgres-backed integration tests, a
+13-check end-to-end smoke, a projection guard, and a conformance suite every module passes).
+M0-1 through M0-7 and M0-9 are closed; M0-8 remains.
 
 ## Thesis
 
@@ -93,6 +93,9 @@ recover a password, without reading source.
 
 - **M2-1** Spectator: `projectStateFor` spectator variant, `subscribe` admits non-seated
   observers (per-table opt-in), presence distinguishes watchers from players.
+  Also fix the chat snapshot while here: `apps/server/src/ws/persistence.ts:32` stores the _sender's_
+  projection with each message, so a hidden-information game writes that player's hand into shared
+  history (findings F7 in [`m0-7-module-contract-findings.md`](m0-7-module-contract-findings.md)).
 - **M2-2** Turn replay scrub driven by `applyEvent` + a checkpoint per turn; HTTP event read
   endpoint; the UI scrubs projections per event index.
 - **M2-3** Post-game summary card (final scores, best category, shareable image).
@@ -118,6 +121,11 @@ the tab.
 
 - **M5-1** Second real title with hidden information — the only way to know the module registry
   and client view registry actually work.
+  Two contract decisions must land with it, both recorded in
+  [`m0-7-module-contract-findings.md`](m0-7-module-contract-findings.md): project event payloads
+  per viewer (F2 — `apps/server/src/ws/hub.ts:389` and `:283` currently send raw payloads to every
+  seat), and give the module a way to deal a shuffled opening position (F4 — `createInitialState` has
+  no `ReduceContext`).
 - **M5-2** `docs/game-modules.md` authoring guide + testkit usage.
 
 ## Guardrails (still non-goals)
