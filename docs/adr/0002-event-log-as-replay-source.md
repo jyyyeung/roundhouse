@@ -104,6 +104,41 @@ checkpoint is a cache. Not built now; noted so it is not discovered late.
   of their own; replay ignores them (see above), so a legacy game's `seq` numbering still folds
   consistently, it just cannot reproduce dice.
 
+## Amendment (M0-7, #17): replay is bounded by the module, not by the wire
+
+The spike that produced ADR 0001's amendment also produced the sharpest constraint on this one. It is
+worth stating before the alternatives, because it narrows what "the log is the replay source" can
+mean once a game has hidden information.
+
+**Replay needs complete event payloads; the wire cannot carry them (F2).** `applyEvent` has to
+reproduce private state, so a `card_drawn` event must name the card even when only its owner may see
+it. The hub currently forwards that event list unchanged to every socket —
+`apps/server/src/ws/hub.ts:389` (`events: input.events`) inside `publishApplied`'s per-socket loop and
+`apps/server/src/ws/hub.ts:283` (`events: result.events`) in `sendSyncFrame` — while the `state` beside
+it _is_ projected per viewer. For a hidden-information game that is a leak one frame after every
+private draw. Nothing in this ADR needs to change for the log: the log stays complete and server-side.
+What has to change is the wire, and the decision belongs to M5-1, the first title that needs it:
+
+1. `projectEventFor(viewer, event)` on `GameModule`, under the same allowlist discipline as
+   `projectStateFor` and with a matching rule in `scripts/check-projection.mjs`;
+2. or keep payloads off the wire entirely and send `type`, `actorId` and a public projection,
+   letting clients render from projected state (they already do) and treating the event stream as
+   notification rather than data;
+3. either way the change is local to `publishApplied` and `sendSyncFrame`, and needs no `v` bump
+   because `v: 2` clients do not fold events into state.
+
+**A module cannot deal its opening hand (F4).** `createInitialState(config: Json, playerIds: string[])`
+receives no `ReduceContext`, so it has no `randomInt`: the spike's deck had to be the deterministic
+sequence `[40..1]`. A real shuffled deal has only two homes today, and both are wrong — the deal goes
+in `config` (hidden information in a table row, and each creation of the same table deals differently),
+or the first intent shuffles (one intent is special, and its event carries the whole hidden deal
+through the frame path described above). Both options belong with the same M5-1 decision: pass `ctx`
+to `createInitialState`, or make `setup` an intent whose events are private by construction.
+
+Neither finding changes the contract for games with no hidden information, which is why yatzy needed
+no code change to pass the suite. Both are written down here so that the first hidden-information title
+starts from a decision instead of a leak.
+
 ## Alternatives considered
 
 - **Store `stateAfter` on every event.** Simplest replay (read the last one), but duplicates state in

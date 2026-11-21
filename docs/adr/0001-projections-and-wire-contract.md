@@ -144,6 +144,43 @@ Two follow-ups this ADR deliberately leaves open:
 - Spectators are refused at `subscribe` (`not_seated`) until M2-1 admits them; the projection
   already has the `{kind: "spectator"}` branch they will use.
 
+## Amendment (M0-7, #17): what the hidden-information spike changed
+
+`packages/game-testkit` puts the contract under test (`describeModuleConformance`) and a throwaway
+four-player game with private hands was written against it and then deleted. Three positions above
+needed correcting; the evidence is in
+[`docs/m0-7-module-contract-findings.md`](../m0-7-module-contract-findings.md).
+
+**Seat limits are not the module's to declare (F1).** The decision sketch named
+`seatLimits: { min, max }` on `GameModule`; the interface that shipped does not have it and should
+not. A seat cap is a table decision, already modelled as `gameTable.softSeatCap` and enforced as
+`table_full` / `not_enough_players` by `apps/server/src/room/runtime.ts`. A module that declared its
+own limits would duplicate that number and drift from it. What the module does know — how many seats
+it can play with — is supplied to the conformance suite as `playerCounts` in the fixtures.
+
+**The brand describes server state, not module state (F3).** `RawGameState` cannot be honoured where
+raw state is made: `createInitialState` and `reduce` traffic in `Json`, so every module ends
+`projectStateFor` with `as unknown as Json` and the spike had to cast _down_ to its own state type
+inside the one function the brand was meant to protect. `GameModule` is not generic, and making it
+`GameModule<S>` would push a type parameter through the registry, the runtime and every package.
+Position now: the brand marks state that is server-owned and must not be serialised directly; the
+module owns and may name its raw shape; the guard, not the brand, is what stops a leak
+(`scripts/check-projection.mjs` refuses `RawGameState` outside the seam). A generic `GameModule<S>`
+stays open if a third module makes the casts expensive enough to justify it.
+
+**`seatIndex` is the authoritative seat, `userId` is the identity (F5).** `ViewerView` carries both
+and nothing said which one decides visibility: yatzy projects from `seatIndex`, the spike projected
+from `playerIds.indexOf(userId)`. Both are correct given a consistent server and both are wrong given
+a stale one. Position now: `seatIndex` decides what a seated player may see and is only ever built
+from the `table_player` row the server just read; `userId` names who is asking (chat attribution, the
+`you` highlight) and must never be the sole input to a visibility decision. This is a review rule,
+not a guard rule — the guard sees syntax, not intent.
+
+Unchanged but now tested rather than assumed: the projection must be JSON-safe (`undefined` survives
+TypeScript under `as unknown as Json` and disappears on the wire — the suite catches it), and the
+chat snapshot follow-up above is a real leak for a hidden-information game, not a cosmetic one
+(findings F6, F7).
+
 ## Alternatives considered
 
 - **Keep `getPublicSnapshot`, add `getSpectatorSnapshot`.** Rejected: two parallel projections drift,
