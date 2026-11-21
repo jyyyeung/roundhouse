@@ -238,3 +238,53 @@ describe("room runtime sync", () => {
     expect(live?.meta.seatUserIds).toEqual(playerIds);
   });
 });
+
+describe("room runtime per-viewer projection", () => {
+  it("gives two seated players snapshots differing only in `you`", async () => {
+    const { runtime } = makeRuntime();
+
+    const first = await runtime.getTableSnapshot({ asUserId: "user-a", tableId });
+    const second = await runtime.getTableSnapshot({ asUserId: "user-b", tableId });
+
+    const firstView = first?.state as Record<string, unknown>;
+    const secondView = second?.state as Record<string, unknown>;
+
+    expect(firstView.you).toBe(0);
+    expect(secondView.you).toBe(1);
+    expect({ ...firstView, you: null }).toEqual({ ...secondView, you: null });
+  });
+
+  it("never puts the stored state on the wire", async () => {
+    const { runtime } = makeRuntime();
+
+    const snapshot = await runtime.getTableSnapshot({ asUserId: "user-a", tableId });
+    const view = snapshot?.state as Record<string, unknown>;
+
+    // currentPlayerIndex / tableId / bonus bookkeeping live in the jsonb, not in
+    // the view: the client sees a turn id, never a seat index it could poke.
+    expect(view.currentPlayerIndex).toBeUndefined();
+    expect(view.tableId).toBeUndefined();
+    expect(Object.keys(view).sort()).toEqual([
+      "currentPlayerId",
+      "dice",
+      "gameId",
+      "holds",
+      "phase",
+      "playerIds",
+      "rollsLeft",
+      "ruleset",
+      "sheets",
+      "winnerIds",
+      "you",
+    ]);
+  });
+
+  it("gives a non-seat an anonymous board", async () => {
+    const { runtime } = makeRuntime();
+
+    const snapshot = await runtime.getTableSnapshot({ asUserId: "user-z", tableId });
+
+    expect((snapshot?.state as Record<string, unknown>).you).toBeNull();
+    expect((snapshot?.state as Record<string, unknown>).currentPlayerId).toBe("user-a");
+  });
+});

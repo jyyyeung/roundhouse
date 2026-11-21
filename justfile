@@ -66,6 +66,10 @@ test:
 typecheck:
     pnpm typecheck
 
+# Invariant I1: stored module state is projected in exactly one place (ADR 0001)
+check-projection:
+    pnpm check:projection
+
 # End-to-end smoke test against a running server. Override SMOKE_BASE_URL /
 # SMOKE_WEB_ORIGIN for a Compose stack (web on :8080).
 smoke:

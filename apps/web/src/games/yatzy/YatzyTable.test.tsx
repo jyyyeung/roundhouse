@@ -104,6 +104,22 @@ describe("YatzyTable", () => {
     onLoadOlderChat: vi.fn(),
   };
 
+  it("renders unchanged when the stored state grows a field the view does not publish", () => {
+    // M0-2 demonstration: the client is typed on the projected view only, so
+    // adding hidden information to YatzyState costs apps/web nothing. The
+    // projection strips it; the UI never reads it; here it is not even rendered.
+    const withPrivateState = {
+      ...baseState(),
+      deckOrder: ["ace", "king"],
+      currentPlayerIndex: 1,
+    } as unknown as YatzyView;
+
+    const { container } = render(<YatzyTable {...defaultProps} state={withPrivateState} />);
+
+    expect(screen.getByText(/2 rolls left/i)).toBeInTheDocument();
+    expect(container.textContent ?? "").not.toMatch(/deckOrder|currentPlayerIndex/);
+  });
+
   it("uses a two-column playboard grid on md+", () => {
     const { container } = render(<YatzyTable {...defaultProps} />);
     const board = container.querySelector(".yatzy-board");

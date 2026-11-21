@@ -1,3 +1,4 @@
+import type { Json } from "@roundhouse/game-core";
 import { relations } from "drizzle-orm";
 import {
   boolean,
@@ -95,7 +96,7 @@ export const gameTable = pgTable(
     id: text("id").primaryKey(),
     code: text("code").notNull().unique(),
     gameId: text("game_id").notNull(),
-    config: jsonb("config").notNull(),
+    config: jsonb("config").$type<Json>().notNull(),
     mode: text("mode", { enum: tableModes }).notNull().default("live"),
     status: text("status", { enum: tableStatuses }).notNull(),
     hostUserId: text("host_user_id")
@@ -136,7 +137,7 @@ export const game = pgTable(
       .notNull()
       .references(() => gameTable.id, { onDelete: "cascade" }),
     gameId: text("game_id").notNull(),
-    state: jsonb("state").notNull(),
+    state: jsonb("state").$type<Json>().notNull(),
     seq: integer("seq").notNull().default(0),
     status: text("status", { enum: gameStatuses }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
@@ -161,7 +162,7 @@ export const gameEvent = pgTable(
     actorId: text("actor_id").references(() => user.id, {
       onDelete: "set null",
     }),
-    payload: jsonb("payload").notNull(),
+    payload: jsonb("payload").$type<Json>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (table) => [
@@ -188,7 +189,7 @@ export const chatMessage = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     text: text("text").notNull(),
-    snapshot: jsonb("snapshot").notNull(),
+    snapshot: jsonb("snapshot").$type<Json>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (table) => [

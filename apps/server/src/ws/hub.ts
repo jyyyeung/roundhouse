@@ -1,4 +1,4 @@
-import type { ChatWire, EventEnvelope, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import type { ChatWire, EventEnvelope, Json, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
 import { parseClientMessage, PROTOCOL_VERSION } from "@roundhouse/game-core";
 import type { IncomingMessage } from "node:http";
 import { WebSocket, type RawData } from "ws";
@@ -44,7 +44,7 @@ export function createWsHub(opts: {
       tableId: string;
       userId: string;
       text: string;
-      snapshot: unknown;
+      snapshot: Json;
       createdAt: Date;
     }) => persistChatMessageToDb(db, input),
   };

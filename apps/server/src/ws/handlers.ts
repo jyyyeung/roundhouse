@@ -1,6 +1,7 @@
 import type {
   ClientTableMessage,
   EventEnvelope,
+  Json,
   RawGameState,
   ServerMessage,
   TableMeta,
@@ -38,7 +39,7 @@ export function createWsHandlers(deps: {
     tableId: string;
     userId: string;
     text: string;
-    snapshot: unknown;
+    snapshot: Json;
     createdAt: Date;
   }) => Promise<{ id: string; createdAt: string }>;
 }) {

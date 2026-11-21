@@ -19,7 +19,7 @@ export async function persistChatMessageToDb(
     tableId: string;
     userId: string;
     text: string;
-    snapshot: unknown;
+    snapshot: Json;
     createdAt: Date;
   },
 ) {
@@ -93,13 +93,13 @@ export function toChatWire(row: {
   id: string;
   userId: string;
   text: string;
-  snapshot: unknown;
+  snapshot: Json;
   createdAt: Date;
 }): ChatWire {
   return {
     createdAt: row.createdAt.toISOString(),
     id: row.id,
-    snapshot: row.snapshot as Json,
+    snapshot: row.snapshot,
     text: row.text,
     userId: row.userId,
   };

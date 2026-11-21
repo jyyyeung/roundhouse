@@ -114,6 +114,36 @@ in the client instead of at runtime in a browser tab.
 - Hard cutover of `v: 1` → absent users. There is exactly one deployment and no published client,
   so no dual-version support is worth writing.
 
+## Implementation notes (M0-2, #12)
+
+Where the pieces landed:
+
+- `apps/server/src/room/projection.ts` is the seam: `viewerForUser(seatUserIds, userId)` names the
+  viewer, `projectSnapshot(module, state, viewer)` is the only function that turns stored state into
+  a payload, and `rawGameState(column)` is the only cast out of the `jsonb` column.
+- `packages/games/yatzy/src/view.ts` holds `YatzyView` and `projectYatzyView`, written as an
+  explicit allowlist (no spread), so a new field on `YatzyState` is invisible until someone adds it
+  to the projection on purpose.
+- `apps/web` names `YatzyView` and nothing else: the web app cannot express a stored-state field,
+  so adding hidden information to a game module costs zero client changes.
+- The `state` columns are typed at the schema (`jsonb(...).$type<Json>()`), so the cast to
+  `RawGameState` no longer has to be repeated at every call site — the seam owns the one that
+  remains.
+
+Enforced, not just documented: `scripts/check-projection.mjs` (`pnpm check:projection`,
+`.github/workflows/contracts.yml`) fails the build if `projectStateFor` is called outside the seam,
+if `RawGameState` is cast or named outside it, if `rawGameState()` is called anywhere but the seam
+and the room runtime, if `apps/web` names any stored-state type, or if `getPublicSnapshot` comes
+back.
+
+Two follow-ups this ADR deliberately leaves open:
+
+- Chat messages embed the *sending viewer's* projected state as their snapshot, so the author's
+  `you` index is stored in shared history. Harmless today (the chat UI reads dice and holds only),
+  but a hidden-information game should store a spectator projection instead.
+- Spectators are refused at `subscribe` (`not_seated`) until M2-1 admits them; the projection
+  already has the `{kind: "spectator"}` branch they will use.
+
 ## Alternatives considered
 
 - **Keep `getPublicSnapshot`, add `getSpectatorSnapshot`.** Rejected: two parallel projections drift,

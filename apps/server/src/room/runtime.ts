@@ -166,7 +166,7 @@ function toEventEnvelope(row: GameEventRow): EventEnvelope {
     createdAt: row.createdAt.toISOString(),
     gameId: row.gameId,
     id: row.id,
-    payload: row.payload as Json,
+    payload: row.payload,
     seq: row.seq,
     tableId: row.tableId,
     type: row.type,
@@ -185,7 +185,7 @@ function resolveTableStatus(table: TableSummary, currentGame: GameRow | null) {
 function toTableMeta(table: TableSummary, currentGame: GameRow | null): TableMeta {
   return {
     code: table.code,
-    config: table.config as Json,
+    config: table.config,
     gameId: table.gameId,
     hostUserId: table.hostUserId,
     seatUserIds: table.seatUserIds,
@@ -547,7 +547,7 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           } satisfies ApplyGameIntentResult;
         }
 
-        const reduced = module.reduce(currentGame.state as Json, parsedIntent.intent, {
+        const reduced = module.reduce(currentGame.state, parsedIntent.intent, {
           actorId: userId,
           now,
           playerIds: table.seatUserIds,

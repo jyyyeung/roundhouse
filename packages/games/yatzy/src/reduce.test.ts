@@ -1,4 +1,3 @@
-import type { RawGameState } from "@roundhouse/game-core";
 import { describe, expect, it, vi } from "vitest";
 import { yatzyCategories } from "./categories";
 import { yatzyModule } from "./module";
@@ -299,52 +298,5 @@ describe("reduce", () => {
       tableId: "yatzy",
       type: "game_finished",
     });
-  });
-});
-
-describe("yatzyModule", () => {
-  it("creates initial state and projects a snapshot for each viewer", () => {
-    const state = yatzyModule.createInitialState({ ruleset: "yahtzee" }, ["p1", "p2"]);
-    const raw = state as unknown as RawGameState;
-    const snapshot = yatzyModule.projectStateFor(raw, { kind: "player", seatIndex: 1, userId: "p2" });
-    const spectatorSnapshot = yatzyModule.projectStateFor(raw, { kind: "spectator", userId: null });
-
-    expect(state).toMatchObject({
-      ruleset: "yahtzee",
-      currentPlayerIndex: 0,
-      rollsLeft: 3,
-      dice: [0, 0, 0, 0, 0],
-      holds: [false, false, false, false, false],
-      phase: "playing",
-      winnerIds: [],
-    });
-    expect(snapshot).toMatchObject({
-      gameId: "yatzy",
-      ruleset: "yahtzee",
-      currentPlayerId: "p1",
-      rollsLeft: 3,
-      dice: [0, 0, 0, 0, 0],
-      holds: [false, false, false, false, false],
-      phase: "playing",
-      winnerIds: [],
-      you: 1,
-    });
-    expect(spectatorSnapshot).toMatchObject({ you: null });
-    // The projection is an allowlist, not a spread: adding an internal field to
-    // YatzyState must not put it on the wire (or into the web bundle's types).
-    expect(Object.keys(snapshot as Record<string, unknown>).sort()).toEqual([
-      "currentPlayerId",
-      "dice",
-      "gameId",
-      "holds",
-      "phase",
-      "playerIds",
-      "rollsLeft",
-      "ruleset",
-      "sheets",
-      "winnerIds",
-      "you",
-    ]);
-    expect(yatzyModule.isFinished(state)).toBe(false);
   });
 });

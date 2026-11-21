@@ -1,0 +1,29 @@
+name: contracts
+
+# Invariant I1: only `projectStateFor` output crosses the wire, from one seam.
+# The unit tests prove the projection strips hidden fields; this job proves that
+# no future code path can bypass the seam in the first place.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  projection-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No install step: the guard reads source files, it does not run the app.
+      - name: Projection guard
+        run: node scripts/check-projection.mjs
