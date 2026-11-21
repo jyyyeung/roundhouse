@@ -161,4 +161,19 @@ describe("connectTableWs", () => {
 
     expect(onConnectionLost).toHaveBeenCalledWith("not_authenticated");
   });
+
+  it("reports a planned restart as its own reason so the caller can reconnect at once", () => {
+    const onConnectionLost = vi.fn();
+    connectTableWs({
+      apiUrl: "http://localhost:3001",
+      tableId: "table-789",
+      onMessage: vi.fn(),
+      onConnectionLost,
+    });
+
+    MockWebSocket.instances[0]?.open();
+    MockWebSocket.instances[0]?.onclose?.({ code: 1012 });
+
+    expect(onConnectionLost).toHaveBeenCalledWith("server_restart");
+  });
 });

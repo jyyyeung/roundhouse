@@ -56,6 +56,12 @@ export function connectTableWs(opts: {
       notifyLost("not_authenticated");
       return;
     }
+    // 1012 is "service restart": the server said goodbye on purpose, so the caller
+    // may reconnect at once instead of backing off from a failure.
+    if (event.code === 1012) {
+      notifyLost("server_restart");
+      return;
+    }
     notifyLost(opened ? `websocket_closed_${event.code}` : "websocket_failed");
   };
 

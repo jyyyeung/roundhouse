@@ -8,6 +8,7 @@ import type {
 } from "@roundhouse/game-core";
 import { intentFromClientMessage, PROTOCOL_VERSION } from "@roundhouse/game-core";
 
+import { createLogger, type Logger } from "../log";
 import type { TablesRuntime } from "../room/runtime";
 import { toChatWire } from "./persistence";
 
@@ -33,6 +34,8 @@ export function createWsHandlers(deps: {
   isDuplicateAction: (tableId: string, actionId: string) => boolean;
   rememberAction: (tableId: string, actionId: string) => void;
   forgetAction: (tableId: string, actionId: string) => void;
+  /** Structured logger; the hub injects one so lines share its connection fields. */
+  logger?: Logger;
   // optional persistence hooks
   persistChatMessage?: (input: {
     tableId: string;
@@ -50,6 +53,7 @@ export function createWsHandlers(deps: {
     forgetAction,
     runtime,
   } = deps;
+  const log = deps.logger ?? createLogger({ fields: { component: "ws.handlers" } });
 
   // rate limit state: tableId -> userId -> timestamps (ms)
   const rateLimits = new Map<string, Map<string, number[]>>();
@@ -65,6 +69,7 @@ export function createWsHandlers(deps: {
         // intents are applied concurrently.
         rememberAction(message.tableId, message.actionId);
 
+        const startedAt = Date.now();
         const result = await runtime.applyGameIntent({
           intent: intentFromClientMessage(message),
           tableId: message.tableId,
@@ -91,6 +96,14 @@ export function createWsHandlers(deps: {
         // intent is broadcast with its authoritative state: a client renders the
         // state it is given and never reconstructs one from events.
         publishApplied(message.tableId, result);
+        log.debug("ws.intent_applied", {
+          actionId: message.actionId,
+          durationMs: Date.now() - startedAt,
+          intentType: message.intentType,
+          seq: result.seq,
+          tableId: message.tableId,
+          userId: connection.userId,
+        });
         return;
       }
 
@@ -175,8 +188,25 @@ export function createWsHandlers(deps: {
               createdAt,
             });
             chatMessageId = res.id;
-          } catch {
-            // swallow persist errors for now
+          } catch (error) {
+            // History is the authoritative chat log, so a message that failed to
+            // store is not broadcast: it would vanish on the next reload. The author
+            // (and only the author) is told, and every reader of the log agrees.
+            log.error("chat.persist_failed", {
+              actionId,
+              error,
+              tableId,
+              userId,
+            });
+            connection.send(
+              errorMessage({
+                actionId,
+                code: "chat_not_persisted",
+                message: "chat_not_persisted",
+                tableId,
+              }),
+            );
+            return;
           }
         }
 

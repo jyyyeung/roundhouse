@@ -2,6 +2,7 @@ import type { ClientTableMessage, ServerMessage } from "@roundhouse/game-core";
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it, vi } from "vitest";
 
+import { createLogger } from "../log";
 import { createWsHandlers, type WsRuntime } from "./handlers";
 
 function makeRuntime(): WsRuntime {
@@ -157,5 +158,60 @@ describe("ws chat", () => {
     expect(applyGameIntent).not.toHaveBeenCalled();
     const after = await runtime.getTableSnapshot({ asUserId: null, tableId: "table-1" });
     expect(after?.seq).toBe(0);
+  });
+
+  it("tells the author and logs an error when the message cannot be stored", async () => {
+    const published: ServerMessage[] = [];
+    const lines: string[] = [];
+    const handlers = createWsHandlers({
+      runtime: makeRuntime(),
+      forgetAction: () => {},
+      isDuplicateAction: () => false,
+      logger: createLogger({ level: "debug", sink: (line) => lines.push(line) }),
+      publishApplied: () => {},
+      publishToTable: (_tableId, message) => {
+        published.push(message);
+      },
+      rememberAction: () => {},
+      persistChatMessage: async () => {
+        throw new Error("insert failed");
+      },
+    });
+    const sent: ServerMessage[] = [];
+
+    await handlers.onMessage(
+      {
+        send: (message) => {
+          sent.push(message);
+        },
+        userId: "user-a",
+      },
+      {
+        actionId: "action-chat",
+        tableId: "table-1",
+        text: "hello",
+        type: "chat",
+        v: 2,
+      } satisfies ClientTableMessage,
+    );
+
+    expect(sent).toEqual([
+      expect.objectContaining({
+        actionId: "action-chat",
+        code: "chat_not_persisted",
+        type: "error",
+      }),
+    ]);
+    // A message that is not in the history is not broadcast: it would vanish on
+    // the next reload and every reader would see a different log.
+    expect(published).toEqual([]);
+    expect(lines.map((line) => JSON.parse(line))).toContainEqual(
+      expect.objectContaining({
+        level: "error",
+        msg: "chat.persist_failed",
+        tableId: "table-1",
+        userId: "user-a",
+      }),
+    );
   });
 });

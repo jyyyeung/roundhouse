@@ -18,13 +18,13 @@ The web app runs on `http://localhost:5173` and the server health endpoint is `h
 
 1. Optional: `cp .env.example .env` if you want to override defaults
 2. Start the stack: `docker compose up --build -d`
-3. Check health: `curl -sf http://localhost:3001/health`
+3. Check health: `curl -sf http://localhost:3001/health` and readiness: `curl -sf http://localhost:3001/ready`
 4. Open the app at `http://localhost:8080`
 
 Compose starts:
 
 - `db`: Postgres 16 with a persistent `postgres-data` volume
-- `server`: runs `pnpm --filter @roundhouse/server db:migrate` before starting the API/websocket server
+- `server`: applies pending migrations in process, then starts the API/websocket server; it reports readiness on `/ready` and Compose waits for that before starting `web`
 - `web`: serves the Vite build from nginx and proxies `/api` plus `/ws` to the server container
 
 To stop the stack, run `docker compose down`. Add `-v` if you also want to remove the Postgres volume (needed after DB name/user defaults change).
@@ -36,8 +36,21 @@ To stop the stack, run `docker compose down`. Add `-v` if you also want to remov
   `docker compose exec -T db createdb -U roundhouse roundhouse_test`
 - `just check-projection` — enforces that module state is projected in exactly one place (invariant I1).
 - `just smoke` — end-to-end run against a started server (`scripts/smoke.mjs`).
-- `just compose-smoke` — builds both Docker images, boots the packaged stack on throwaway ports, checks `/health`, the web root, and the end-to-end script, then tears it down and removes the volume.
+- `just compose-smoke` — builds both Docker images, boots the packaged stack on throwaway ports, checks `/health` and `/ready`, the web root, and the end-to-end script, then tears it down and removes the volume.
 - `pnpm lint` / `pnpm format` — Biome does linting, formatting, and import order in one pass. `pnpm lint:fix` writes fixes; CI fails on `pnpm lint` and `pnpm format:check`.
+
+## Operations
+
+`docs/ops.md` is the full story; the short version:
+
+- `GET /health` is process liveness (no I/O) and `GET /ready` checks Postgres plus
+  pending migrations, answering `503` within a second when either is unhappy.
+- Logs are one JSON object per line on stdout (`LOG_LEVEL` sets the floor), keyed by
+  `msg` event name, with `requestId` per HTTP request and `connectionId` per socket.
+- `SIGTERM`/`SIGINT` close sockets with `1012 server_restart` (the web client
+  reconnects immediately), then the pool, all inside a 5-second budget.
+- The server image builds in two stages, installs production dependencies only, and
+  runs as `node`, not root.
 
 ## CI
 
