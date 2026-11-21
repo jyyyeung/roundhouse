@@ -20,9 +20,11 @@ export type GameModule = {
   defaultConfig: Json; // what a fresh table plays
   configSchema: z.ZodType; // what a valid config looks like
   intents: Readonly<Record<string, z.ZodType>>; // inbound action allowlist
-  createInitialState(ctx: ReduceContext): GameState;
+  createInitialState(config: Json, playerIds: string[]): GameState; // the runtime adds tableId to config
   reduce(state: GameState, intent: ClientIntent, ctx: ReduceContext): ReduceResult;
   projectStateFor(state: GameState, viewer: ViewerView): Json; // what that viewer may see
+  applyEvent(state: Json, event: EventEnvelope): Json; // replay: fold one event
+  isFinished(state: Json): boolean;
 };
 ```
 
@@ -53,7 +55,19 @@ the player's intentions: the property test in ADR
 the post-intent state. So an event that resolves randomness records the outcome
 (`dice_rolled { dice, rollsLeft }`), not the fact that a roll happened.
 
-Deal shuffled openings inside `createInitialState` using `ctx.randomInt`; do not deal in `reduce`.
+Deal shuffled openings inside `createInitialState` (`config` carries `tableId` by the time the
+runtime calls it) — never in `reduce`.
+
+## 2b. Secrets: state until revealed
+
+An event is a **public** fact: the hub sends the same `events` array to every socket, so anything you
+put in a payload is on every opponent's wire before the state projection runs. A secret therefore
+lives in state (`pending`, a hand, a hidden card) and reaches only its owner through
+`projectStateFor`; it becomes an event at the moment it becomes public — the reveal. Duel is the
+worked example: `duel_picked` says only `{ playerId }` ("this seat has committed"), and both cards
+appear once, in `duel_round`, after the round resolves. Read
+[ADR 0005](adr/0005-secrets-enter-the-log-at-the-reveal.md) before designing a hidden-information
+game; the price is that a log which stops mid-round cannot rebuild that round's pending secret.
 
 ## 3. Registration
 
@@ -75,7 +89,7 @@ const gameUi: Record<string, GameUi> = {
     View: YatzyViewForTable,
     tableTitle: yatzyTableTitle,
   },
-  duel: { ConfigControls: DuelConfigControls, View: DuelViewForTable }, // ← here
+  duel: { View: DuelViewForTable }, // ← here (no config form, nothing to name)
 };
 ```
 
@@ -115,10 +129,10 @@ hiding (state fields a viewer must not see), seat symmetry and your declared
 equal `module.playerCount`, so the suite fails when they disagree rather than silently playing a
 different game.
 
-If the game has hidden information, also call `assertProjectionHidesSecret` with a secret the state
-holds, and remember that event payloads are currently broadcast to every seat (finding F2) — keep
-secrets out of events until [ADR 0002](adr/0002-event-log-as-replay-source.md)'s per-viewer payload
-work lands.
+Declare the secret in the fixtures instead of hiding it by hand: `secretVisibility: "owner-only"`
+plus a `plantSecret` that writes a marker where the real secret lives makes the suite fail if any
+other viewer's projection carries it. Event payloads are broadcast to every seat (finding F2), so the
+secret must not be in one until it is revealed — see [ADR 0005](adr/0005-secrets-enter-the-log-at-the-reveal.md).
 
 Then run the gate:
 
@@ -132,6 +146,7 @@ pnpm typecheck && pnpm test && pnpm check:projection && pnpm lint
 - [ ] `playerCount`, `defaultConfig`, `configSchema` declared and enforced by tests
 - [ ] `reduce` pure; randomness and time from `ReduceContext`
 - [ ] every `reduce` outcome reconstructible from `events` (fold property)
+- [ ] secrets are state, not event payloads, until the reveal (ADR 0005)
 - [ ] `projectStateFor` publishes an allowlist; spectators get a valid view with `you: null`
 - [ ] `describeModuleConformance(module, fixtures)` passes
 - [ ] one line in `apps/server/src/modules/registry.ts`

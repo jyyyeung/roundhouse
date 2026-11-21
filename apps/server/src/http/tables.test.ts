@@ -18,13 +18,14 @@ function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
   };
 }
 
-function makeApp(runtime: TablesRuntime) {
+function makeApp(runtime: TablesRuntime, onTableChanged?: (tableId: string) => void) {
   const app = new Hono();
   app.route(
     "/api/tables",
     createTablesRouter({
       runtime,
       getSessionFromHeaders: async () => ({ user: { id: "user-1" } }),
+      onTableChanged,
     }),
   );
   return app;
@@ -105,5 +106,37 @@ describe("tables http api", () => {
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({ code: "invalid_request" });
     expect(runtime.createTable).not.toHaveBeenCalled();
+  });
+
+  it("pushes the new seat list when someone joins", async () => {
+    const runtime = makeRuntime({
+      joinTable: vi.fn().mockResolvedValue({ tableId: "table-1" }),
+    });
+    const onTableChanged = vi.fn();
+
+    const res = await makeApp(runtime, onTableChanged).request("/api/tables/join", {
+      method: "POST",
+      body: JSON.stringify({ code: "ABC123" }),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(onTableChanged).toHaveBeenCalledWith("table-1");
+  });
+
+  it("does not push when the join is refused", async () => {
+    const runtime = makeRuntime({
+      joinTable: vi.fn().mockRejectedValue(new TablesError("table_full", "table_full")),
+    });
+    const onTableChanged = vi.fn();
+
+    const res = await makeApp(runtime, onTableChanged).request("/api/tables/join", {
+      method: "POST",
+      body: JSON.stringify({ code: "ABC123" }),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(onTableChanged).not.toHaveBeenCalled();
   });
 });

@@ -126,6 +126,9 @@ export function createTablesRouter(opts: {
       const userId = await requireSession(getSession, c.req.raw.headers);
       const body = joinBodySchema.parse(await c.req.json());
       const result = await runtime.joinTable({ userId, code: body.code });
+      // A seat change is a state change: the host's open view has to learn about
+      // the new player, or "Start game" stays disabled until someone reloads.
+      opts.onTableChanged?.(result.tableId);
       return c.json(result);
     } catch (error) {
       return handleError(error);

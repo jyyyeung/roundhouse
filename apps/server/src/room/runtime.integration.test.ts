@@ -10,6 +10,9 @@
  *   DATABASE_URL_TEST=postgres://roundhouse:roundhouse@localhost:5432/roundhouse_test \
  *     pnpm --filter @roundhouse/server test
  */
+
+import type { Json } from "@roundhouse/game-core";
+import { type DuelState, duelModule } from "@roundhouse/game-duel";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -94,9 +97,12 @@ integration(title, () => {
     return name;
   }
 
-  async function makeTable(host: string, options: { gameId?: string; softSeatCap?: number } = {}) {
+  async function makeTable(
+    host: string,
+    options: { config?: Json; gameId?: string; softSeatCap?: number } = {},
+  ) {
     return runtime.createTable({
-      config: { ruleset: "yatzy" },
+      config: options.config ?? { ruleset: "yatzy" },
       gameId: options.gameId ?? "yatzy",
       // Undefined means "the game decides" — the runtime defaults to playerCount.max.
       softSeatCap: options.softSeatCap,
@@ -419,6 +425,168 @@ integration(title, () => {
       expect(result).toMatchObject({ code: "illegal_action", ok: false });
       expect(await eventSeqs(gameRowId)).toEqual([]);
       expect((await gameRow(gameRowId)).seq).toBe(0);
+    });
+  });
+
+  describe("a secret-pick duel over real jsonb", () => {
+    async function startedDuel(config?: Json) {
+      const players = await Promise.all([makeUser(), makeUser()]);
+      const table = await makeTable(players[0], { config, gameId: "duel" });
+      for (const player of players.slice(1)) {
+        await runtime.joinTable({ code: table.code, userId: player });
+      }
+      const started = await runtime.startTable({ tableId: table.tableId, userId: players[0] });
+      return { ...table, gameRowId: started.gameRowId, players };
+    }
+
+    async function pick(input: { tableId: string; userId: string; card: string }) {
+      return runtime.applyGameIntent({
+        intent: { payload: { card: input.card }, type: "play" },
+        randomInt: () => 0,
+        tableId: input.tableId,
+        userId: input.userId,
+      });
+    }
+
+    it("keeps a pending pick out of every viewer's snapshot but its owner's", async () => {
+      const duel = await startedDuel();
+      const [alice, bob] = duel.players as [string, string];
+
+      await pick({ card: "strike", tableId: duel.tableId, userId: alice });
+
+      // The stored row really does hold the secret: this is the state the
+      // projection has to hide, not a state that never contained it.
+      const { state } = await gameRow(duel.gameRowId);
+      expect((state as unknown as DuelState).pending).toEqual({ [alice]: "strike" });
+
+      const aliceSnapshot = await runtime.getTableSnapshot({
+        asUserId: alice,
+        tableId: duel.tableId,
+      });
+      const bobSnapshot = await runtime.getTableSnapshot({ asUserId: bob, tableId: duel.tableId });
+      const spectatorSnapshot = await runtime.getTableSnapshot({
+        asUserId: null,
+        tableId: duel.tableId,
+      });
+
+      expect(JSON.stringify(aliceSnapshot?.state)).toContain('"yourPick":"strike"');
+      expect(JSON.stringify(bobSnapshot?.state)).not.toContain("strike");
+      expect(JSON.stringify(spectatorSnapshot?.state)).not.toContain("strike");
+      // Tempo is public: bob can see that alice has committed.
+      expect(JSON.stringify(bobSnapshot?.state)).toContain(`"pickedBy":["${alice}"]`);
+    });
+
+    it("never writes the card to the event log before the round resolves", async () => {
+      const duel = await startedDuel();
+      const [alice, bob] = duel.players as [string, string];
+
+      await pick({ card: "strike", tableId: duel.tableId, userId: alice });
+
+      const rows = await sql<{ payload: Record<string, unknown>; type: string }[]>`
+        select type, payload from game_event where game_row_id = ${duel.gameRowId} order by seq
+      `;
+      expect(rows.map((row) => row.type)).toEqual(["duel_picked"]);
+      // Events are broadcast unprojected (finding F2), so the secret must not be
+      // in the frame a pick produces either.
+      expect(rows[0]?.payload).toEqual({ playerId: alice });
+
+      await pick({ card: "guard", tableId: duel.tableId, userId: bob });
+      const after = await sql<{ payload: Record<string, unknown>; type: string }[]>`
+        select type, payload from game_event where game_row_id = ${duel.gameRowId} order by seq
+      `;
+      expect(after.map((row) => row.type)).toEqual(["duel_picked", "duel_round"]);
+      // The reveal carries both cards, in seat order, to everyone. The second
+      // player's pick is never a separate event: it arrives already revealed.
+      const reveal = after[1]?.payload as { plays: { card: string }[] } | undefined;
+      expect(reveal?.plays.map((play) => play.card)).toEqual(["strike", "guard"]);
+    });
+
+    it("plays a full match to a winner and reproduces the final state from the log", async () => {
+      const duel = await startedDuel({ rounds: 2, tableId: "ignored-by-runtime" });
+      const [alice, bob] = duel.players as [string, string];
+
+      // Alice wins both rounds: strike beats feint, guard beats strike.
+      for (const [aliceCard, bobCard] of [
+        ["strike", "feint"],
+        ["guard", "strike"],
+      ] as const) {
+        await pick({ card: aliceCard, tableId: duel.tableId, userId: alice });
+        const resolution = await pick({ card: bobCard, tableId: duel.tableId, userId: bob });
+        expect(resolution.ok).toBe(true);
+      }
+
+      const { seq, state } = await gameRow(duel.gameRowId);
+      const finished = state as unknown as DuelState;
+
+      expect(finished.phase).toBe("finished");
+      expect(finished.winnerIds).toEqual([alice]);
+      expect(finished.decidedBy).toBe("rounds");
+      expect(finished.scores).toEqual({ [alice]: 2, [bob]: 0 });
+      // Per round: one `duel_picked` for the first seat (no card) and one
+      // `duel_round` for the reveal. Two rounds plus the finish is five events,
+      // and the game row's seq is that count.
+      expect(seq).toBe(5);
+      expect(await eventSeqs(duel.gameRowId)).toEqual([1, 2, 3, 4, 5]);
+
+      const statusRow = await sql<
+        { status: string }[]
+      >`select status from game where id = ${duel.gameRowId}`;
+      expect(statusRow[0]?.status).toBe("finished");
+
+      // Invariant I3 over the real rows: folding the stored log reproduces the
+      // stored state, whatever Postgres did to the jsonb on the way in and out.
+      const events = await sql<{ payload: unknown; type: string }[]>`
+        select type, payload from game_event where game_row_id = ${duel.gameRowId} order by seq
+      `;
+      const replayed = events.reduce<Json>(
+        (current, event, index) =>
+          duelModule.applyEvent(current, {
+            actorId: alice,
+            createdAt: new Date(0).toISOString(),
+            gameId: "duel",
+            id: `replay-${index}`,
+            payload: event.payload as Json,
+            seq: index + 1,
+            tableId: duel.tableId,
+            type: event.type,
+          }),
+        duelModule.createInitialState({ rounds: 2, tableId: duel.tableId }, duel.players),
+      );
+      expect(replayed).toEqual(finished);
+    });
+
+    it("breaks a level match with one server draw that the log can replay", async () => {
+      const duel = await startedDuel({ rounds: 1 });
+      const [alice, bob] = duel.players as [string, string];
+
+      // A clash scores nothing, so one round of it leaves the match level with no
+      // rounds left: the only way to finish is the server's draw.
+      await pick({ card: "guard", tableId: duel.tableId, userId: alice });
+      await runtime.applyGameIntent({
+        intent: { payload: { card: "guard" }, type: "play" },
+        randomInt: () => 1,
+        tableId: duel.tableId,
+        userId: bob,
+      });
+
+      const { state } = await gameRow(duel.gameRowId);
+      const resolved = state as unknown as DuelState;
+      expect(resolved.scores).toEqual({ [alice]: 0, [bob]: 0 });
+      expect(resolved.decidedBy).toBe("roll");
+      expect(resolved.decisiveRoll).toEqual({ roll: 1, winnerId: bob });
+      expect(resolved.winnerIds).toEqual([bob]);
+
+      // The draw is in the log, so replaying it picks the same winner instead of
+      // re-rolling (the reason `decisiveRoll` is state at all).
+      const events = await sql<{ payload: unknown; type: string }[]>`
+        select type, payload from game_event where game_row_id = ${duel.gameRowId} order by seq
+      `;
+      expect(events.map((event) => event.type)).toEqual([
+        "duel_picked",
+        "duel_round",
+        "duel_decided",
+        "game_finished",
+      ]);
     });
   });
 

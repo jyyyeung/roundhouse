@@ -29,6 +29,14 @@ describe("games http api", () => {
           id: "yatzy",
           playerCount: { max: 6, min: 2 },
         }),
+        // Second registered game: proving a game can be added by package and
+        // one registry line (ADR 0004) is the point of M5-0/M5-1.
+        expect.objectContaining({
+          defaultConfig: { rounds: 3 },
+          displayName: "Duel",
+          id: "duel",
+          playerCount: { max: 2, min: 2 },
+        }),
       ]),
     );
   });
