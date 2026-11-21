@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-roundhouse}
@@ -30,12 +30,16 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8080}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:8080}
       PORT: ${PORT:-3001}
-    command:
-      - /bin/sh
-      - -c
-      - pnpm --filter @roundhouse/server db:migrate && pnpm --filter @roundhouse/server exec tsx src/index.ts
     ports:
       - "${SERVER_PORT:-3001}:3001"
+    healthcheck:
+      # /ready, not /health: `web` must not serve a page whose API cannot reach
+      # Postgres, so the dependency is readiness, not process liveness.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3001/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   web:
     build:
@@ -44,7 +48,7 @@ services:
     restart: unless-stopped
     depends_on:
       server:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${WEB_PORT:-8080}:80"
 

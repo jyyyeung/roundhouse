@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type {
   EventEnvelope,
@@ -9,6 +10,7 @@ import type {
 import { PROTOCOL_VERSION, parseClientMessage } from "@roundhouse/game-core";
 import { type RawData, WebSocket } from "ws";
 import { db } from "../db/client";
+import { createLogger, type Logger } from "../log";
 import { getModule } from "../modules/registry";
 import { projectSnapshot, viewerForUser } from "../room/projection";
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
@@ -17,7 +19,11 @@ import { type ChatPage, listChatMessagesForTable, persistChatMessageToDb } from 
 
 type Session = { user?: { id: string } } | null;
 type GetSession = (headers: Headers) => Promise<Session> | Session;
-type HubSocket = WebSocket & { tableId?: string; userId?: string };
+type HubSocket = WebSocket & {
+  connectionId: string;
+  tableId?: string;
+  userId?: string;
+};
 
 const ACTION_TTL_MS = 5 * 60 * 1000;
 // A yatzy intent or chat message is a few hundred bytes; 64 KiB is generous and
@@ -29,7 +35,10 @@ export function createWsHub(opts: {
   getSessionFromHeaders: GetSession;
   /** Chat paging is read-only and side-effect free, so tests inject it. */
   listChatPage?: (input: { tableId: string; beforeId?: string }) => Promise<ChatPage>;
+  /** Structured logger; tests inject a capturing one. */
+  logger?: Logger;
 }) {
+  const log = opts.logger ?? createLogger({ fields: { component: "ws.hub" } });
   const listChatPage =
     opts.listChatPage ??
     ((input) => listChatMessagesForTable(db, input.tableId, { beforeId: input.beforeId }));
@@ -53,6 +62,7 @@ export function createWsHub(opts: {
   };
 
   const handlers = createWsHandlers({
+    logger: log,
     runtime: opts.runtime,
     publishToTable,
     publishApplied,
@@ -83,8 +93,30 @@ export function createWsHub(opts: {
   return {
     /** Called after an HTTP mutation so sockets see the new state immediately. */
     publishTableState,
+    /**
+     * Close every live socket with a retryable code (1012 = service restart) so a
+     * client reconnects to the fresh process instead of treating the disconnect as
+     * a failure worth backing off from.
+     */
+    shutdown({ code = 1012, reason = "server_restart" }: { code?: number; reason?: string } = {}) {
+      let closed = 0;
+      for (const sockets of socketsByTable.values()) {
+        for (const socket of sockets) {
+          socket.close(code, reason);
+          closed += 1;
+        }
+      }
+      socketsByTable.clear();
+      userIdsByTable.clear();
+      presenceByTable.clear();
+      actionIdsByTable.clear();
+      log.info("ws.shutdown", { closed, code, reason });
+      return closed;
+    },
     async handleConnection(ws: WebSocket, request: IncomingMessage) {
       const socket = ws as HubSocket;
+      socket.connectionId = randomUUID();
+      log.debug("ws.connected", { connectionId: socket.connectionId });
       // Register listeners before awaiting auth — clients send subscribe on open and
       // those frames are dropped if the handler isn't attached yet.
       const pending: RawData[] = [];
@@ -113,6 +145,11 @@ export function createWsHub(opts: {
             type: "error",
             v: PROTOCOL_VERSION,
           });
+          log.warn("ws.frame_too_large", {
+            bytes,
+            connectionId: socket.connectionId,
+            tableId: socket.tableId,
+          });
           socket.close(1009, "frame_too_large");
           return;
         }
@@ -125,6 +162,11 @@ export function createWsHub(opts: {
               message: parsed.detail,
               type: "error",
               v: PROTOCOL_VERSION,
+            });
+            log.warn("ws.bad_message", {
+              code: parsed.code,
+              connectionId: socket.connectionId,
+              tableId: socket.tableId,
             });
             return;
           }
@@ -161,6 +203,11 @@ export function createWsHub(opts: {
             message,
           );
         } catch (error) {
+          log.error("ws.message_failed", {
+            connectionId: socket.connectionId,
+            error,
+            tableId: socket.tableId,
+          });
           send(socket, {
             code: "internal_error",
             message: error instanceof Error ? error.message : "internal_error",
@@ -179,13 +226,20 @@ export function createWsHub(opts: {
         void handleRaw(raw);
       });
 
-      socket.on("close", () => {
+      socket.on("close", (code: number, reason: Buffer) => {
+        log.debug("ws.closed", {
+          code,
+          connectionId: socket.connectionId,
+          reason: reason.toString(),
+          tableId: socket.tableId,
+        });
         void unsubscribe(socket);
       });
 
       const session = await opts.getSessionFromHeaders(toHeaders(request));
       userId = session?.user?.id;
       if (!userId) {
+        log.warn("ws.not_authenticated", { connectionId: socket.connectionId });
         // Say why before closing: a browser WebSocket cannot read the close reason,
         // only the listener on the page can see the frame.
         send(socket, {

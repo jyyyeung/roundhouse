@@ -593,3 +593,55 @@ describe("ws hub sync v2", () => {
     );
   });
 });
+
+describe("hub shutdown", () => {
+  const meta: TableMeta = {
+    code: "ABCD23",
+    config: { ruleset: "yatzy" },
+    gameId: "yatzy",
+    hostUserId: "user-a",
+    seatUserIds: ["user-a", "user-b"],
+    softSeatCap: 4,
+    status: "active",
+  };
+
+  function makeHub() {
+    return createWsHub({
+      runtime: makeRuntime({
+        getTableSnapshot: vi
+          .fn()
+          .mockImplementation(async () => ({ meta, seq: 0, state: null, tableId: "table-1" })),
+      }),
+      getSessionFromHeaders: async () => ({ user: { id: "user-a" } }),
+    });
+  }
+
+  async function connect(hub: ReturnType<typeof createWsHub>) {
+    const socket = new MockSocket();
+    await hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
+    await socket.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+    return socket;
+  }
+
+  it("closes every live socket with a retryable code and a reason", async () => {
+    const hub = makeHub();
+    const first = await connect(hub);
+    const second = await connect(hub);
+
+    const closed = hub.shutdown();
+
+    expect(closed).toBe(2);
+    expect(first.closed).toEqual({ code: 1012, reason: "server_restart" });
+    expect(second.closed).toEqual({ code: 1012, reason: "server_restart" });
+  });
+
+  it("forgets the rooms, so a later publish reaches nobody", async () => {
+    const hub = makeHub();
+    const socket = await connect(hub);
+
+    hub.shutdown();
+    await hub.publishTableState("table-1");
+
+    expect(socket.frames().filter((frame) => frame.type === "snapshot")).toHaveLength(1);
+  });
+});

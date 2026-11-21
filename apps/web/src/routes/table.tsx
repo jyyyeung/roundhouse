@@ -228,8 +228,10 @@ export function TablePage({ session }: { session: SessionLike }) {
           : `Could not connect (${reason}). Retrying…`,
       );
 
-      const delay = Math.min(8_000, 400 * 2 ** attempt);
-      attempt += 1;
+      // A restart (1012) is a planned goodbye: reconnect at once, and reset the
+      // backoff so a later real failure starts from a short delay.
+      const delay = reason === "server_restart" ? 0 : Math.min(8_000, 400 * 2 ** attempt);
+      attempt = reason === "server_restart" ? 0 : attempt + 1;
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       reconnectTimer = window.setTimeout(() => {
         if (!alive) return;

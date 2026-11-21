@@ -112,6 +112,16 @@ async function main() {
   const healthBody = await health.text();
   check("GET /health", health.ok, `${health.status} ${healthBody.slice(0, 80)}`);
 
+  // Readiness is a different promise from liveness: it may only pass when the
+  // database and the migrations both answer.
+  const ready = await fetch(`${baseUrl}/ready`);
+  const readyBody = await ready.json().catch(() => ({}));
+  check(
+    "GET /ready",
+    ready.ok && readyBody.ok === true,
+    `${ready.status} ${JSON.stringify(readyBody).slice(0, 160)}`,
+  );
+
   let { body, response } = await jsonRequest("/api/auth/sign-up/email", {
     body: { email: emailA, name: "smoke-a", password },
   });

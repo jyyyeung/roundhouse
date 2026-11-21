@@ -4,12 +4,15 @@ Plan of record. Complements `docs/superpowers/specs/2026-08-02-yatzy-online-desi
 (the v1 design) with the engineering sequence that gets us from "one game works" to
 "the platform the spec promised".
 
-Status as of this revision: the live Yatzy/Yahtzee MVP is shipped, and the M0
-contracts are largely in place — per-viewer projections, a replayable event log, seq-based
-sync, shared wire schemas, runtime tests against real Postgres, and the CI to keep all of
-it honest (`pnpm typecheck` clean, 192 unit tests, 22 Postgres-backed integration tests, a
-13-check end-to-end smoke, a projection guard, and a conformance suite every module passes).
-M0-1 through M0-7 and M0-9 are closed; M0-8 remains.
+Status as of this revision: **M0 is complete.** The live Yatzy/Yahtzee MVP is shipped and
+the three implicit contracts are now enforced — per-viewer projections with a guard that
+keeps them at one seam, a replayable event log with `applyEvent`, seq-based sync with
+bounded resync, shared wire schemas at the handler boundary, serialised intent application,
+runtime tests against real Postgres, a conformance suite every module must pass, and an ops
+surface that distinguishes liveness from readiness (`pnpm typecheck` clean, 219 unit tests,
+22 Postgres-backed integration tests, a 14-check end-to-end smoke, a projection guard, and
+JSON logs with a bounded shutdown). The next section is M1: making the thing usable by
+people who are not the author.
 
 ## Thesis
 
