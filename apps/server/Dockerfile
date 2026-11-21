@@ -8,7 +8,7 @@
 # The runtime stage does not need pnpm: it runs the binaries in node_modules
 # directly, which also means start-up needs no network and no package-manager
 # cache that has to be warmed as the right user.
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -28,7 +28,7 @@ COPY packages packages
 # test-only packages, so the runtime image carries no test tooling.
 RUN pnpm install --frozen-lockfile --prod --filter "@roundhouse/server..."
 
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 
 ENV NODE_ENV=production
 ENV PORT=3001
