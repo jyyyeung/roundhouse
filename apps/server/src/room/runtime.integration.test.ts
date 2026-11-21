@@ -98,7 +98,8 @@ integration(title, () => {
     return runtime.createTable({
       config: { ruleset: "yatzy" },
       gameId: options.gameId ?? "yatzy",
-      softSeatCap: options.softSeatCap ?? 4,
+      // Undefined means "the game decides" — the runtime defaults to playerCount.max.
+      softSeatCap: options.softSeatCap,
       userId: host,
     });
   }
@@ -205,8 +206,9 @@ integration(title, () => {
   describe("seat assignment", () => {
     it("seats parallel joins on unique, contiguous indices", async () => {
       const host = await makeUser();
-      const { tableId, code } = await makeTable(host, { softSeatCap: 8 });
-      const joiners = await Promise.all(Array.from({ length: 6 }, () => makeUser()));
+      // Yatzy seats at most six, so the races fill the whole table it declares.
+      const { tableId, code } = await makeTable(host, { softSeatCap: 6 });
+      const joiners = await Promise.all(Array.from({ length: 5 }, () => makeUser()));
 
       const results = await Promise.all(
         joiners.map((player) => runtime.joinTable({ code, userId: player })),
@@ -217,8 +219,8 @@ integration(title, () => {
       const seats = await sql<{ seat_index: number }[]>`
         select seat_index from table_player where table_id = ${tableId} order by seat_index
       `;
-      // The host took seat 0, so six joiners land on 1..6.
-      expect(seats.map((row) => row.seat_index)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+      // The host took seat 0, so five joiners land on 1..5.
+      expect(seats.map((row) => row.seat_index)).toEqual([0, 1, 2, 3, 4, 5]);
     });
 
     it("surfaces table_full at the cap instead of a constraint violation", async () => {
@@ -246,12 +248,24 @@ integration(title, () => {
       expect(await seatCount(tableId)).toBe(2);
     });
 
-    it("documents the softSeatCap: 1 gap — a one-seat table can never start", async () => {
-      // Known gap (roadmap): create accepts cap 1, but a game needs two players.
+    it("refuses a seat cap the game cannot play", async () => {
+      // Formerly a known gap: create accepted cap 1 and the table could never
+      // start. The module's playerCount now bounds the cap at create time, so the
+      // mistake surfaces where it is made.
       const host = await makeUser();
-      const { tableId } = await makeTable(host, { softSeatCap: 1 });
 
-      await expectTablesError(runtime.startTable({ tableId, userId: host }), "not_enough_players");
+      await expectTablesError(makeTable(host, { softSeatCap: 1 }), "invalid_seat_cap");
+      await expectTablesError(makeTable(host, { softSeatCap: 9 }), "invalid_seat_cap");
+    });
+
+    it("defaults the cap to the game's maximum", async () => {
+      const host = await makeUser();
+      const { tableId } = await makeTable(host);
+
+      const [row] = await sql<{ soft_seat_cap: number }[]>`
+        select soft_seat_cap from game_table where id = ${tableId}
+      `;
+      expect(row.soft_seat_cap).toBe(6);
     });
   });
 

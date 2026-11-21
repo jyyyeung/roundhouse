@@ -17,7 +17,9 @@ import type { YatzyState } from "./reduce";
  * hidden-information module fails if it forgets to project.
  */
 
-const PLAYERS = ["alice", "bob", "carol", "dave", "erin"];
+// Six ids because yatzy seats up to six: a fixture set must be able to fill the
+// module's own declared maximum.
+const PLAYERS = ["alice", "bob", "carol", "dave", "erin", "frank"];
 
 function openCategories(state: YatzyState, playerId: string): string[] {
   const categories = state.ruleset === "yatzy" ? yatzyCategories : yahtzeeCategories;
@@ -55,9 +57,9 @@ const fixtures: ConformanceFixtures = {
   }),
   secretMarker: "conformance-secret-deck-order",
   secretVisibility: "hidden-from-all",
-  // Tables seat 2 to 5; `gameTable.softSeatCap` defaults to 4 and is a table
-  // decision, not a module one (see the M0-7 findings note under docs/).
-  playerCounts: { min: 2, max: 5 },
+  // Must equal `yatzyModule.playerCount`: the suite fails when the fixtures and
+  // the module disagree about how many players the game has rules for.
+  playerCounts: { min: 2, max: 6 },
   maxIntentsToFinish: 400,
 };
 

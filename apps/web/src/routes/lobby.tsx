@@ -1,16 +1,16 @@
-import { getRulesetCompareHelp } from "@roundhouse/game-yatzy";
+import type { GameCatalogueEntry, Json } from "@roundhouse/game-core";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getGameUi, tableTitleFor } from "../games/registry";
 import { authClient } from "../lib/auth-client";
 import {
   buildShareUrl,
   createTable,
+  getGameCatalogue,
   getRecentTables,
   joinTable,
   type RecentTable,
-  type Ruleset,
 } from "../lib/tables";
-import { InfoTip } from "../ui/InfoTip";
 
 type SessionLike = {
   user?: {
@@ -33,9 +33,10 @@ function getErrorMessage(error: unknown) {
 }
 
 export function LobbyPage({ session }: { session: SessionLike }) {
-  const rulesetHelp = getRulesetCompareHelp();
   const navigate = useNavigate();
-  const [ruleset, setRuleset] = useState<Ruleset>("yatzy");
+  const [games, setGames] = useState<GameCatalogueEntry[]>([]);
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [config, setConfig] = useState<Json>(null);
   const [joinCode, setJoinCode] = useState("");
   const [tables, setTables] = useState<RecentTable[]>([]);
   const [createdTable, setCreatedTable] = useState<{ tableId: string; code: string } | null>(null);
@@ -61,11 +62,47 @@ export function LobbyPage({ session }: { session: SessionLike }) {
     void refreshTables();
   }, []);
 
+  // The server's own game list: the lobby offers exactly what it can host, so a
+  // new module appears here without a web change.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const catalogue = await getGameCatalogue();
+        if (cancelled) return;
+        setGames(catalogue);
+        const first = catalogue[0];
+        if (first) {
+          setGameId(first.id);
+          setConfig(first.defaultConfig);
+        }
+      } catch (caughtError) {
+        if (!cancelled) setError(getErrorMessage(caughtError));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedGame = games.find((game) => game.id === gameId);
+  const ConfigControls = selectedGame ? getGameUi(selectedGame.id)?.ConfigControls : undefined;
+
+  function selectGame(next: GameCatalogueEntry) {
+    setGameId(next.id);
+    // Switching games resets the config to that game's default: a yatzy ruleset
+    // means nothing to a duel, and the server would reject it.
+    setConfig(next.defaultConfig);
+  }
+
   async function handleCreate() {
     setBusyAction("create");
     setError(null);
     try {
-      const result = await createTable({ ruleset });
+      if (!selectedGame) throw new Error("No game selected");
+      const result = await createTable({ config, gameId: selectedGame.id });
       setCreatedTable(result);
       await refreshTables();
     } catch (caughtError) {
@@ -129,28 +166,37 @@ export function LobbyPage({ session }: { session: SessionLike }) {
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">
             Create table
           </p>
-          <div className="mt-4 block">
-            <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-              <label htmlFor="create-ruleset">Ruleset</label>
-              <InfoTip label="About rulesets">
-                <div className="space-y-1">
-                  <p className="font-semibold">{rulesetHelp.title}</p>
-                  {rulesetHelp.body.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
-              </InfoTip>
+          {games.length > 1 ? (
+            <div className="mt-4 block">
+              <label
+                className="mb-2 block text-sm font-semibold text-slate-700"
+                htmlFor="create-game"
+              >
+                Game
+              </label>
+              <select
+                id="create-game"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-[var(--color-ink)]"
+                value={gameId ?? ""}
+                onChange={(event) => {
+                  const next = games.find((game) => game.id === event.target.value);
+                  if (next) selectGame(next);
+                }}
+              >
+                {games.map((game) => (
+                  <option key={game.id} value={game.id}>
+                    {game.displayName} ({game.playerCount.min}-{game.playerCount.max} players)
+                  </option>
+                ))}
+              </select>
             </div>
-            <select
-              id="create-ruleset"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-[var(--color-ink)]"
-              value={ruleset}
-              onChange={(event) => setRuleset(event.target.value as Ruleset)}
-            >
-              <option value="yatzy">Yatzy</option>
-              <option value="yahtzee">Yahtzee</option>
-            </select>
-          </div>
+          ) : null}
+
+          {ConfigControls && selectedGame ? (
+            <div className="mt-4">
+              <ConfigControls config={config} onChange={setConfig} />
+            </div>
+          ) : null}
           <button
             type="button"
             className="mt-auto w-full rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)] shadow-[0_14px_30px_rgba(42,157,143,0.24)] disabled:cursor-wait disabled:opacity-70"
@@ -241,7 +287,11 @@ export function LobbyPage({ session }: { session: SessionLike }) {
                   <div className="flex items-start justify-between gap-3 md:items-center">
                     <div className="min-w-0">
                       <p className="font-display text-2xl text-[var(--color-ink)] md:text-xl">
-                        {table.config?.ruleset === "yahtzee" ? "Yahtzee" : "Yatzy"}
+                        {tableTitleFor(
+                          table.gameId,
+                          table.config,
+                          games.find((game) => game.id === table.gameId)?.displayName,
+                        )}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
                         {table.status} · {table.seatUserIds.length}/{table.softSeatCap} seated

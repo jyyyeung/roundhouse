@@ -1,6 +1,8 @@
 export type { ReplayEvent } from "./apply-event";
 export { applyYatzyEvent } from "./apply-event";
 export { yahtzeeCategories, yatzyCategories } from "./categories";
+export type { YatzyConfig } from "./config";
+export { defaultYatzyConfig, yatzyConfigSchema, yatzyPlayerCount } from "./config";
 export type { ScoreHelp, ScoreHelpKey, SurfaceHelp } from "./help";
 export { getRulesetCompareHelp, getScoreHelp, getTurnHelp } from "./help";
 export * from "./intents";

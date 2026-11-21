@@ -87,6 +87,17 @@ function validateFixtures(module: GameModule, fixtures: ConformanceFixtures): vo
     Date.parse(fixtures.now),
   ), "fixtures.now must be a parseable ISO 8601 timestamp");
   require(fixtures.secretMarker.length > 0, "fixtures.secretMarker must not be empty");
+  require(Number.isInteger(module.playerCount.min) &&
+    Number.isInteger(module.playerCount.max) &&
+    module.playerCount.min >= 1 &&
+    module.playerCount.min <=
+      module.playerCount.max, "module.playerCount must satisfy 1 <= min <= max");
+  require(fixtures.playerCounts.min === module.playerCount.min &&
+    fixtures.playerCounts.max ===
+      module.playerCount
+        .max, `fixtures.playerCounts (${fixtures.playerCounts.min}-${fixtures.playerCounts.max}) must equal module.playerCount (${module.playerCount.min}-${module.playerCount.max})`);
+  const defaultConfig = module.configSchema.safeParse(module.defaultConfig);
+  require(defaultConfig.success, `module.defaultConfig must satisfy module.configSchema (${defaultConfig.success ? "" : defaultConfig.error.issues[0]?.message})`);
 }
 
 function contextFor(fixtures: ConformanceFixtures, actorId: string, rng: Rng): ReduceContext {
@@ -253,6 +264,11 @@ export function assertProjectionHidesSecret(
   fixtures: ConformanceFixtures,
   baseState?: Json,
 ): void {
+  // Both entry points validate the module's own declaration, so a module cannot
+  // claim a seat range its fixtures never cover by being checked with the
+  // narrower export.
+  validateFixtures(module, fixtures);
+
   const state =
     baseState ??
     assertJsonSafe(

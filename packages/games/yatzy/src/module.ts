@@ -7,6 +7,7 @@ import type {
 } from "@roundhouse/game-core";
 import { applyYatzyEvent } from "./apply-event";
 import { yahtzeeCategories, yatzyCategories } from "./categories";
+import { defaultYatzyConfig, yatzyConfigSchema, yatzyPlayerCount } from "./config";
 import { yatzyIntents } from "./intents";
 import { reduce, type YatzyState } from "./reduce";
 import type { Ruleset } from "./types";
@@ -63,6 +64,9 @@ function isFinished(state: Json) {
 export const yatzyModule: GameModule = {
   id: "yatzy",
   displayName: "Yatzy",
+  playerCount: yatzyPlayerCount,
+  defaultConfig: defaultYatzyConfig,
+  configSchema: yatzyConfigSchema,
   intents: yatzyIntents,
   createInitialState,
   reduce,

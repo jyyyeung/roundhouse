@@ -10,6 +10,7 @@ import { auth, getSessionFromHeaders } from "./auth";
 import { closeDatabase, db } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { env } from "./env";
+import { createGamesRouter } from "./http/games";
 import { createTablesRouter } from "./http/tables";
 import { logger } from "./log";
 import { createDatabaseChecks } from "./ops/db-health";
@@ -61,6 +62,16 @@ app.use(
 );
 
 app.use(
+  "/api/games/*",
+  cors({
+    origin: env.PUBLIC_WEB_URL,
+    credentials: true,
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["GET", "OPTIONS"],
+  }),
+);
+
+app.use(
   "/api/tables/*",
   cors({
     origin: env.PUBLIC_WEB_URL,
@@ -71,6 +82,8 @@ app.use(
 );
 
 app.on(["POST", "GET", "OPTIONS"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+app.route("/api/games", createGamesRouter());
 
 app.route(
   "/api/tables",

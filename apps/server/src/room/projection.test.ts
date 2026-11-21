@@ -1,14 +1,18 @@
 import type { GameModule, RawGameState } from "@roundhouse/game-core";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { projectSnapshot, rawGameState, viewerForUser } from "./projection";
 
 function fakeModule(projectStateFor: GameModule["projectStateFor"]): GameModule {
   return {
     applyEvent: (state) => state,
+    configSchema: z.object({}).loose(),
     createInitialState: () => null,
+    defaultConfig: {},
     displayName: "Fake",
     id: "fake",
+    playerCount: { max: 4, min: 2 },
     intents: {},
     isFinished: () => false,
     projectStateFor,

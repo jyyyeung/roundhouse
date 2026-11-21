@@ -1,10 +1,10 @@
 import type { ClientMessage, Json, TableMeta } from "@roundhouse/game-core";
 import { PROTOCOL_VERSION } from "@roundhouse/game-core";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { renderGameView } from "../games/registry";
-import type { TableChatMessage } from "../games/yatzy/model";
+import { renderGameView, tableTitleFor } from "../games/registry";
+import type { TableChatMessage } from "../lib/chat";
 import {
   getRecentTables,
   joinTable,
@@ -83,12 +83,6 @@ function mergeChat(current: TableChatMessage[], incoming: TableChatMessage[]) {
   });
 }
 
-function readDice(value: unknown) {
-  if (!Array.isArray(value)) return null;
-  if (!value.every((item) => typeof item === "number")) return null;
-  return [...value];
-}
-
 export function TablePage({ session }: { session: SessionLike }) {
   const { tableId = "unknown-table" } = useParams();
   const [searchParams] = useSearchParams();
@@ -102,7 +96,6 @@ export function TablePage({ session }: { session: SessionLike }) {
   // The last seq this view is known to be correct for. Every server frame carries
   // one, so this is the only progress signal the client needs.
   const lastSeqRef = useRef(0);
-  const previousDiceRef = useRef<number[] | null>(null);
   const [meta, setMeta] = useState<TableMeta | null>(null);
   const [state, setState] = useState<unknown>(null);
   const [messages, setMessages] = useState<TableChatMessage[]>([]);
@@ -110,18 +103,8 @@ export function TablePage({ session }: { session: SessionLike }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<"start" | "rematch" | null>(null);
-  const [rollVersion, setRollVersion] = useState(0);
   const [hasMoreChat, setHasMoreChat] = useState(false);
   const [loadingOlderChat, setLoadingOlderChat] = useState(false);
-
-  const rulesetLabel = useMemo(() => {
-    return meta?.config &&
-      typeof meta.config === "object" &&
-      "ruleset" in meta.config &&
-      meta.config.ruleset === "yahtzee"
-      ? "Yahtzee"
-      : "Yatzy";
-  }, [meta?.config]);
 
   function sendOrFlag(message: ClientMessage) {
     const ok = connectionRef.current?.send(message) ?? false;
@@ -252,21 +235,6 @@ export function TablePage({ session }: { session: SessionLike }) {
      * is always a function of the last seq the server sent.
      */
     function applyServerState(next: { meta: TableMeta; state: unknown; seq: number }) {
-      const nextDice =
-        next.state && typeof next.state === "object" && "dice" in next.state
-          ? readDice((next.state as { dice: unknown }).dice)
-          : null;
-
-      if (
-        nextDice &&
-        previousDiceRef.current &&
-        nextDice.length === previousDiceRef.current.length &&
-        nextDice.some((value, index) => value !== previousDiceRef.current?.[index])
-      ) {
-        setRollVersion((version) => version + 1);
-      }
-
-      previousDiceRef.current = nextDice ? [...nextDice] : null;
       lastSeqRef.current = next.seq;
       hasSnapshotRef.current = true;
       setMeta(next.meta);
@@ -464,7 +432,9 @@ export function TablePage({ session }: { session: SessionLike }) {
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">
             Table {meta.code}
           </p>
-          <h1 className="mt-2 font-display text-4xl text-[var(--color-ink)]">{rulesetLabel}</h1>
+          <h1 className="mt-2 font-display text-4xl text-[var(--color-ink)]">
+            {meta ? tableTitleFor(meta.gameId, meta.config) : "Table"}
+          </h1>
         </div>
         <Link
           className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-[var(--color-ink)] shadow-sm"
@@ -531,7 +501,6 @@ export function TablePage({ session }: { session: SessionLike }) {
             messages,
             onIntent: sendIntent,
             onSendChat: sendChat,
-            rollVersion,
             hasMoreChat,
             loadingOlderChat,
             onLoadOlderChat: loadOlderChat,

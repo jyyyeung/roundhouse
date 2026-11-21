@@ -41,9 +41,31 @@ declare const rawGameStateBrand: unique symbol;
  */
 export type RawGameState = { readonly [rawGameStateBrand]: true };
 
+/**
+ * The seat range a module can actually run with. Declared by the module rather
+ * than by the table, because it is game knowledge: yatzy has no rules for one
+ * player, and a duel has none for three.
+ */
+export type PlayerCount = { min: number; max: number };
 export interface GameModule {
   id: string;
   displayName: string;
+  /**
+   * Valid seat counts. Every table for this game is created inside this range,
+   * and the server refuses to start a game outside it, so a module never has to
+   * defend against a player count its rules cannot express.
+   */
+  playerCount: PlayerCount;
+  /**
+   * The config a table gets when the caller supplies none, and the value the game
+   * catalogue advertises. Must satisfy `configSchema`.
+   */
+  defaultConfig: Json;
+  /**
+   * Validates (and normalises) the per-table config blob. The server parses every
+   * `POST /api/tables` config through this before the row is written.
+   */
+  configSchema: z.ZodType;
   /**
    * Every intent the module accepts, keyed by `intent.type`, with the schema its
    * payload must satisfy. The server rejects anything absent from this map before

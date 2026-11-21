@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
-
+import type { TableChatMessage } from "../../lib/chat";
 import { ChatComposer } from "./ChatComposer";
 import { ChatDiceChips } from "./ChatDiceChips";
-import { readChatSnapshot, type TableChatMessage } from "./model";
+import { readChatSnapshot } from "./model";
 
 export type ChatPanelProps = {
   mode: "dock" | "overlay";

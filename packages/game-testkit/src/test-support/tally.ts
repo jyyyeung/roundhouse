@@ -7,6 +7,7 @@ import type {
   ReduceResult,
   ViewerView,
 } from "@roundhouse/game-core";
+import { z } from "zod";
 
 /**
  * The smallest game that can satisfy the conformance suite: N players take turns
@@ -82,6 +83,9 @@ export function makeTallyModule(leak: TallyLeak = "none"): GameModule {
   return {
     id: "tally",
     displayName: "Tally",
+    playerCount: { min: 2, max: 3 },
+    defaultConfig: {},
+    configSchema: z.object({}).loose(),
     intents: {},
 
     createInitialState(_config: Json, playerIds: string[]): Json {

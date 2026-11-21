@@ -1,5 +1,5 @@
 import { getRulesetCompareHelp } from "@roundhouse/game-yatzy";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,7 @@ vi.mock("../lib/tables", async () => {
   return {
     ...actual,
     getRecentTables: vi.fn(),
+    getGameCatalogue: vi.fn(),
     createTable: vi.fn(),
     joinTable: vi.fn(),
   };
@@ -23,6 +24,15 @@ vi.mock("../lib/auth-client", () => ({
 }));
 
 const getRecentTables = vi.mocked(tables.getRecentTables);
+const getGameCatalogue = vi.mocked(tables.getGameCatalogue);
+const createTable = vi.mocked(tables.createTable);
+
+const yatzyEntry = {
+  id: "yatzy",
+  displayName: "Yatzy",
+  playerCount: { min: 2, max: 6 },
+  defaultConfig: { ruleset: "yatzy" },
+};
 
 function renderLobby() {
   return render(
@@ -36,6 +46,7 @@ describe("LobbyPage layout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getRecentTables.mockResolvedValue([]);
+    getGameCatalogue.mockResolvedValue([yatzyEntry]);
     vi.stubGlobal(
       "matchMedia",
       vi.fn().mockImplementation(() => ({
@@ -99,10 +110,13 @@ describe("LobbyPage layout", () => {
     const { container } = renderLobby();
 
     await waitFor(() => {
-      expect(screen.getByText("Yatzy")).toBeInTheDocument();
+      expect(container.querySelector(".lobby-recent-row")).not.toBeNull();
     });
 
-    const row = container.querySelector(".lobby-recent-row");
+    // Scoped to the row: with one game in the catalogue the only other "Yatzy"
+    // on the page is an option in the game's own ruleset picker.
+    const row = container.querySelector(".lobby-recent-row") as HTMLElement;
+    expect(within(row).getByText("Yatzy")).toBeInTheDocument();
     expect(row?.className).toMatch(/md:flex/);
     expect(row?.className).toMatch(/md:items-center/);
 
@@ -123,9 +137,9 @@ describe("LobbyPage layout", () => {
     const help = getRulesetCompareHelp();
 
     renderLobby();
-    await waitFor(() => {
-      expect(getRecentTables).toHaveBeenCalled();
-    });
+    // The ruleset picker belongs to the game, so it only appears once the
+    // server's catalogue says which games exist.
+    await screen.findByRole("combobox", { name: /ruleset/i });
 
     expect(screen.getByRole("button", { name: "About rulesets" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "About rulesets" }));
@@ -135,5 +149,37 @@ describe("LobbyPage layout", () => {
     const select = screen.getByRole("combobox", { name: /ruleset/i }) as HTMLSelectElement;
     expect(select.value).toBe("yatzy");
     expect(document.activeElement).not.toBe(select);
+  });
+
+  it("creates a table with the game the catalogue offered", async () => {
+    const user = userEvent.setup();
+    createTable.mockResolvedValue({ tableId: "table-9", code: "ABC234" });
+
+    renderLobby();
+    await screen.findByRole("combobox", { name: /ruleset/i });
+    await user.click(screen.getByRole("button", { name: /^create table$/i }));
+
+    await waitFor(() => {
+      expect(createTable).toHaveBeenCalledWith({ gameId: "yatzy", config: { ruleset: "yatzy" } });
+    });
+  });
+
+  it("follows the catalogue when the server hosts more than one game", async () => {
+    getGameCatalogue.mockResolvedValue([
+      yatzyEntry,
+      {
+        id: "duel",
+        displayName: "Duel",
+        playerCount: { min: 2, max: 2 },
+        defaultConfig: { rounds: 3 },
+      },
+    ]);
+
+    renderLobby();
+    const picker = (await screen.findByRole("combobox", { name: /game/i })) as HTMLSelectElement;
+    expect(Array.from(picker.options).map((option) => option.value)).toEqual(["yatzy", "duel"]);
+    // Yatzy's own controls are rendered for yatzy; the lobby never learns what a
+    // ruleset is beyond the component the game hands it.
+    expect(screen.getByRole("combobox", { name: /ruleset/i })).toBeInTheDocument();
   });
 });

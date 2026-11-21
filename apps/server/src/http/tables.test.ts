@@ -61,6 +61,38 @@ describe("tables http api", () => {
     await expect(res.json()).resolves.toMatchObject({ code: "table_full" });
   });
 
+  it("defaults the config to the module's default when the caller sends none", async () => {
+    const createTable = vi.fn().mockResolvedValue({ code: "ABC123", tableId: "table-1" });
+
+    const res = await makeApp(makeRuntime({ createTable })).request("/api/tables", {
+      method: "POST",
+      body: JSON.stringify({ gameId: "yatzy" }),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(res.status).toBe(201);
+    // The default is the module's, not a literal in this router: the game that
+    // owns the config declares what an untouched table looks like.
+    expect(createTable).toHaveBeenCalledWith(
+      expect.objectContaining({ config: { ruleset: "yatzy" }, gameId: "yatzy" }),
+    );
+  });
+
+  it("validates the config with the module's schema rather than a known game id", async () => {
+    const runtime = makeRuntime();
+
+    const res = await makeApp(runtime).request("/api/tables", {
+      method: "POST",
+      body: JSON.stringify({ gameId: "yatzy", config: { ruleset: "yatzy" } }),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(res.status).toBe(201);
+    expect(runtime.createTable).toHaveBeenCalledWith(
+      expect.objectContaining({ config: { ruleset: "yatzy" } }),
+    );
+  });
+
   it("rejects invalid yatzy config when creating a table", async () => {
     const runtime = makeRuntime();
 

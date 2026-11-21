@@ -1,5 +1,6 @@
 import type { Json } from "@roundhouse/game-core";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   assertProjectionHidesSecret,
@@ -95,5 +96,50 @@ describe("conformance suite self-check", () => {
         tallyFixtures({ plantSecret: (state) => state }),
       ),
     ).toThrow(/plantSecret did not put "conformance-secret" into the state/);
+  });
+});
+
+describe("module seat and config declarations", () => {
+  const withPlayerCount = (playerCount: { min: number; max: number }) => ({
+    ...makeTallyModule(),
+    playerCount,
+  });
+  const withDefaultConfig = (defaultConfig: Json) => ({
+    ...makeTallyModule(),
+    defaultConfig,
+  });
+
+  it("rejects a module whose seat range is inverted", () => {
+    expect(() =>
+      assertProjectionHidesSecret(withPlayerCount({ min: 3, max: 2 }), tallyFixtures()),
+    ).toThrow(/module.playerCount must satisfy 1 <= min <= max/);
+  });
+
+  it("rejects fixtures that disagree with the module's seat range", () => {
+    // Otherwise a module could claim 2-6 players while every conformance game was
+    // played at 3, and the seat limit would never be exercised.
+    expect(() =>
+      assertProjectionHidesSecret(withPlayerCount({ min: 2, max: 5 }), tallyFixtures()),
+    ).toThrow(/fixtures.playerCounts \(2-3\) must equal module.playerCount \(2-5\)/);
+  });
+
+  it("rejects a default config the module's own schema would not accept", () => {
+    const picky = {
+      ...makeTallyModule(),
+      configSchema: z.object({ rounds: z.number() }),
+    };
+
+    expect(() =>
+      assertProjectionHidesSecret({ ...picky, defaultConfig: { rounds: "many" } }, tallyFixtures()),
+    ).toThrow(/module.defaultConfig must satisfy module.configSchema/);
+    expect(() =>
+      assertProjectionHidesSecret({ ...picky, defaultConfig: { rounds: 3 } }, tallyFixtures()),
+    ).not.toThrow();
+  });
+
+  it("accepts a module whose default config passes its own schema", () => {
+    expect(() =>
+      assertProjectionHidesSecret(withDefaultConfig({ anything: true }), tallyFixtures()),
+    ).not.toThrow();
   });
 });

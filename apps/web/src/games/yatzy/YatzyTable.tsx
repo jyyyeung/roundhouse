@@ -1,12 +1,12 @@
 import type { Json, TableMeta } from "@roundhouse/game-core";
 import type { YatzyView } from "@roundhouse/game-yatzy";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
-
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { TableChatMessage } from "../../lib/chat";
 import { ChatComposer } from "./ChatComposer";
 import { ChatPanel } from "./ChatPanel";
 import { DiceTray } from "./DiceTray";
-import { type TableChatMessage, totalScore } from "./model";
+import { totalScore } from "./model";
 import { ScoreSheet } from "./ScoreSheet";
 
 type YatzyTableProps = {
@@ -17,11 +17,31 @@ type YatzyTableProps = {
   messages: TableChatMessage[];
   onIntent: (type: string, payload: Json) => void;
   onSendChat: (text: string) => void;
-  rollVersion: number;
   hasMoreChat: boolean;
   loadingOlderChat: boolean;
   onLoadOlderChat: () => void;
 };
+
+/**
+ * Counts how often the dice actually changed, so the tray can animate a roll
+ * instead of every state update. This is yatzy's reading of its own state: it
+ * used to live in the table route, which meant the platform knew what a die was.
+ */
+function useRollVersion(dice: readonly number[]) {
+  const previous = useRef<number[] | null>(null);
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    const next = [...dice];
+    const prior = previous.current;
+    if (prior && prior.length === next.length && next.some((value, at) => value !== prior[at])) {
+      setVersion((current) => current + 1);
+    }
+    previous.current = next;
+  }, [dice]);
+
+  return version;
+}
 
 function useXlChatDock() {
   const [dock, setDock] = useState(() =>
@@ -43,6 +63,7 @@ function useXlChatDock() {
 }
 
 export function YatzyTable(props: YatzyTableProps) {
+  const rollVersion = useRollVersion(props.state.dice);
   const [chatOpen, setChatOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [statusExpanded, setStatusExpanded] = useState(false);
@@ -153,7 +174,7 @@ export function YatzyTable(props: YatzyTableProps) {
                 props.state.phase !== "finished" &&
                 !props.state.dice.every((die) => die === 0)
               }
-              rollVersion={props.rollVersion}
+              rollVersion={rollVersion}
               onRoll={() => props.onIntent("roll", {})}
               onToggleHold={(index) => {
                 const nextHolds = props.state.holds.map((held, heldIndex) =>

@@ -34,10 +34,18 @@ To stop the stack, run `docker compose down`. Add `-v` if you also want to remov
 - `pnpm test` — unit suites for every package. No database, no network; fast enough to run on save.
 - `just test-integration` — `apps/server/src/room/runtime.integration.test.ts` against real Postgres (concurrent joins, concurrent intents, every `TablesError` code, per-viewer projection). It refuses to run unless `DATABASE_URL_TEST` names a database ending in `_test`, because it truncates every table between tests. Create it once:
   `docker compose exec -T db createdb -U roundhouse roundhouse_test`
-- `just check-projection` — enforces that module state is projected in exactly one place (invariant I1).
+- `just check-projection` — the contract guard: module state is projected in exactly one place (invariant I1) and platform code names no specific game.
 - `just smoke` — end-to-end run against a started server (`scripts/smoke.mjs`).
 - `just compose-smoke` — builds both Docker images, boots the packaged stack on throwaway ports, checks `/health` and `/ready`, the web root, and the end-to-end script, then tears it down and removes the volume.
 - `pnpm lint` / `pnpm format` — Biome does linting, formatting, and import order in one pass. `pnpm lint:fix` writes fixes; CI fails on `pnpm lint` and `pnpm format:check`.
+
+## Adding a game
+
+`docs/adding-a-game.md` is the walkthrough: a package under `packages/games/<id>/` declaring
+`playerCount`, `defaultConfig` and `configSchema` plus a `GameModule`, one line in
+`apps/server/src/modules/registry.ts`, one entry in `apps/web/src/games/registry.tsx`. The lobby, the
+`/api/games` catalogue and the table route pick it up with no further edits — see
+[ADR 0004](docs/adr/0004-games-are-data.md) for why the platform is not allowed to branch per game.
 
 ## Operations
 
