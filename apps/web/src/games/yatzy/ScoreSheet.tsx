@@ -1,5 +1,10 @@
+import {
+  getScoreHelp,
+  type ScoreHelp,
+  type ScoreHelpKey,
+  type YatzyView,
+} from "@roundhouse/game-yatzy";
 import { motion } from "motion/react";
-import { getScoreHelp, type ScoreHelp, type ScoreHelpKey, type YatzyView } from "@roundhouse/game-yatzy";
 
 import { InfoTip } from "../../ui/InfoTip";
 import { categoriesFor, formatCategory, previewScore, totalScore, upperTotal } from "./model";
@@ -23,7 +28,11 @@ function HelpBody(props: { help: ScoreHelp }) {
   );
 }
 
-function LabelWithHelp(props: { text: string; helpKey: ScoreHelpKey; ruleset: YatzyView["ruleset"] }) {
+function LabelWithHelp(props: {
+  text: string;
+  helpKey: ScoreHelpKey;
+  ruleset: YatzyView["ruleset"];
+}) {
   const help = getScoreHelp(props.ruleset, props.helpKey);
   return (
     <div className="flex items-center gap-1.5">
@@ -44,9 +53,14 @@ export function ScoreSheet(props: ScoreSheetProps) {
         <table className="min-w-full border-collapse">
           <thead className="bg-[var(--color-cream)] text-left">
             <tr>
-              <th className="px-3 py-2 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--color-coral)]">Category</th>
+              <th className="px-3 py-2 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--color-coral)]">
+                Category
+              </th>
               {props.state.playerIds.map((playerId) => (
-                <th key={playerId} className="px-3 py-2 text-sm font-semibold text-[var(--color-ink)]">
+                <th
+                  key={playerId}
+                  className="px-3 py-2 text-sm font-semibold text-[var(--color-ink)]"
+                >
                   {props.playerLabels[playerId] ?? playerId}
                 </th>
               ))}
@@ -106,10 +120,17 @@ export function ScoreSheet(props: ScoreSheetProps) {
             ))}
             <tr className="border-t border-slate-200 bg-slate-50/70">
               <td className="px-3 py-2 text-sm font-semibold text-slate-700">
-                <LabelWithHelp text="Upper total" helpKey="upper_total" ruleset={props.state.ruleset} />
+                <LabelWithHelp
+                  text="Upper total"
+                  helpKey="upper_total"
+                  ruleset={props.state.ruleset}
+                />
               </td>
               {props.state.playerIds.map((playerId) => (
-                <td key={`upper:${playerId}`} className="px-3 py-2 text-sm font-semibold text-[var(--color-ink)]">
+                <td
+                  key={`upper:${playerId}`}
+                  className="px-3 py-2 text-sm font-semibold text-[var(--color-ink)]"
+                >
                   {upperTotal(props.state.sheets[playerId] ?? {})}
                 </td>
               ))}
@@ -119,7 +140,10 @@ export function ScoreSheet(props: ScoreSheetProps) {
                 <LabelWithHelp text="Bonus" helpKey="bonus" ruleset={props.state.ruleset} />
               </td>
               {props.state.playerIds.map((playerId) => (
-                <td key={`bonus:${playerId}`} className="px-3 py-2 text-sm font-semibold text-[var(--color-ink)]">
+                <td
+                  key={`bonus:${playerId}`}
+                  className="px-3 py-2 text-sm font-semibold text-[var(--color-ink)]"
+                >
                   {props.state.sheets[playerId]?.bonus ?? "-"}
                 </td>
               ))}
@@ -129,7 +153,10 @@ export function ScoreSheet(props: ScoreSheetProps) {
                 <LabelWithHelp text="Total" helpKey="total" ruleset={props.state.ruleset} />
               </td>
               {props.state.playerIds.map((playerId) => (
-                <td key={`total:${playerId}`} className="px-3 py-2 text-sm font-bold text-[var(--color-ink)]">
+                <td
+                  key={`total:${playerId}`}
+                  className="px-3 py-2 text-sm font-bold text-[var(--color-ink)]"
+                >
                   {totalScore(props.state, playerId)}
                 </td>
               ))}

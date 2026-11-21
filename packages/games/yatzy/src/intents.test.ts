@@ -13,10 +13,14 @@ describe("yatzy intent contract", () => {
   it("accepts the payloads the UI sends", () => {
     expect(parseIntent(yatzyIntents, { payload: {}, type: "roll" }).ok).toBe(true);
     expect(
-      parseIntent(yatzyIntents, { payload: { holds: [true, false, false, true, false] }, type: "set_holds" })
-        .ok,
+      parseIntent(yatzyIntents, {
+        payload: { holds: [true, false, false, true, false] },
+        type: "set_holds",
+      }).ok,
     ).toBe(true);
-    expect(parseIntent(yatzyIntents, { payload: { category: "ones" }, type: "score" }).ok).toBe(true);
+    expect(parseIntent(yatzyIntents, { payload: { category: "ones" }, type: "score" }).ok).toBe(
+      true,
+    );
   });
 
   it("rejects payloads reduce would have to defend against", () => {
@@ -24,7 +28,9 @@ describe("yatzy intent contract", () => {
       code: "invalid_payload",
       ok: false,
     });
-    expect(parseIntent(yatzyIntents, { payload: { holds: [true] }, type: "set_holds" })).toMatchObject({
+    expect(
+      parseIntent(yatzyIntents, { payload: { holds: [true] }, type: "set_holds" }),
+    ).toMatchObject({
       code: "invalid_payload",
       ok: false,
     });

@@ -17,15 +17,15 @@ Reuse the same popover interaction and styling. No live dice math. No behavior c
 
 ## Decisions
 
-| Topic | Choice |
-|---|---|
-| Scope | Ruleset picker + dice tray only (waiting room / presence / chat out of scope) |
-| Ruleset tip content | Short static contrast of **both** rulesets — not selection-dependent |
-| Depth | Bullets only; per-category detail stays on score-sheet ⓘ |
-| Turn tip | One tray-level ⓘ (not per die) |
-| Copy location | Plain strings / pure helpers in `@roundhouse/game-yatzy` (extend `help.ts`); web only renders |
-| UI chrome | Existing `apps/web/src/ui/InfoTip.tsx` — no new Radix deps, no Tooltip |
-| Yahtzee “bonus Yahtzee” | Do **not** document — not implemented in `score.ts` |
+| Topic                   | Choice                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------- |
+| Scope                   | Ruleset picker + dice tray only (waiting room / presence / chat out of scope)                 |
+| Ruleset tip content     | Short static contrast of **both** rulesets — not selection-dependent                          |
+| Depth                   | Bullets only; per-category detail stays on score-sheet ⓘ                                      |
+| Turn tip                | One tray-level ⓘ (not per die)                                                                |
+| Copy location           | Plain strings / pure helpers in `@roundhouse/game-yatzy` (extend `help.ts`); web only renders |
+| UI chrome               | Existing `apps/web/src/ui/InfoTip.tsx` — no new Radix deps, no Tooltip                        |
+| Yahtzee “bonus Yahtzee” | Do **not** document — not implemented in `score.ts`                                           |
 
 ## Design
 
@@ -82,12 +82,12 @@ Path: `apps/web/src/games/yatzy/DiceTray.tsx`
 
 ### Components & files
 
-| Piece | Path | Role |
-|---|---|---|
-| Surface help | `packages/games/yatzy/src/help.ts` (+ tests, `index.ts` export) | `getRulesetCompareHelp` / `getTurnHelp` |
-| Lobby | `apps/web/src/routes/lobby.tsx` (+ test if present / add focused test) | Ruleset ⓘ |
-| Dice tray | `apps/web/src/games/yatzy/DiceTray.tsx` (+ `DiceTray.test.tsx`) | Turn ⓘ |
-| `InfoTip` | unchanged | Shared primitive |
+| Piece        | Path                                                                   | Role                                    |
+| ------------ | ---------------------------------------------------------------------- | --------------------------------------- |
+| Surface help | `packages/games/yatzy/src/help.ts` (+ tests, `index.ts` export)        | `getRulesetCompareHelp` / `getTurnHelp` |
+| Lobby        | `apps/web/src/routes/lobby.tsx` (+ test if present / add focused test) | Ruleset ⓘ                               |
+| Dice tray    | `apps/web/src/games/yatzy/DiceTray.tsx` (+ `DiceTray.test.tsx`)        | Turn ⓘ                                  |
+| `InfoTip`    | unchanged                                                              | Shared primitive                        |
 
 ### Accessibility
 

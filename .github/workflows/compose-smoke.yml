@@ -1,0 +1,33 @@
+name: compose-smoke
+
+# Builds the two Docker images and runs the packaged stack. Nothing else in CI
+# touches the Dockerfiles or nginx.conf, so a broken image would otherwise only
+# surface on a self-hoster's machine.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: compose-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose-smoke:
+    name: compose smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # The script only needs Node's fetch for the waiters and the end-to-end
+      # assertions; the application itself runs inside the images.
+      - name: Run the packaged stack
+        run: ./scripts/compose-smoke.sh

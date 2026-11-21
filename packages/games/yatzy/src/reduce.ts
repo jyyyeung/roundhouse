@@ -1,7 +1,7 @@
-import { EventEnvelope, ReduceContext, ReduceResult } from "@roundhouse/game-core";
-import { scoreCategory } from "./score";
+import type { EventEnvelope, ReduceContext, ReduceResult } from "@roundhouse/game-core";
 import { yahtzeeCategories, yatzyCategories } from "./categories";
-import { Category, Dice, Ruleset } from "./types";
+import { scoreCategory } from "./score";
+import type { Category, Dice, Ruleset } from "./types";
 
 type Sheet = Record<string, number | null> & {
   bonus?: number | null;
@@ -40,7 +40,10 @@ function upperScore(sheet: Sheet) {
 }
 
 function totalScore(ruleset: Ruleset, sheet: Sheet) {
-  return categoriesFor(ruleset).reduce((sum, category) => sum + (sheet[category] ?? 0), 0) + (sheet.bonus ?? 0);
+  return (
+    categoriesFor(ruleset).reduce((sum, category) => sum + (sheet[category] ?? 0), 0) +
+    (sheet.bonus ?? 0)
+  );
 }
 
 function currentPlayerId(state: YatzyState) {
@@ -76,7 +79,9 @@ function fail(error: string): ReduceResult {
 }
 
 function isValidHolds(value: unknown): value is boolean[] {
-  return Array.isArray(value) && value.length === 5 && value.every((item) => typeof item === "boolean");
+  return (
+    Array.isArray(value) && value.length === 5 && value.every((item) => typeof item === "boolean")
+  );
 }
 
 function isPlayerTurn(state: YatzyState, ctx: ReduceContext) {
@@ -93,10 +98,7 @@ function cloneState(state: YatzyState): YatzyState {
     dice: [...state.dice],
     holds: [...state.holds],
     sheets: Object.fromEntries(
-      Object.entries(state.sheets).map(([playerId, sheet]) => [
-        playerId,
-        { ...sheet },
-      ])
+      Object.entries(state.sheets).map(([playerId, sheet]) => [playerId, { ...sheet }]),
     ),
   };
 }
@@ -108,23 +110,27 @@ function applyBonus(sheet: Sheet) {
 
 function finishIfComplete(state: YatzyState) {
   const isComplete = state.playerIds.every((playerId) =>
-    categoriesFor(state.ruleset).every((category) => state.sheets[playerId]?.[category] !== null)
+    categoriesFor(state.ruleset).every((category) => state.sheets[playerId]?.[category] !== null),
   );
 
   if (!isComplete) return state;
 
   const scores = state.playerIds.map((playerId) =>
-    totalScore(state.ruleset, state.sheets[playerId] ?? createSheet(state.ruleset))
+    totalScore(state.ruleset, state.sheets[playerId] ?? createSheet(state.ruleset)),
   );
   const top = Math.max(...scores);
   return {
     ...state,
     phase: "finished",
-    winnerIds: state.playerIds.filter((playerId, index) => scores[index] === top),
+    winnerIds: state.playerIds.filter((_playerId, index) => scores[index] === top),
   };
 }
 
-export function reduce(state: unknown, intent: { type: string; payload: unknown }, ctx: ReduceContext): ReduceResult {
+export function reduce(
+  state: unknown,
+  intent: { type: string; payload: unknown },
+  ctx: ReduceContext,
+): ReduceResult {
   const current = cloneState(state as YatzyState);
 
   if (current.phase === "finished") {
@@ -139,7 +145,7 @@ export function reduce(state: unknown, intent: { type: string; payload: unknown 
     if (current.rollsLeft <= 0) return fail("no_rolls_left");
 
     const dice = current.dice.map((value, index) =>
-      current.holds[index] && value !== 0 ? value : ctx.randomInt(6) + 1
+      current.holds[index] && value !== 0 ? value : ctx.randomInt(6) + 1,
     );
 
     return success(
@@ -156,7 +162,7 @@ export function reduce(state: unknown, intent: { type: string; payload: unknown 
           payload: { dice: [...dice], rollsLeft: current.rollsLeft - 1 },
           type: "dice_rolled",
         },
-      ]
+      ],
     );
   }
 
@@ -179,7 +185,7 @@ export function reduce(state: unknown, intent: { type: string; payload: unknown 
           payload: { holds: [...holds] },
           type: "dice_held",
         },
-      ]
+      ],
     );
   }
 
@@ -244,7 +250,7 @@ export function reduce(state: unknown, intent: { type: string; payload: unknown 
   return fail("unknown_intent");
 }
 
+export type { Sheet, YatzyState };
 // Replay primitives shared with `apply-event.ts`: folding an event has to use
 // the same scoring and turn rules as reducing an intent, or replay drifts.
 export { applyBonus, cloneState, createSheet, resetTurn };
-export type { YatzyState, Sheet };

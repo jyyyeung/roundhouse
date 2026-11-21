@@ -1,12 +1,11 @@
+import type { ClientMessage, ServerMessage, TableMeta } from "@roundhouse/game-core";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import type { ClientMessage, ServerMessage, TableMeta } from "@roundhouse/game-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { TablePage } from "./table";
-import { connectTableWs } from "../lib/ws";
 import { getRecentTables, joinTable, startTable } from "../lib/tables";
+import { connectTableWs } from "../lib/ws";
+import { TablePage } from "./table";
 
 vi.mock("../lib/ws", () => ({
   connectTableWs: vi.fn(),
@@ -251,8 +250,42 @@ describe("TablePage", () => {
           dice: [1, 2, 3, 4, 5],
           holds: [true, false, true, false, true],
           sheets: {
-            "user-a": { ones: null, twos: null, threes: null, fours: null, fives: null, sixes: null, one_pair: null, two_pairs: null, three_kind: null, four_kind: null, small_straight: null, large_straight: null, full_house: null, chance: null, yatzy: null, bonus: null },
-            "user-b": { ones: null, twos: null, threes: null, fours: null, fives: null, sixes: null, one_pair: null, two_pairs: null, three_kind: null, four_kind: null, small_straight: null, large_straight: null, full_house: null, chance: null, yatzy: null, bonus: null },
+            "user-a": {
+              ones: null,
+              twos: null,
+              threes: null,
+              fours: null,
+              fives: null,
+              sixes: null,
+              one_pair: null,
+              two_pairs: null,
+              three_kind: null,
+              four_kind: null,
+              small_straight: null,
+              large_straight: null,
+              full_house: null,
+              chance: null,
+              yatzy: null,
+              bonus: null,
+            },
+            "user-b": {
+              ones: null,
+              twos: null,
+              threes: null,
+              fours: null,
+              fives: null,
+              sixes: null,
+              one_pair: null,
+              two_pairs: null,
+              three_kind: null,
+              four_kind: null,
+              small_straight: null,
+              large_straight: null,
+              full_house: null,
+              chance: null,
+              yatzy: null,
+              bonus: null,
+            },
           },
           phase: "playing",
           winnerIds: [],
@@ -559,7 +592,9 @@ describe("TablePage", () => {
     expect(await screen.findByText("First message")).toBeInTheDocument();
     expect(screen.getByText("Third message")).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /load earlier messages/i })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole("button", { name: /load earlier messages/i }),
+      ).not.toBeInTheDocument(),
     );
   });
 });

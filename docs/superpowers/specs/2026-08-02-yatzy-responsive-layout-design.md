@@ -16,15 +16,15 @@ Success criteria:
 
 ## Decisions
 
-| Topic | Choice |
-|---|---|
-| Desktop layout | Side-by-side ~42% / 58% (left play / right sheet) |
-| Approach | Balanced playboard (hero banner kept on desktop; sheet scrolls in-panel) |
-| Mobile banner | Compact strip; expand on tap for helper + chips |
-| Score density | Compact (~40–44px touch targets) |
-| Standings | Desktop only, slim strip under dice; hidden on mobile |
-| Breakpoint | Tailwind `md` (768px) |
-| Die faces / scoring / chat | Unchanged |
+| Topic                      | Choice                                                                   |
+| -------------------------- | ------------------------------------------------------------------------ |
+| Desktop layout             | Side-by-side ~42% / 58% (left play / right sheet)                        |
+| Approach                   | Balanced playboard (hero banner kept on desktop; sheet scrolls in-panel) |
+| Mobile banner              | Compact strip; expand on tap for helper + chips                          |
+| Score density              | Compact (~40–44px touch targets)                                         |
+| Standings                  | Desktop only, slim strip under dice; hidden on mobile                    |
+| Breakpoint                 | Tailwind `md` (768px)                                                    |
+| Die faces / scoring / chat | Unchanged                                                                |
 
 ## Design
 
@@ -57,12 +57,12 @@ Success criteria:
 
 ### Components touched
 
-| File | Change |
-|---|---|
+| File             | Change                                                               |
+| ---------------- | -------------------------------------------------------------------- |
 | `YatzyTable.tsx` | Responsive grid; banner expand state; standings placement/visibility |
-| `DiceTray.tsx` | Cap die button size; center row |
-| `ScoreSheet.tsx` | Dense padding; desktop in-panel scroll container classes |
-| Tests | Layout/banner expand / standings visibility as needed |
+| `DiceTray.tsx`   | Cap die button size; center row                                      |
+| `ScoreSheet.tsx` | Dense padding; desktop in-panel scroll container classes             |
+| Tests            | Layout/banner expand / standings visibility as needed                |
 
 ### Out of scope
 

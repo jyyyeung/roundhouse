@@ -1,4 +1,4 @@
-import type { ClientTableMessage, RawGameState, ServerMessage } from "@roundhouse/game-core";
+import type { ClientTableMessage, ServerMessage } from "@roundhouse/game-core";
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,8 +17,8 @@ function makeRuntime(): WsRuntime {
     softSeatCap: 4,
   };
 
-  let seq = 0;
-  let state = yatzyModule.createInitialState(meta.config, playerIds);
+  const seq = 0;
+  const state = yatzyModule.createInitialState(meta.config, playerIds);
 
   return {
     async getTableSnapshot(input) {
@@ -146,20 +146,16 @@ describe("ws chat", () => {
       persistChatMessage: async () => ({ createdAt: new Date().toISOString(), id: "msg-1" }),
     });
 
-    await handlers.onMessage(
-      { send() {}, userId: "user-a" },
-      {
-        actionId: "action-chat",
-        tableId: "table-1",
-        text: "hello",
-        type: "chat",
-        v: 2,
-      } satisfies ClientTableMessage,
-    );
+    await handlers.onMessage({ send() {}, userId: "user-a" }, {
+      actionId: "action-chat",
+      tableId: "table-1",
+      text: "hello",
+      type: "chat",
+      v: 2,
+    } satisfies ClientTableMessage);
 
     expect(applyGameIntent).not.toHaveBeenCalled();
     const after = await runtime.getTableSnapshot({ asUserId: null, tableId: "table-1" });
     expect(after?.seq).toBe(0);
   });
 });
-

@@ -48,4 +48,3 @@ describe("scoreCategory yahtzee", () => {
     expect(scoreCategory("yahtzee", "four_kind", [5, 5, 5, 5, 2])).toBe(22);
   });
 });
-

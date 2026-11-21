@@ -1,8 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-
-import { createTablesRouter, TablesError } from "./tables";
 import type { TablesRuntime } from "../room/runtime";
+import { createTablesRouter, TablesError } from "./tables";
 
 function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
   return {

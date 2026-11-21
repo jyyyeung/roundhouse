@@ -1,20 +1,20 @@
-export { scoreCategory } from "./score";
-export { reduce } from "./reduce";
-export { applyYatzyEvent } from "./apply-event";
 export type { ReplayEvent } from "./apply-event";
-export { yatzyModule } from "./module";
-export { yatzyCategories, yahtzeeCategories } from "./categories";
-export { getScoreHelp, getRulesetCompareHelp, getTurnHelp } from "./help";
+export { applyYatzyEvent } from "./apply-event";
+export { yahtzeeCategories, yatzyCategories } from "./categories";
 export type { ScoreHelp, ScoreHelpKey, SurfaceHelp } from "./help";
-export type {
-  Ruleset,
-  Dice,
-  Upper,
-  YatzyCategory,
-  YahtzeeCategory,
-  Category,
-} from "./types";
-export { projectYatzyView } from "./view";
-export type { YatzyView } from "./view";
-export type { YatzyState, Sheet } from "./reduce";
+export { getRulesetCompareHelp, getScoreHelp, getTurnHelp } from "./help";
 export * from "./intents";
+export { yatzyModule } from "./module";
+export type { Sheet, YatzyState } from "./reduce";
+export { reduce } from "./reduce";
+export { scoreCategory } from "./score";
+export type {
+  Category,
+  Dice,
+  Ruleset,
+  Upper,
+  YahtzeeCategory,
+  YatzyCategory,
+} from "./types";
+export type { YatzyView } from "./view";
+export { projectYatzyView } from "./view";

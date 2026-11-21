@@ -25,7 +25,10 @@ describe("parseIntent", () => {
   });
 
   it("returns the parsed payload, not the raw one", () => {
-    const result = parseIntent(schemas, { payload: { category: "ones", extra: true }, type: "score" });
+    const result = parseIntent(schemas, {
+      payload: { category: "ones", extra: true },
+      type: "score",
+    });
 
     expect(result).toEqual({ intent: { payload: { category: "ones" }, type: "score" }, ok: true });
   });

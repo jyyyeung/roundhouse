@@ -11,15 +11,15 @@ Replace it with a single compact chip row under the username that shows dice val
 
 ## Decisions
 
-| Topic | Choice |
-|---|---|
-| Layout | Mini chips under name/time, above message body |
-| Face content | Arabic digits (not pips / not `DieFace`) |
-| Held style | Teal fill + deep teal border (mirrors dice tray) |
-| Free style | White fill + slate border |
-| Rolls left | Do not show in chat |
-| Nested Snapshot card | Remove |
-| Architecture | Extract `ChatDiceChips`; wire from `ChatPanel` |
+| Topic                       | Choice                                                  |
+| --------------------------- | ------------------------------------------------------- |
+| Layout                      | Mini chips under name/time, above message body          |
+| Face content                | Arabic digits (not pips / not `DieFace`)                |
+| Held style                  | Teal fill + deep teal border (mirrors dice tray)        |
+| Free style                  | White fill + slate border                               |
+| Rolls left                  | Do not show in chat                                     |
+| Nested Snapshot card        | Remove                                                  |
+| Architecture                | Extract `ChatDiceChips`; wire from `ChatPanel`          |
 | Protocol / snapshot payload | Unchanged (`rollsLeft` may still arrive; UI ignores it) |
 
 ## Design

@@ -15,7 +15,7 @@ Three contracts are currently **implicit and unenforced**:
    (`packages/game-core/src/module.ts:30`) but never called. `apps/server/src/room/runtime.ts:354`
    ships the module's raw internal state on the wire, and the client reaches into it
    (`apps/web/src/routes/table.tsx:202-203` reads `state.dice`).
-2. **What the event log means.** `game_event` is append-only and complete in *type*, but
+2. **What the event log means.** `game_event` is append-only and complete in _type_, but
    `dice_rolled` carries `payload: {}` (`packages/games/yatzy/src/reduce.ts:156`) — the resolved
    dice are not recorded anywhere, so state cannot be reconstructed from the log. Meanwhile
    chat writes a non-game `chat_sent` row into the same stream and bumps `game.seq`
@@ -33,17 +33,17 @@ So contracts come first. Features follow in the order real users need them.
 
 CI should be able to prove all of these. Each one names the milestone issue that lands it.
 
-| # | Invariant | Lands in |
-|---|---|---|
-| I1 | A client receives only `projectStateFor(state, viewer)` output. No raw module state crosses the wire; players and spectators receive different projections. | M0-2 |
-| I2 | `reduce` is pure: same `(state, intent, resolvedRandom, now)` → same `(state', events)`. Modules never call `Math.random`/`Date.now`. | M0-7 |
-| I3 | For every reachable state, folding a module's events over `applyEvent` reproduces the state `reduce` produced. `game_event` holds game transitions only — no chat, no presence. | M0-3 |
-| I4 | A client view is a function of `seq`. Gaps trigger a bounded resync; resync cost is O(new events), not O(game length). | M0-4 |
-| I5 | Every registered module passes the shared conformance suite (`packages/game-testkit`). | M0-7 |
-| I6 | Every inbound wire payload is parsed by a schema shared with the client. Handlers never see `any`. | M0-1 |
+| #   | Invariant                                                                                                                                                                       | Lands in |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| I1  | A client receives only `projectStateFor(state, viewer)` output. No raw module state crosses the wire; players and spectators receive different projections.                     | M0-2     |
+| I2  | `reduce` is pure: same `(state, intent, resolvedRandom, now)` → same `(state', events)`. Modules never call `Math.random`/`Date.now`.                                           | M0-7     |
+| I3  | For every reachable state, folding a module's events over `applyEvent` reproduces the state `reduce` produced. `game_event` holds game transitions only — no chat, no presence. | M0-3     |
+| I4  | A client view is a function of `seq`. Gaps trigger a bounded resync; resync cost is O(new events), not O(game length).                                                          | M0-4     |
+| I5  | Every registered module passes the shared conformance suite (`packages/game-testkit`).                                                                                          | M0-7     |
+| I6  | Every inbound wire payload is parsed by a schema shared with the client. Handlers never see `any`.                                                                              | M0-1     |
 
 `I1` and `I3` are the load-bearing pair: `I1` makes hidden-information games possible at all,
-`I3` makes replay/spectator/audit the *same* mechanism rather than three.
+`I3` makes replay/spectator/audit the _same_ mechanism rather than three.
 
 ## M0 — Contracts (blocks everything)
 
@@ -51,17 +51,17 @@ CI should be able to prove all of these. Each one names the milestone issue that
 ops surface they touch. Nothing else should land before M0-1 through M0-4; M0-5 through M0-8
 can run in parallel with them.
 
-| ID | Issue | Depends on |
-|---|---|---|
-| [M0-1](../issues/11) | Wire contract: shared Zod schemas in `game-core`, typed handler boundary, per-module intent allowlist | — |
-| [M0-2](../issues/12) | Replace `getPublicSnapshot` with `projectStateFor(state, viewer)`; single server-side projection choke point | — |
-| [M0-3](../issues/13) | Event log as replay source: record resolved outcomes, add `applyEvent`, evict chat from `game_event` | — |
-| [M0-4](../issues/14) | Sync v2: seq-based incremental sync, bounded resync, presence only on membership change, paged chat backfill | M0-1, M0-2 |
-| [M0-5](../issues/15) | Test the critical path: `apps/server/src/room/runtime.ts` against real Postgres (races, idempotency, seq contiguity) | M0-3 |
-| [M0-6](../issues/16) | CI + lint/format gates, dependabot config, compose smoke | M0-1, M0-5 |
-| [M0-7](../issues/17) | `packages/game-testkit` conformance suite + timeboxed hidden-information module spike (throwaway) | M0-2, M0-3 |
-| [M0-8](../issues/18) | Ops correctness: `/health` vs `/ready`, graceful shutdown, structured logs, production server image | — |
-| [M0-9](../issues/19) | Serialise intent application: `applyGameIntent` takes no table row lock today, so concurrent intents collide on `game_event_game_row_id_seq_idx` or lose an update | — |
+| ID                   | Issue                                                                                                                                                              | Depends on |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| [M0-1](../issues/11) | Wire contract: shared Zod schemas in `game-core`, typed handler boundary, per-module intent allowlist                                                              | —          |
+| [M0-2](../issues/12) | Replace `getPublicSnapshot` with `projectStateFor(state, viewer)`; single server-side projection choke point                                                       | —          |
+| [M0-3](../issues/13) | Event log as replay source: record resolved outcomes, add `applyEvent`, evict chat from `game_event`                                                               | —          |
+| [M0-4](../issues/14) | Sync v2: seq-based incremental sync, bounded resync, presence only on membership change, paged chat backfill                                                       | M0-1, M0-2 |
+| [M0-5](../issues/15) | Test the critical path: `apps/server/src/room/runtime.ts` against real Postgres (races, idempotency, seq contiguity)                                               | M0-3       |
+| [M0-6](../issues/16) | CI + lint/format gates, dependabot config, compose smoke                                                                                                           | M0-1, M0-5 |
+| [M0-7](../issues/17) | `packages/game-testkit` conformance suite + timeboxed hidden-information module spike (throwaway)                                                                  | M0-2, M0-3 |
+| [M0-8](../issues/18) | Ops correctness: `/health` vs `/ready`, graceful shutdown, structured logs, production server image                                                                | —          |
+| [M0-9](../issues/19) | Serialise intent application: `applyGameIntent` takes no table row lock today, so concurrent intents collide on `game_event_game_row_id_seq_idx` or lose an update | —          |
 
 **Exit criteria:** all six invariants proven in CI; a scripted 50-roll game produces O(rolls)
 server→client messages, not O(rolls × history); the spike either validates the module interface
@@ -119,12 +119,12 @@ the tab.
 ## Guardrails (still non-goals)
 
 From the v1 spec, unchanged: no native store apps, no AI opponents, no 3D/WebGL dice, no
-seasons/custom crew metrics, no unauthenticated guests, no second title *before* M0 exists.
+seasons/custom crew metrics, no unauthenticated guests, no second title _before_ M0 exists.
 
 ## ADRs
 
-| ADR | Decision |
-|---|---|
+| ADR                                               | Decision                                                                                        |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | [0001](adr/0001-projections-and-wire-contract.md) | Per-viewer projections, one server-side choke point, schemas as the single source of wire types |
-| [0002](adr/0002-event-log-as-replay-source.md) | Events are replay input via `applyEvent`; game log is game-only |
-| [0003](adr/0003-client-sync-model.md) | Seq-versioned incremental sync with bounded resync |
+| [0002](adr/0002-event-log-as-replay-source.md)    | Events are replay input via `applyEvent`; game log is game-only                                 |
+| [0003](adr/0003-client-sync-model.md)             | Seq-versioned incremental sync with bounded resync                                              |

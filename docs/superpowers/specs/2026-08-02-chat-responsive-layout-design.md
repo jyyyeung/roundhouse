@@ -16,26 +16,26 @@ Success criteria:
 
 ## Decisions
 
-| Topic | Choice |
-|---|---|
-| Approach | Modeful `ChatPanel` (`dock` \| `overlay`) + extracted `ChatComposer` |
-| Desktop placement | Right rail **outside** the play \| sheet board (option B) |
-| Dock breakpoint | Tailwind **`xl` (1280px)** |
-| Playboard breakpoint | Unchanged — `md` two-column board |
-| Mobile float | Always-visible bottom composer when overlay closed (option A) |
-| Draft | Controlled/shared across float + panel |
-| Banner Chat button | Hidden at `xl+` (`xl:hidden`) |
-| Unread / notifications / protocol | **Out of scope** (later) |
+| Topic                             | Choice                                                               |
+| --------------------------------- | -------------------------------------------------------------------- |
+| Approach                          | Modeful `ChatPanel` (`dock` \| `overlay`) + extracted `ChatComposer` |
+| Desktop placement                 | Right rail **outside** the play \| sheet board (option B)            |
+| Dock breakpoint                   | Tailwind **`xl` (1280px)**                                           |
+| Playboard breakpoint              | Unchanged — `md` two-column board                                    |
+| Mobile float                      | Always-visible bottom composer when overlay closed (option A)        |
+| Draft                             | Controlled/shared across float + panel                               |
+| Banner Chat button                | Hidden at `xl+` (`xl:hidden`)                                        |
+| Unread / notifications / protocol | **Out of scope** (later)                                             |
 
 ## Design
 
 ### Viewport behavior
 
-| Viewport | Chat UI |
-|---|---|
-| `xl+` | Docked rail always mounted. `mode="dock"`. Banner Chat hidden. |
-| `md`–`lg` | Overlay drawer. Banner Chat toggles `chatOpen`. |
-| `< md` | Overlay for history + floating composer when `!chatOpen`. |
+| Viewport  | Chat UI                                                        |
+| --------- | -------------------------------------------------------------- |
+| `xl+`     | Docked rail always mounted. `mode="dock"`. Banner Chat hidden. |
+| `md`–`lg` | Overlay drawer. Banner Chat toggles `chatOpen`.                |
+| `< md`    | Overlay for history + floating composer when `!chatOpen`.      |
 
 ### Shell / layout
 
@@ -87,13 +87,13 @@ YatzyTable
 
 ## Components touched
 
-| File | Change |
-|---|---|
-| `ChatPanel.tsx` | Dock/overlay modes; controlled draft; use `ChatComposer` |
-| `ChatComposer.tsx` | **New** — shared input + send |
-| `YatzyTable.tsx` | `xl` board\|rail grid; mode wiring; float; hide Chat at `xl` |
-| `table.tsx` | Widen shell at `xl` (`max-w-7xl`) |
-| Tests | Dock vs overlay structure; float visibility; Chat `xl:hidden`; regression on chips/table |
+| File               | Change                                                                                   |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| `ChatPanel.tsx`    | Dock/overlay modes; controlled draft; use `ChatComposer`                                 |
+| `ChatComposer.tsx` | **New** — shared input + send                                                            |
+| `YatzyTable.tsx`   | `xl` board\|rail grid; mode wiring; float; hide Chat at `xl`                             |
+| `table.tsx`        | Widen shell at `xl` (`max-w-7xl`)                                                        |
+| Tests              | Dock vs overlay structure; float visibility; Chat `xl:hidden`; regression on chips/table |
 
 ## Verification
 

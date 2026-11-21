@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { yatzyCategories } from "./categories";
-import { yatzyModule } from "./module";
 import { reduce, type YatzyState } from "./reduce";
 
 function baseState(overrides: Record<string, unknown> = {}) {
@@ -31,7 +30,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt: vi.fn(),
-      }
+      },
     );
 
     expect(result).toEqual({ ok: false, error: "not_your_turn" });
@@ -54,7 +53,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt,
-      }
+      },
     );
 
     expect(result).toEqual({
@@ -91,7 +90,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt,
-      }
+      },
     );
 
     expect(result.ok).toBe(true);
@@ -111,7 +110,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt: vi.fn(),
-      }
+      },
     );
 
     expect(result).toEqual({
@@ -140,7 +139,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt: vi.fn(),
-      }
+      },
     );
     const wrongTypeHolds = reduce(
       baseState({ rollsLeft: 2 }),
@@ -150,7 +149,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt: vi.fn(),
-      }
+      },
     );
 
     expect(shortHolds).toEqual({ ok: false, error: "illegal_holds" });
@@ -166,7 +165,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt: vi.fn(),
-      }
+      },
     );
 
     expect(result).toEqual({ ok: false, error: "must_roll_first" });
@@ -186,7 +185,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt: vi.fn(),
-      }
+      },
     );
 
     expect(result.ok).toBe(true);
@@ -251,7 +250,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt: vi.fn(),
-      }
+      },
     );
 
     expect(result.ok).toBe(true);
@@ -264,7 +263,7 @@ describe("reduce", () => {
       yatzyCategories.map((category, index) => [
         category,
         category === "chance" ? null : index + 1,
-      ])
+      ]),
     );
     const state = baseState({
       sheets: {
@@ -283,7 +282,7 @@ describe("reduce", () => {
         now: () => new Date("2026-08-02T00:00:00.000Z"),
         playerIds: ["p1", "p2"],
         randomInt: vi.fn(),
-      }
+      },
     );
 
     expect(result.ok).toBe(true);

@@ -1,8 +1,8 @@
+import type { TableMeta } from "@roundhouse/game-core";
+import type { YatzyView } from "@roundhouse/game-yatzy";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TableMeta } from "@roundhouse/game-core";
-import type { YatzyView } from "@roundhouse/game-yatzy";
 
 import { YatzyTable } from "./YatzyTable";
 

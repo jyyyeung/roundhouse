@@ -1,7 +1,6 @@
+import type { Json } from "@roundhouse/game-core";
 import { Hono } from "hono";
 import { z } from "zod";
-
-import type { Json } from "@roundhouse/game-core";
 import { TablesError, type TablesRuntime } from "../room/runtime";
 
 type Session = { user?: { id: string } } | null;
@@ -43,7 +42,10 @@ function parseCreateTableBody(input: unknown) {
   return body;
 }
 
-async function requireSession(getSession: (headers: Headers) => Promise<Session> | Session, headers: Headers) {
+async function requireSession(
+  getSession: (headers: Headers) => Promise<Session> | Session,
+  headers: Headers,
+) {
   const session = await getSession(headers);
   const userId = session?.user?.id;
   if (!userId) {
@@ -81,13 +83,10 @@ export function createTablesRouter(opts: {
     }
     const tableError = toTablesError(error);
     if (tableError) {
-      return new Response(
-        JSON.stringify({ code: tableError.code, message: tableError.message }),
-        {
-          status: tableError.status,
-          headers: { "content-type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ code: tableError.code, message: tableError.message }), {
+        status: tableError.status,
+        headers: { "content-type": "application/json" },
+      });
     }
 
     throw error;

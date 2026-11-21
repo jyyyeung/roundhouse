@@ -15,13 +15,19 @@ function chipLabel(dice: number[], holds: boolean[]) {
 
 export function ChatDiceChips(props: ChatDiceChipsProps) {
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-1.5" role="group" aria-label={chipLabel(props.dice, props.holds)}>
+    // biome-ignore lint/a11y/useSemanticElements: a labelled run of decorative chips is a group, not a form fieldset
+    <div
+      className="mt-1.5 flex flex-wrap items-center gap-1.5"
+      role="group"
+      aria-label={chipLabel(props.dice, props.holds)}
+    >
       {props.dice.map((value, index) => {
         const held = props.holds[index] === true;
+        const slotId = `die-${index}`;
 
         return (
           <span
-            key={index}
+            key={slotId}
             data-chip=""
             data-held={held ? "" : undefined}
             aria-hidden="true"

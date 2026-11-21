@@ -1,8 +1,8 @@
 import type { IncomingMessage } from "node:http";
 import { serve } from "@hono/node-server";
-import { cors } from "hono/cors";
 import { Hono } from "hono";
-import { WebSocketServer, type WebSocket } from "ws";
+import { cors } from "hono/cors";
+import { type WebSocket, WebSocketServer } from "ws";
 
 import { auth, getSessionFromHeaders } from "./auth";
 import { db } from "./db/client";
@@ -38,9 +38,7 @@ app.use(
   }),
 );
 
-app.on(["POST", "GET", "OPTIONS"], "/api/auth/*", (c) =>
-  auth.handler(c.req.raw),
-);
+app.on(["POST", "GET", "OPTIONS"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route(
   "/api/tables",

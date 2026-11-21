@@ -13,16 +13,16 @@ Establish a shared tip primitive so other surfaces (lobby, dice tray, settings, 
 
 ## Decisions
 
-| Topic | Choice |
-|---|---|
-| Affordance | ⓘ button beside label (does not own score-cell clicks) |
-| Content | Static only — what + how scored + fixed example |
-| Live dice preview | No (scoreboard cells already show current preview) |
-| Scope | All categories for active ruleset + Upper total + Bonus + Total |
-| UI chrome | Shared `InfoTip` built on `@radix-ui/react-popover` |
-| Why Popover not Tooltip | Mobile needs click-to-toggle; Tooltip is hover-centric. Popover is the right primitive; hover-open is layered for fine pointers |
-| Copy location | Structured help data in `@roundhouse/game-yatzy` (plain strings / pure lookup — no React). Web only renders. Future games export the same shape from their packages. |
-| Portal / positioning | Radix portal + collision (flip/shift) so sticky/overflow score sheet does not clip tips |
+| Topic                   | Choice                                                                                                                                                               |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Affordance              | ⓘ button beside label (does not own score-cell clicks)                                                                                                               |
+| Content                 | Static only — what + how scored + fixed example                                                                                                                      |
+| Live dice preview       | No (scoreboard cells already show current preview)                                                                                                                   |
+| Scope                   | All categories for active ruleset + Upper total + Bonus + Total                                                                                                      |
+| UI chrome               | Shared `InfoTip` built on `@radix-ui/react-popover`                                                                                                                  |
+| Why Popover not Tooltip | Mobile needs click-to-toggle; Tooltip is hover-centric. Popover is the right primitive; hover-open is layered for fine pointers                                      |
+| Copy location           | Structured help data in `@roundhouse/game-yatzy` (plain strings / pure lookup — no React). Web only renders. Future games export the same shape from their packages. |
+| Portal / positioning    | Radix portal + collision (flip/shift) so sticky/overflow score sheet does not clip tips                                                                              |
 
 ## Design
 
@@ -84,13 +84,13 @@ Convention for later games: each `@roundhouse/game-*` package owns its help look
 
 ### Components & files
 
-| Piece | Path | Role |
-|---|---|---|
-| `InfoTip` | `apps/web/src/ui/InfoTip.tsx` | Shared Radix Popover tip: pointer-mode open, portal, collision |
-| Help data | `packages/games/yatzy/src/help.ts` (+ export from `index.ts`) | `getScoreHelp` / types; ruleset + key → strings |
-| Help tests | `packages/games/yatzy/src/help.test.ts` | Completeness vs category lists + footers |
-| Sheet wiring | `apps/web/src/games/yatzy/ScoreSheet.tsx` | Place ⓘ/`InfoTip` on labels; call `getScoreHelp(state.ruleset, key)` |
-| Dep | `apps/web/package.json` | `@radix-ui/react-popover` |
+| Piece        | Path                                                          | Role                                                                 |
+| ------------ | ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `InfoTip`    | `apps/web/src/ui/InfoTip.tsx`                                 | Shared Radix Popover tip: pointer-mode open, portal, collision       |
+| Help data    | `packages/games/yatzy/src/help.ts` (+ export from `index.ts`) | `getScoreHelp` / types; ruleset + key → strings                      |
+| Help tests   | `packages/games/yatzy/src/help.test.ts`                       | Completeness vs category lists + footers                             |
+| Sheet wiring | `apps/web/src/games/yatzy/ScoreSheet.tsx`                     | Place ⓘ/`InfoTip` on labels; call `getScoreHelp(state.ruleset, key)` |
+| Dep          | `apps/web/package.json`                                       | `@radix-ui/react-popover`                                            |
 
 No changes to scoring formulas, reducer, or protocol — help is documentation of existing rules.
 

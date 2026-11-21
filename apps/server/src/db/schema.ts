@@ -7,9 +7,9 @@ import {
   jsonb,
   pgTable,
   primaryKey,
-  uniqueIndex,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const tableModes = ["live", "async"] as const;
@@ -122,10 +122,7 @@ export const tablePlayer = pgTable(
   (table) => [
     primaryKey({ columns: [table.tableId, table.userId] }),
     index("table_player_table_id_idx").on(table.tableId),
-    uniqueIndex("table_player_table_id_seat_index_idx").on(
-      table.tableId,
-      table.seatIndex,
-    ),
+    uniqueIndex("table_player_table_id_seat_index_idx").on(table.tableId, table.seatIndex),
   ],
 );
 
@@ -168,10 +165,7 @@ export const gameEvent = pgTable(
   (table) => [
     index("game_event_game_row_id_idx").on(table.gameRowId),
     index("game_event_table_id_idx").on(table.tableId),
-    uniqueIndex("game_event_game_row_id_seq_idx").on(
-      table.gameRowId,
-      table.seq,
-    ),
+    uniqueIndex("game_event_game_row_id_seq_idx").on(table.gameRowId, table.seq),
   ],
 );
 

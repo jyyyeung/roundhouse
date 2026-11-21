@@ -42,11 +42,13 @@ apps/web/src/
 ### Task 1: `getScoreHelp` in `@roundhouse/game-yatzy`
 
 **Files:**
+
 - Create: `packages/games/yatzy/src/help.ts`
 - Create: `packages/games/yatzy/src/help.test.ts`
 - Modify: `packages/games/yatzy/src/index.ts`
 
 **Interfaces:**
+
 - Produces:
   - `export type ScoreHelp = { title: string; what: string; score: string; example: string }`
   - `export type ScoreHelpKey = Category | "upper_total" | "bonus" | "total"`
@@ -120,11 +122,13 @@ git commit -m "feat(game-yatzy): add getScoreHelp for category tips"
 ### Task 2: Shared `InfoTip` + Radix dependency
 
 **Files:**
+
 - Modify: `apps/web/package.json` (add `@radix-ui/react-popover`)
 - Create: `apps/web/src/ui/InfoTip.tsx`
 - Create: `apps/web/src/ui/InfoTip.test.tsx`
 
 **Interfaces:**
+
 - Produces: `export function InfoTip(props: { label: string; children: React.ReactNode; className?: string }): JSX.Element`
 
 - [ ] **Step 1: Install dependency**
@@ -196,10 +200,12 @@ git commit -m "feat(web): add shared InfoTip popover primitive"
 ### Task 3: Wire `ScoreSheet`
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/ScoreSheet.tsx`
 - Modify: `apps/web/src/games/yatzy/ScoreSheet.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `getScoreHelp`, `InfoTip`
 
 - [ ] **Step 1: Extend ScoreSheet tests**
@@ -239,13 +245,13 @@ git commit -m "feat(web): show category help tips on score sheet"
 
 ## Spec coverage
 
-| Spec requirement | Task |
-|---|---|
-| ⓘ beside categories + footers | 3 |
-| Hover fine / click coarse | 2 |
-| Static what/score/example | 1 + 3 |
-| Help in game-yatzy | 1 |
-| Shared InfoTip + Radix Popover | 2 |
-| Completeness tests | 1 |
-| InfoTip smoke test | 2 |
-| No live preview / no scoring changes | all |
+| Spec requirement                     | Task  |
+| ------------------------------------ | ----- |
+| ⓘ beside categories + footers        | 3     |
+| Hover fine / click coarse            | 2     |
+| Static what/score/example            | 1 + 3 |
+| Help in game-yatzy                   | 1     |
+| Shared InfoTip + Radix Popover       | 2     |
+| Completeness tests                   | 1     |
+| InfoTip smoke test                   | 2     |
+| No live preview / no scoring changes | all   |

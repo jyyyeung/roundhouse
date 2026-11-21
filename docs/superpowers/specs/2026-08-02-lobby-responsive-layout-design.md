@@ -16,16 +16,16 @@ Success criteria:
 
 ## Decisions
 
-| Topic | Choice |
-|---|---|
-| Layout approach | Balanced actions + list (two-column hub) |
-| Breakpoint | Tailwind `md` (768px) — same as playboard |
-| Shell width (`md+`) | ~`max-w-5xl` with slightly larger horizontal padding |
-| Create / Join | Equal 50/50 grid; stretch cards so CTAs align at bottom when possible |
-| Recent tables (`md+`) | Horizontal row: name/status, code badge, truncated link + copy, Open button |
-| Recent tables (`< md`) | Keep current tall cream cards |
-| Theme / copy | Unchanged (Fredoka/Manrope, coral/teal cards, existing button labels) |
-| Scope | `lobby.tsx` (+ tests as needed) |
+| Topic                  | Choice                                                                      |
+| ---------------------- | --------------------------------------------------------------------------- |
+| Layout approach        | Balanced actions + list (two-column hub)                                    |
+| Breakpoint             | Tailwind `md` (768px) — same as playboard                                   |
+| Shell width (`md+`)    | ~`max-w-5xl` with slightly larger horizontal padding                        |
+| Create / Join          | Equal 50/50 grid; stretch cards so CTAs align at bottom when possible       |
+| Recent tables (`md+`)  | Horizontal row: name/status, code badge, truncated link + copy, Open button |
+| Recent tables (`< md`) | Keep current tall cream cards                                               |
+| Theme / copy           | Unchanged (Fredoka/Manrope, coral/teal cards, existing button labels)       |
+| Scope                  | `lobby.tsx` (+ tests as needed)                                             |
 
 ## Design
 
@@ -56,10 +56,10 @@ Success criteria:
 
 ### Components / files
 
-| File | Change |
-|---|---|
+| File                            | Change                                                               |
+| ------------------------------- | -------------------------------------------------------------------- |
 | `apps/web/src/routes/lobby.tsx` | Responsive shell, action grid, denser recent rows, copy-link control |
-| Tests (if present / needed) | Layout class or copy-link behavior assertions as warranted |
+| Tests (if present / needed)     | Layout class or copy-link behavior assertions as warranted           |
 
 ### Out of scope
 

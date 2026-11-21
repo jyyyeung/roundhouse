@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { authClient } from "../lib/auth-client";
@@ -18,7 +18,12 @@ type Mode = "signin" | "signup";
 
 function getErrorMessage(error: unknown) {
   if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
     return error.message;
   }
   return "Something went sideways. Try again.";
@@ -39,7 +44,9 @@ export function LoginPage({ session }: { session: SessionState }) {
   }, [location.state]);
 
   if (session.isPending) {
-    return <div className="px-6 py-10 text-center text-[var(--color-ink)]">Checking your session...</div>;
+    return (
+      <div className="px-6 py-10 text-center text-[var(--color-ink)]">Checking your session...</div>
+    );
   }
 
   if (session.data) {
@@ -92,14 +99,22 @@ export function LoginPage({ session }: { session: SessionState }) {
         <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl bg-[var(--color-cream)] p-1">
           <button
             type="button"
-            className={mode === "signin" ? "rounded-xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)] shadow-sm" : "rounded-xl px-4 py-3 font-semibold text-slate-500"}
+            className={
+              mode === "signin"
+                ? "rounded-xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)] shadow-sm"
+                : "rounded-xl px-4 py-3 font-semibold text-slate-500"
+            }
             onClick={() => setMode("signin")}
           >
             Sign in
           </button>
           <button
             type="button"
-            className={mode === "signup" ? "rounded-xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)] shadow-sm" : "rounded-xl px-4 py-3 font-semibold text-slate-500"}
+            className={
+              mode === "signup"
+                ? "rounded-xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)] shadow-sm"
+                : "rounded-xl px-4 py-3 font-semibold text-slate-500"
+            }
             onClick={() => setMode("signup")}
           >
             Create account
@@ -143,7 +158,11 @@ export function LoginPage({ session }: { session: SessionState }) {
             />
           </label>
 
-          {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p> : null}
+          {error ? (
+            <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+              {error}
+            </p>
+          ) : null}
 
           <button
             type="submit"

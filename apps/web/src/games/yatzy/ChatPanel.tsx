@@ -49,10 +49,15 @@ function MessageList(props: MessageListProps) {
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-sm font-semibold text-[var(--color-ink)]">{label}</p>
               <time className="text-xs text-slate-500">
-                {new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                {new Date(message.createdAt).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
               </time>
             </div>
-            {snapshot.dice.length > 0 ? <ChatDiceChips dice={snapshot.dice} holds={snapshot.holds} /> : null}
+            {snapshot.dice.length > 0 ? (
+              <ChatDiceChips dice={snapshot.dice} holds={snapshot.holds} />
+            ) : null}
             <p className="mt-2 text-sm leading-6 text-slate-700">{message.text}</p>
           </article>
         );
@@ -82,7 +87,9 @@ export function ChatPanel(props: ChatPanelProps) {
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">Chat</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">
+              Chat
+            </p>
             <p className="mt-1 text-sm text-slate-500">Dice talk stays in the room.</p>
           </div>
         </div>
@@ -121,7 +128,9 @@ export function ChatPanel(props: ChatPanelProps) {
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">Chat</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">
+                  Chat
+                </p>
                 <p className="mt-1 text-sm text-slate-500">Dice talk stays in the room.</p>
               </div>
               <button
@@ -133,12 +142,12 @@ export function ChatPanel(props: ChatPanelProps) {
               </button>
             </div>
             <MessageList
-          messages={props.messages}
-          playerLabels={props.playerLabels}
-          hasMoreChat={props.hasMoreChat}
-          loadingOlderChat={props.loadingOlderChat}
-          onLoadOlderChat={props.onLoadOlderChat}
-        />
+              messages={props.messages}
+              playerLabels={props.playerLabels}
+              hasMoreChat={props.hasMoreChat}
+              loadingOlderChat={props.loadingOlderChat}
+              onLoadOlderChat={props.onLoadOlderChat}
+            />
             {composer}
           </motion.aside>
         </>

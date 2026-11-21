@@ -42,7 +42,10 @@ function nextIntent(state: YatzyState, random: () => number): Intent {
   const roll = random();
 
   if (state.rollsLeft === 0 && open.length > 0) {
-    return { payload: { category: open[Math.floor(random() * open.length)] }, type: "score" } as Intent;
+    return {
+      payload: { category: open[Math.floor(random() * open.length)] },
+      type: "score",
+    } as Intent;
   }
 
   if (state.rollsLeft === 3 || roll < 0.45) return rollIntent;
@@ -56,7 +59,10 @@ function nextIntent(state: YatzyState, random: () => number): Intent {
 
   if (open.length === 0) return rollIntent;
 
-  return { payload: { category: open[Math.floor(random() * open.length)] }, type: "score" } as Intent;
+  return {
+    payload: { category: open[Math.floor(random() * open.length)] },
+    type: "score",
+  } as Intent;
 }
 
 /**
@@ -120,7 +126,10 @@ describe("event log replay", () => {
 
 describe("applyYatzyEvent", () => {
   const playerIds = ["user-a", "user-b"];
-  const initial = yatzyModule.createInitialState({ ruleset: "yatzy" }, playerIds) as unknown as YatzyState;
+  const initial = yatzyModule.createInitialState(
+    { ruleset: "yatzy" },
+    playerIds,
+  ) as unknown as YatzyState;
 
   it("records the resolved dice, so a replay never re-rolls", () => {
     const rolled = yatzyModule.reduce(json(initial), rollIntent, {

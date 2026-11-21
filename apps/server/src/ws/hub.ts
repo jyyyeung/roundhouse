@@ -1,18 +1,20 @@
-import type { ChatWire, EventEnvelope, Json, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
-import { parseClientMessage, PROTOCOL_VERSION } from "@roundhouse/game-core";
 import type { IncomingMessage } from "node:http";
-import { WebSocket, type RawData } from "ws";
-
+import type {
+  EventEnvelope,
+  Json,
+  RawGameState,
+  ServerMessage,
+  TableMeta,
+} from "@roundhouse/game-core";
+import { PROTOCOL_VERSION, parseClientMessage } from "@roundhouse/game-core";
+import { type RawData, WebSocket } from "ws";
+import { db } from "../db/client";
 import { getModule } from "../modules/registry";
 import { projectSnapshot, viewerForUser } from "../room/projection";
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
 import { createWsHandlers } from "./handlers";
-import { db } from "../db/client";
-import {
-  type ChatPage,
-  persistChatMessageToDb,
-  listChatMessagesForTable,
-} from "./persistence";
+import { type ChatPage, listChatMessagesForTable, persistChatMessageToDb } from "./persistence";
+
 type Session = { user?: { id: string } } | null;
 type GetSession = (headers: Headers) => Promise<Session> | Session;
 type HubSocket = WebSocket & { tableId?: string; userId?: string };
@@ -29,7 +31,8 @@ export function createWsHub(opts: {
   listChatPage?: (input: { tableId: string; beforeId?: string }) => Promise<ChatPage>;
 }) {
   const listChatPage =
-    opts.listChatPage ?? ((input) => listChatMessagesForTable(db, input.tableId, { beforeId: input.beforeId }));
+    opts.listChatPage ??
+    ((input) => listChatMessagesForTable(db, input.tableId, { beforeId: input.beforeId }));
 
   const actionIdsByTable = new Map<string, Map<string, number>>();
   const socketsByTable = new Map<string, Set<HubSocket>>();
@@ -497,7 +500,6 @@ function moduleOrNull(gameId: string) {
     return null;
   }
 }
-
 
 function rawToString(raw: RawData) {
   if (typeof raw === "string") return raw;

@@ -39,10 +39,12 @@ apps/web/src/routes/
 ### Task 1: `ChatDiceChips` component
 
 **Files:**
+
 - Create: `apps/web/src/games/yatzy/ChatDiceChips.tsx`
 - Test: `apps/web/src/games/yatzy/ChatDiceChips.test.tsx`
 
 **Interfaces:**
+
 - Consumes: none
 - Produces: `export function ChatDiceChips(props: { dice: number[]; holds: boolean[] }): JSX.Element`
 
@@ -111,7 +113,11 @@ function chipLabel(dice: number[], holds: boolean[]) {
 
 export function ChatDiceChips(props: ChatDiceChipsProps) {
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-1.5" role="group" aria-label={chipLabel(props.dice, props.holds)}>
+    <div
+      className="mt-1.5 flex flex-wrap items-center gap-1.5"
+      role="group"
+      aria-label={chipLabel(props.dice, props.holds)}
+    >
       {props.dice.map((value, index) => {
         const held = props.holds[index] === true;
 
@@ -159,12 +165,14 @@ EOF
 ### Task 2: Wire chips into `ChatPanel` and update table test
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/ChatPanel.tsx`
 - Modify: `apps/web/src/routes/table.test.tsx`
 - Test: `apps/web/src/routes/table.test.tsx`
 - Test: `apps/web/src/games/yatzy/ChatDiceChips.test.tsx` (regression)
 
 **Interfaces:**
+
 - Consumes: `ChatDiceChips` from Task 1; existing `readChatSnapshot`
 - Produces: chat messages with dice render chips under the username; no nested Snapshot card / holds string / rolls-left line
 
@@ -212,23 +220,30 @@ import { readChatSnapshot, type TableChatMessage } from "./model";
 2. Replace the message article body so the chip row sits under the name/time row and above the text. Full message map render:
 
 ```tsx
-{props.messages.map((message) => {
-  const snapshot = readChatSnapshot(message.snapshot);
-  const label = props.playerLabels[message.userId] ?? message.userId;
+{
+  props.messages.map((message) => {
+    const snapshot = readChatSnapshot(message.snapshot);
+    const label = props.playerLabels[message.userId] ?? message.userId;
 
-  return (
-    <article key={message.id} className="rounded-[1.5rem] bg-[var(--color-cream)] p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm font-semibold text-[var(--color-ink)]">{label}</p>
-        <time className="text-xs text-slate-500">
-          {new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-        </time>
-      </div>
-      {snapshot.dice.length > 0 ? <ChatDiceChips dice={snapshot.dice} holds={snapshot.holds} /> : null}
-      <p className="mt-2 text-sm leading-6 text-slate-700">{message.text}</p>
-    </article>
-  );
-})}
+    return (
+      <article key={message.id} className="rounded-[1.5rem] bg-[var(--color-cream)] p-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-sm font-semibold text-[var(--color-ink)]">{label}</p>
+          <time className="text-xs text-slate-500">
+            {new Date(message.createdAt).toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </time>
+        </div>
+        {snapshot.dice.length > 0 ? (
+          <ChatDiceChips dice={snapshot.dice} holds={snapshot.holds} />
+        ) : null}
+        <p className="mt-2 text-sm leading-6 text-slate-700">{message.text}</p>
+      </article>
+    );
+  });
+}
 ```
 
 Delete the nested Snapshot block entirely (the `rounded-2xl bg-white/80` section with “Snapshot”, joined digits, “Holds:”, and rolls left).
@@ -258,17 +273,17 @@ EOF
 
 ## Spec coverage (self-review)
 
-| Spec requirement | Task |
-|---|---|
-| Mini chips under name/time, above body | Task 2 |
-| Arabic digits | Task 1 |
-| Held teal fill + deep teal border | Task 1 |
-| Free white + slate border | Task 1 |
-| No rolls left in chat | Task 2 |
-| Remove nested Snapshot card | Task 2 |
-| `ChatDiceChips` extraction | Task 1 |
-| Payload unchanged | both (no server/model edits) |
-| Update table test away from `66642` / rolls left | Task 2 |
-| Unit-test held/free styling | Task 1 |
+| Spec requirement                                 | Task                         |
+| ------------------------------------------------ | ---------------------------- |
+| Mini chips under name/time, above body           | Task 2                       |
+| Arabic digits                                    | Task 1                       |
+| Held teal fill + deep teal border                | Task 1                       |
+| Free white + slate border                        | Task 1                       |
+| No rolls left in chat                            | Task 2                       |
+| Remove nested Snapshot card                      | Task 2                       |
+| `ChatDiceChips` extraction                       | Task 1                       |
+| Payload unchanged                                | both (no server/model edits) |
+| Update table test away from `66642` / rolls left | Task 2                       |
+| Unit-test held/free styling                      | Task 1                       |
 
 No placeholders. Aria-label format locked to `Dice a, b, …; held i, j, …` (omit held clause when empty). Missing `holds[i]` treated as free.

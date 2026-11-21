@@ -1,10 +1,17 @@
-import { EventEnvelope, GameModule, Json, RawGameState, ViewerView } from "@roundhouse/game-core";
-import { yahtzeeCategories, yatzyCategories } from "./categories";
-import { reduce, type YatzyState } from "./reduce";
+import type {
+  EventEnvelope,
+  GameModule,
+  Json,
+  RawGameState,
+  ViewerView,
+} from "@roundhouse/game-core";
 import { applyYatzyEvent } from "./apply-event";
-import { Ruleset } from "./types";
+import { yahtzeeCategories, yatzyCategories } from "./categories";
 import { yatzyIntents } from "./intents";
+import { reduce, type YatzyState } from "./reduce";
+import type { Ruleset } from "./types";
 import { projectYatzyView } from "./view";
+
 function categoriesFor(ruleset: Ruleset) {
   return ruleset === "yatzy" ? yatzyCategories : yahtzeeCategories;
 }
@@ -21,7 +28,8 @@ function normalizeRuleset(value: unknown): Ruleset {
 }
 
 function createInitialState(config: Json, playerIds: string[]) {
-  const { ruleset = "yatzy", tableId = "yatzy" } = (config as { ruleset?: Ruleset; tableId?: string }) ?? {};
+  const { ruleset = "yatzy", tableId = "yatzy" } =
+    (config as { ruleset?: Ruleset; tableId?: string }) ?? {};
   const normalizedRuleset = normalizeRuleset(ruleset);
 
   return {
@@ -32,7 +40,9 @@ function createInitialState(config: Json, playerIds: string[]) {
     rollsLeft: 3,
     dice: [0, 0, 0, 0, 0],
     holds: [false, false, false, false, false],
-    sheets: Object.fromEntries(playerIds.map((playerId) => [playerId, emptySheet(normalizedRuleset)])),
+    sheets: Object.fromEntries(
+      playerIds.map((playerId) => [playerId, emptySheet(normalizedRuleset)]),
+    ),
     phase: "playing" as const,
     winnerIds: [],
   } satisfies YatzyState;

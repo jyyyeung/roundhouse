@@ -1,6 +1,6 @@
+import { getRulesetCompareHelp } from "@roundhouse/game-yatzy";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { authClient } from "../lib/auth-client";
 import {
   buildShareUrl,
@@ -10,7 +10,6 @@ import {
   type RecentTable,
   type Ruleset,
 } from "../lib/tables";
-import { getRulesetCompareHelp } from "@roundhouse/game-yatzy";
 import { InfoTip } from "../ui/InfoTip";
 
 type SessionLike = {
@@ -22,7 +21,12 @@ type SessionLike = {
 
 function getErrorMessage(error: unknown) {
   if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
     return error.message;
   }
   return "Something went sideways. Try again.";
@@ -52,6 +56,7 @@ export function LobbyPage({ session }: { session: SessionLike }) {
     }
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load once on mount; refreshTables is redefined every render
   useEffect(() => {
     void refreshTables();
   }, []);
@@ -100,7 +105,9 @@ export function LobbyPage({ session }: { session: SessionLike }) {
       <header className="rounded-[2rem] bg-[linear-gradient(135deg,var(--color-coral),var(--color-mango))] p-6 text-white shadow-[0_20px_50px_rgba(238,108,77,0.35)]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-white/80">Roundhouse</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-white/80">
+              Roundhouse
+            </p>
             <h1 className="mt-3 font-display text-4xl leading-none">Pull up a seat</h1>
             <p className="mt-3 text-sm text-white/85">
               {session?.user?.name || session?.user?.email || "Signed in"}
@@ -119,15 +126,17 @@ export function LobbyPage({ session }: { session: SessionLike }) {
 
       <div className="lobby-actions mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 md:items-stretch">
         <section className="flex h-full flex-col rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Create table</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">
+            Create table
+          </p>
           <div className="mt-4 block">
             <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
               <label htmlFor="create-ruleset">Ruleset</label>
               <InfoTip label="About rulesets">
                 <div className="space-y-1">
                   <p className="font-semibold">{rulesetHelp.title}</p>
-                  {rulesetHelp.body.map((line, index) => (
-                    <p key={`line-${index}`}>{line}</p>
+                  {rulesetHelp.body.map((line) => (
+                    <p key={line}>{line}</p>
                   ))}
                 </div>
               </InfoTip>
@@ -155,7 +164,11 @@ export function LobbyPage({ session }: { session: SessionLike }) {
             <div className="mt-4 rounded-3xl bg-[var(--color-cream)] p-4">
               <p className="text-sm font-semibold text-[var(--color-ink)]">Invite link</p>
               <p className="mt-2 break-all text-sm text-slate-600">
-                {buildShareUrl({ webBaseUrl, tableId: createdTable.tableId, code: createdTable.code })}
+                {buildShareUrl({
+                  webBaseUrl,
+                  tableId: createdTable.tableId,
+                  code: createdTable.code,
+                })}
               </p>
               <p className="mt-2 text-sm text-slate-500">Code: {createdTable.code}</p>
               <button
@@ -170,7 +183,9 @@ export function LobbyPage({ session }: { session: SessionLike }) {
         </section>
 
         <section className="flex h-full flex-col rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Join by code</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">
+            Join by code
+          </p>
           <form className="mt-4 flex flex-1 flex-col space-y-4" onSubmit={handleJoin}>
             <input
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center font-display text-3xl uppercase tracking-[0.3em] text-[var(--color-ink)]"
@@ -194,7 +209,9 @@ export function LobbyPage({ session }: { session: SessionLike }) {
 
       <section className="mt-5 rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Recent tables</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">
+            Recent tables
+          </p>
           <button
             type="button"
             className="text-sm font-semibold text-[var(--color-teal-deep)]"
@@ -206,7 +223,9 @@ export function LobbyPage({ session }: { session: SessionLike }) {
 
         {loading ? <p className="mt-4 text-sm text-slate-500">Loading your tables...</p> : null}
         {!loading && tables.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">No tables yet. Create one and start inviting chaos.</p>
+          <p className="mt-4 text-sm text-slate-500">
+            No tables yet. Create one and start inviting chaos.
+          </p>
         ) : null}
 
         <div className="mt-4 space-y-3">
@@ -259,7 +278,11 @@ export function LobbyPage({ session }: { session: SessionLike }) {
           })}
         </div>
 
-        {error ? <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p> : null}
+        {error ? (
+          <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            {error}
+          </p>
+        ) : null}
       </section>
     </div>
   );

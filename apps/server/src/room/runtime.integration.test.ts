@@ -82,7 +82,9 @@ integration(title, () => {
     await sql.end({ timeout: 5 });
   });
 
-  async function makeUser(name = `user-${(userCounter += 1)}`) {
+  async function makeUser() {
+    userCounter += 1;
+    const name = `user-${userCounter}`;
     await db.insert(user).values({
       email: `${name}@integration.test`,
       emailVerified: true,
@@ -92,10 +94,7 @@ integration(title, () => {
     return name;
   }
 
-  async function makeTable(
-    host: string,
-    options: { gameId?: string; softSeatCap?: number } = {},
-  ) {
+  async function makeTable(host: string, options: { gameId?: string; softSeatCap?: number } = {}) {
     return runtime.createTable({
       config: { ruleset: "yatzy" },
       gameId: options.gameId ?? "yatzy",
@@ -105,9 +104,7 @@ integration(title, () => {
   }
 
   async function seatTable(playerCount: number, options: { softSeatCap?: number } = {}) {
-    const players = await Promise.all(
-      Array.from({ length: playerCount }, () => makeUser()),
-    );
+    const players = await Promise.all(Array.from({ length: playerCount }, () => makeUser()));
     const table = await makeTable(players[0], options);
     for (const player of players.slice(1)) {
       await runtime.joinTable({ code: table.code, userId: player });
@@ -195,11 +192,7 @@ integration(title, () => {
   }
 
   /** The hub dispatches frames off the socket callback, so poll instead of assuming. */
-  async function waitFor(
-    predicate: () => boolean,
-    description: string,
-    timeoutMs = 5_000,
-  ) {
+  async function waitFor(predicate: () => boolean, description: string, timeoutMs = 5_000) {
     const startedAt = Date.now();
     while (!predicate()) {
       if (Date.now() - startedAt > timeoutMs) {
@@ -258,10 +251,7 @@ integration(title, () => {
       const host = await makeUser();
       const { tableId } = await makeTable(host, { softSeatCap: 1 });
 
-      await expectTablesError(
-        runtime.startTable({ tableId, userId: host }),
-        "not_enough_players",
-      );
+      await expectTablesError(runtime.startTable({ tableId, userId: host }), "not_enough_players");
     });
   });
 
@@ -467,10 +457,7 @@ integration(title, () => {
     it("not_host: only the host may start", async () => {
       const { tableId, players } = await seatTable(2);
 
-      await expectTablesError(
-        runtime.startTable({ tableId, userId: players[1] }),
-        "not_host",
-      );
+      await expectTablesError(runtime.startTable({ tableId, userId: players[1] }), "not_host");
     });
 
     it("table_not_lobby: start a table that has left the lobby", async () => {
@@ -484,14 +471,11 @@ integration(title, () => {
     });
 
     it("not_a_player: only a seated player may rematch", async () => {
-      const { tableId, gameRowId, players } = await startedGame(2);
+      const { tableId, gameRowId } = await startedGame(2);
       await sql`update game set status = 'finished', finished_at = now() where id = ${gameRowId}`;
       const stranger = await makeUser();
 
-      await expectTablesError(
-        runtime.rematchTable({ tableId, userId: stranger }),
-        "not_a_player",
-      );
+      await expectTablesError(runtime.rematchTable({ tableId, userId: stranger }), "not_a_player");
     });
 
     it("rematch_unavailable: rematch a lobby table with no finished game", async () => {
@@ -539,12 +523,12 @@ integration(title, () => {
       const first = await runtime.getTableSnapshot({ asUserId: players[0], tableId });
       const second = await runtime.getTableSnapshot({ asUserId: players[1], tableId });
 
-      expect(first?.state).toMatchObject({ dice: [3, 3, 3, 3, 3], rollsLeft: 2, you: 0 });
-      expect((first?.state as Record<string, unknown>).currentPlayerIndex).toBeUndefined();
-      expect({ ...(first?.state as object), you: null }).toEqual({
-        ...(second?.state as object),
-        you: null,
-      });
+      const firstView = first!.state as Record<string, unknown>;
+      const secondView = second!.state as Record<string, unknown>;
+
+      expect(firstView).toMatchObject({ dice: [3, 3, 3, 3, 3], rollsLeft: 2, you: 0 });
+      expect(firstView.currentPlayerIndex).toBeUndefined();
+      expect({ ...firstView, you: null }).toEqual({ ...secondView, you: null });
     });
 
     it("replays a real stored log back to the stored state", async () => {
@@ -582,7 +566,6 @@ integration(title, () => {
     });
   });
 });
-
 
 class MockSocket {
   readyState = 1;

@@ -40,10 +40,27 @@ type ClientMessage =
 type ServerMessage =
   | { v: 2; type: "snapshot"; tableId: string; seq: number; state: Json; meta: TableMeta }
   // authoritative state for the frame that just happened — the client never infers state
-  | { v: 2; type: "applied"; tableId: string; seq: number; state: Json; meta: TableMeta; events: EventEnvelope[] }
-  | { v: 2; type: "events"; tableId: string; fromSeq: number; toSeq: number; state: Json; meta: TableMeta; events: EventEnvelope[] }
+  | {
+      v: 2;
+      type: "applied";
+      tableId: string;
+      seq: number;
+      state: Json;
+      meta: TableMeta;
+      events: EventEnvelope[];
+    }
+  | {
+      v: 2;
+      type: "events";
+      tableId: string;
+      fromSeq: number;
+      toSeq: number;
+      state: Json;
+      meta: TableMeta;
+      events: EventEnvelope[];
+    }
   | { v: 2; type: "chat"; tableId: string; message: ChatWire }
-  | { v: 2; type: "spoke"; tableId: string; message: ChatWire }        // ack for the sender only
+  | { v: 2; type: "spoke"; tableId: string; message: ChatWire } // ack for the sender only
   | { v: 2; type: "presence"; tableId: string; onlineUserIds: string[] }
   | { v: 2; type: "error"; tableId?: string; actionId?: string; code: string; message: string };
 ```
@@ -57,7 +74,7 @@ type ServerMessage =
    game row is gone. Bounded either way: O(new events), never O(game length).
 3. **Chat and presence stop riding on subscribe.** Chat history is paged (`chatPage { beforeId }`,
    N=50, oldest-first in the response) and only fetched past the first screen. Presence is published
-   when the *set* of connected users changes, not on every subscribe — compare the computed set
+   when the _set_ of connected users changes, not on every subscribe — compare the computed set
    against the last published one and drop no-ops.
 
 Client-side, the `event → subscribe` path is deleted; `snapshotWatchTimer` survives only as the

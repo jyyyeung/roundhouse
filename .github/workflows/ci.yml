@@ -1,0 +1,54 @@
+name: ci
+
+# The gate every change has to pass: types, lint/format, unit tests, and a build.
+# Database-backed checks live in integration.yml, the packaged-stack check in
+# compose-smoke.yml, and the contract guard in contracts.yml.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Unit tests never touch a database (integration.yml owns that), but the
+      # server's env schema is validated at import, so it needs plausible values.
+      DATABASE_URL: postgres://roundhouse:roundhouse@localhost:5432/roundhouse
+      BETTER_AUTH_SECRET: ci-secret-0123456789abcdef0123456789
+      BETTER_AUTH_URL: http://localhost:3001
+      PUBLIC_WEB_URL: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

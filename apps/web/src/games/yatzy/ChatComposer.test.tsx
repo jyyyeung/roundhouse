@@ -25,7 +25,13 @@ describe("ChatComposer", () => {
 
     onSend.mockClear();
     rerender(
-      <ChatComposer draft="   " onDraftChange={onDraftChange} canSend onSend={onSend} variant="panel" />,
+      <ChatComposer
+        draft="   "
+        onDraftChange={onDraftChange}
+        canSend
+        onSend={onSend}
+        variant="panel"
+      />,
     );
     expect(screen.getByRole("button", { name: /send message/i })).toBeDisabled();
   });

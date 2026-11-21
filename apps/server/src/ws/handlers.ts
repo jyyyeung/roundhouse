@@ -11,7 +11,6 @@ import { intentFromClientMessage, PROTOCOL_VERSION } from "@roundhouse/game-core
 import type { TablesRuntime } from "../room/runtime";
 import { toChatWire } from "./persistence";
 
-
 export type WsRuntime = Pick<TablesRuntime, "applyGameIntent" | "getTableSnapshot">;
 
 export type WsConnection = {
@@ -43,7 +42,14 @@ export function createWsHandlers(deps: {
     createdAt: Date;
   }) => Promise<{ id: string; createdAt: string }>;
 }) {
-  const { isDuplicateAction, publishApplied, publishToTable, rememberAction, forgetAction, runtime } = deps;
+  const {
+    isDuplicateAction,
+    publishApplied,
+    publishToTable,
+    rememberAction,
+    forgetAction,
+    runtime,
+  } = deps;
 
   // rate limit state: tableId -> userId -> timestamps (ms)
   const rateLimits = new Map<string, Map<string, number[]>>();
@@ -174,7 +180,6 @@ export function createWsHandlers(deps: {
           }
         }
 
-
         // One frame, every socket. The author's own socket is included so a
         // second tab of the same user stays consistent; the client merges by
         // message id, so nothing is rendered twice.
@@ -202,7 +207,6 @@ export function createWsHandlers(deps: {
     },
   };
 }
-
 
 function errorMessage(input: {
   code: string;

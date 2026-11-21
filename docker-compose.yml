@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
 
   server:
     build:
@@ -35,7 +35,7 @@ services:
       - -c
       - pnpm --filter @roundhouse/server db:migrate && pnpm --filter @roundhouse/server exec tsx src/index.ts
     ports:
-      - "3001:3001"
+      - "${SERVER_PORT:-3001}:3001"
 
   web:
     build:
@@ -46,7 +46,7 @@ services:
       server:
         condition: service_started
     ports:
-      - "8080:80"
+      - "${WEB_PORT:-8080}:80"
 
 volumes:
   postgres-data:

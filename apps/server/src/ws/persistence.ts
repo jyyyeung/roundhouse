@@ -1,5 +1,5 @@
-import { and, desc, eq, lt, or } from "drizzle-orm";
 import type { ChatWire, Json } from "@roundhouse/game-core";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 
 import type { Database } from "../db/client";
 import { chatMessage } from "../db/schema";
@@ -104,4 +104,3 @@ export function toChatWire(row: {
     userId: row.userId,
   };
 }
-

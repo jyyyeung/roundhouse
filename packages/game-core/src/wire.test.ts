@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   clientMessageSchema,
-  parseClientMessage,
   PROTOCOL_VERSION,
+  parseClientMessage,
   serverMessageSchema,
 } from "./wire";
 
@@ -18,14 +18,25 @@ const validIntent = {
 
 describe("parseClientMessage", () => {
   it("accepts each client frame variant", () => {
-    expect(parseClientMessage(JSON.stringify({ tableId: "table-1", type: "subscribe", v: 2 }))).toEqual({
+    expect(
+      parseClientMessage(JSON.stringify({ tableId: "table-1", type: "subscribe", v: 2 })),
+    ).toEqual({
       message: { tableId: "table-1", type: "subscribe", v: 2 },
       ok: true,
     });
-    expect(parseClientMessage(JSON.stringify(validIntent))).toEqual({ message: validIntent, ok: true });
+    expect(parseClientMessage(JSON.stringify(validIntent))).toEqual({
+      message: validIntent,
+      ok: true,
+    });
     expect(
       parseClientMessage(
-        JSON.stringify({ actionId: "action-2", tableId: "table-1", text: "hi", type: "chat", v: 2 }),
+        JSON.stringify({
+          actionId: "action-2",
+          tableId: "table-1",
+          text: "hi",
+          type: "chat",
+          v: 2,
+        }),
       ),
     ).toEqual({
       message: { actionId: "action-2", tableId: "table-1", text: "hi", type: "chat", v: 2 },
@@ -76,7 +87,10 @@ describe("parseClientMessage", () => {
       code: "bad_message",
       ok: false,
     });
-    expect(parseClientMessage(JSON.stringify(null))).toMatchObject({ code: "bad_message", ok: false });
+    expect(parseClientMessage(JSON.stringify(null))).toMatchObject({
+      code: "bad_message",
+      ok: false,
+    });
   });
 
   it("names the field that failed", () => {
@@ -86,7 +100,9 @@ describe("parseClientMessage", () => {
     expect(missingActionId).toMatchObject({ code: "bad_message", ok: false });
     expect(missingActionId.ok === false && missingActionId.detail).toContain("actionId");
 
-    const emptyTableId = parseClientMessage(JSON.stringify({ tableId: "", type: "subscribe", v: 2 }));
+    const emptyTableId = parseClientMessage(
+      JSON.stringify({ tableId: "", type: "subscribe", v: 2 }),
+    );
     expect(emptyTableId).toMatchObject({ code: "bad_message", ok: false });
     expect(emptyTableId.ok === false && emptyTableId.detail).toContain("tableId");
   });
@@ -140,7 +156,15 @@ describe("server frames", () => {
     };
     const frames = [
       { meta, seq: 0, state: null, tableId: "table-1", type: "snapshot", v: 2 },
-      { events: [event], meta, seq: 1, state: { dice: [1, 2, 3, 4, 5] }, tableId: "table-1", type: "applied", v: 2 },
+      {
+        events: [event],
+        meta,
+        seq: 1,
+        state: { dice: [1, 2, 3, 4, 5] },
+        tableId: "table-1",
+        type: "applied",
+        v: 2,
+      },
       {
         events: [event],
         fromSeq: 0,
@@ -164,32 +188,55 @@ describe("server frames", () => {
   });
 
   it("rejects a snapshot whose status is not a real table status", () => {
-    const frame = { meta: { ...meta, status: "paused" }, seq: 0, state: null, tableId: "table-1", type: "snapshot", v: 2 };
+    const frame = {
+      meta: { ...meta, status: "paused" },
+      seq: 0,
+      state: null,
+      tableId: "table-1",
+      type: "snapshot",
+      v: 2,
+    };
     expect(serverMessageSchema.safeParse(frame).success).toBe(false);
   });
 });
 
 describe("clientMessageSchema", () => {
   it("requires the current protocol version", () => {
-    expect(clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: PROTOCOL_VERSION }).success).toBe(
-      true,
-    );
-    expect(clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: 1 }).success).toBe(false);
+    expect(
+      clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: PROTOCOL_VERSION })
+        .success,
+    ).toBe(true);
+    expect(
+      clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: 1 }).success,
+    ).toBe(false);
   });
 
   it("accepts a resync request and a chat page request", () => {
     expect(
-      clientMessageSchema.safeParse({ sinceSeq: 4, tableId: "table-1", type: "sync", v: PROTOCOL_VERSION })
-        .success,
+      clientMessageSchema.safeParse({
+        sinceSeq: 4,
+        tableId: "table-1",
+        type: "sync",
+        v: PROTOCOL_VERSION,
+      }).success,
     ).toBe(true);
     expect(
-      clientMessageSchema.safeParse({ beforeId: "chat-1", tableId: "table-1", type: "chatPage", v: PROTOCOL_VERSION })
-        .success,
+      clientMessageSchema.safeParse({
+        beforeId: "chat-1",
+        tableId: "table-1",
+        type: "chatPage",
+        v: PROTOCOL_VERSION,
+      }).success,
     ).toBe(true);
-    expect(clientMessageSchema.safeParse({ tableId: "table-1", type: "sync", v: PROTOCOL_VERSION }).success).toBe(false);
+    expect(
+      clientMessageSchema.safeParse({ tableId: "table-1", type: "sync", v: PROTOCOL_VERSION })
+        .success,
+    ).toBe(false);
   });
 
   it("ignores a protocol version from the future", () => {
-    expect(clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: 99 }).success).toBe(false);
+    expect(
+      clientMessageSchema.safeParse({ tableId: "table-1", type: "subscribe", v: 99 }).success,
+    ).toBe(false);
   });
 });

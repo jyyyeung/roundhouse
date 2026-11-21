@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SAFE_ALPHABET, generateInviteCode } from "./codes";
+import { generateInviteCode, SAFE_ALPHABET } from "./codes";
 
 describe("generateInviteCode", () => {
   it("returns length 6 by default using safe alphabet", () => {
@@ -13,4 +13,3 @@ describe("generateInviteCode", () => {
     expect(code).not.toMatch(/[0O1I]/i);
   });
 });
-

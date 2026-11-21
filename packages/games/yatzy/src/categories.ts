@@ -1,4 +1,4 @@
-import { YatzyCategory, YahtzeeCategory } from "./types";
+import type { YahtzeeCategory, YatzyCategory } from "./types";
 
 export const yatzyCategories: YatzyCategory[] = [
   "ones",
@@ -33,4 +33,3 @@ export const yahtzeeCategories: YahtzeeCategory[] = [
   "yahtzee",
   "chance",
 ];
-

@@ -1,6 +1,14 @@
-import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
-import type { ClientIntent, EventEnvelope, Json, RawGameState, TableMeta, ViewerView } from "@roundhouse/game-core";
+import type {
+  ClientIntent,
+  EventEnvelope,
+  GameModule,
+  Json,
+  RawGameState,
+  TableMeta,
+  ViewerView,
+} from "@roundhouse/game-core";
 import { generateInviteCode, parseIntent } from "@roundhouse/game-core";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 
 import type { Database } from "../db/client";
 import { game, gameEvent, gameTable, tablePlayer } from "../db/schema";
@@ -22,7 +30,7 @@ type DbLike = Pick<Database, "select" | "insert" | "update" | "transaction" | "e
 function projectForViewer(currentGame: GameRow | null, viewer: ViewerView): Json {
   if (!currentGame) return null;
 
-  let module;
+  let module: GameModule;
   try {
     module = getModule(currentGame.gameId);
   } catch {
@@ -57,11 +65,24 @@ export type TablesRuntime = {
     softSeatCap?: number;
   }): Promise<{ tableId: string; code: string }>;
   joinTable(input: { userId: string; code: string }): Promise<{ tableId: string }>;
-  startTable(input: { userId: string; tableId: string }): Promise<{ tableId: string; gameRowId: string }>;
-  rematchTable(input: { userId: string; tableId: string }): Promise<{ tableId: string; gameRowId: string }>;
+  startTable(input: {
+    userId: string;
+    tableId: string;
+  }): Promise<{ tableId: string; gameRowId: string }>;
+  rematchTable(input: {
+    userId: string;
+    tableId: string;
+  }): Promise<{ tableId: string; gameRowId: string }>;
   getMine(input: { userId: string }): Promise<TableSummary[]>;
-  getTableSnapshot(input: { tableId: string; asUserId: string | null }): Promise<TableSnapshot | null>;
-  getTableSync(input: { tableId: string; asUserId: string | null; sinceSeq: number }): Promise<TableSync | null>;
+  getTableSnapshot(input: {
+    tableId: string;
+    asUserId: string | null;
+  }): Promise<TableSnapshot | null>;
+  getTableSync(input: {
+    tableId: string;
+    asUserId: string | null;
+    sinceSeq: number;
+  }): Promise<TableSync | null>;
   getTableLiveState(input: { tableId: string }): Promise<TableLiveState | null>;
   applyGameIntent(input: {
     tableId: string;
@@ -101,7 +122,12 @@ export type TableSync =
   | { kind: "snapshot"; tableId: string; seq: number; state: Json; meta: TableMeta };
 
 /** Unprojected live state: the hub projects it per socket after an HTTP mutation. */
-export type TableLiveState = { tableId: string; seq: number; state: RawGameState | null; meta: TableMeta };
+export type TableLiveState = {
+  tableId: string;
+  seq: number;
+  state: RawGameState | null;
+  meta: TableMeta;
+};
 
 export type ApplyGameIntentResult =
   | {
@@ -152,11 +178,15 @@ async function loadTableByCode(db: DbLike, code: string) {
 }
 
 async function lockTableById(db: DbLike, tableId: string) {
-  await db.execute(sql`select ${gameTable.id} from ${gameTable} where ${gameTable.id} = ${tableId} for update`);
+  await db.execute(
+    sql`select ${gameTable.id} from ${gameTable} where ${gameTable.id} = ${tableId} for update`,
+  );
 }
 
 async function lockTableByCode(db: DbLike, code: string) {
-  await db.execute(sql`select ${gameTable.id} from ${gameTable} where ${gameTable.code} = ${code} for update`);
+  await db.execute(
+    sql`select ${gameTable.id} from ${gameTable} where ${gameTable.code} = ${code} for update`,
+  );
 }
 
 /** Stored event row → wire envelope. The inverse of nothing yet: #13 adds fold. */
@@ -174,7 +204,12 @@ function toEventEnvelope(row: GameEventRow): EventEnvelope {
 }
 
 function isUniqueViolation(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "23505";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "23505"
+  );
 }
 
 function resolveTableStatus(table: TableSummary, currentGame: GameRow | null) {
@@ -210,10 +245,7 @@ async function loadRecentTables(db: DbLike, userId: string) {
   const joinedTables =
     joinedIds.length === 0
       ? []
-      : await db
-          .select()
-          .from(gameTable)
-          .where(inArray(gameTable.id, joinedIds));
+      : await db.select().from(gameTable).where(inArray(gameTable.id, joinedIds));
 
   const tablesById = new Map<string, TableRow>();
   for (const row of hostedTables) tablesById.set(row.id, row);
@@ -235,9 +267,10 @@ async function loadRecentTables(db: DbLike, userId: string) {
 export function createRoomRuntime(db: Database): TablesRuntime {
   return {
     async createTable({ userId, gameId, config, softSeatCap = 4 }) {
-      let module;
+      // Only the registry knows whether this game id exists; the returned module
+      // is not needed here, so this is a validation call, not a lookup.
       try {
-        module = getModule(gameId);
+        getModule(gameId);
       } catch (error) {
         if (error instanceof Error && error.message.startsWith("unknown_game:")) {
           throw new TablesError("unknown_game", error.message);
@@ -315,9 +348,10 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           return { tableId, gameRowId: table.currentGame.id };
         }
         if (table.status !== "lobby") throw new TablesError("table_not_lobby", "table_not_lobby");
-        if (table.seatUserIds.length < 2) throw new TablesError("not_enough_players", "not_enough_players");
+        if (table.seatUserIds.length < 2)
+          throw new TablesError("not_enough_players", "not_enough_players");
 
-        let module;
+        let module: GameModule;
         try {
           module = getModule(table.gameId);
         } catch (error) {
@@ -343,10 +377,7 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           createdAt,
         });
 
-        await tx
-          .update(gameTable)
-          .set({ status: "active" })
-          .where(eq(gameTable.id, tableId));
+        await tx.update(gameTable).set({ status: "active" }).where(eq(gameTable.id, tableId));
 
         return { tableId, gameRowId };
       });
@@ -357,7 +388,8 @@ export function createRoomRuntime(db: Database): TablesRuntime {
         await lockTableById(tx, tableId);
         const table = await loadTableById(tx, tableId);
         if (!table) throw new TablesError("table_missing", "table_missing", 404);
-        if (!table.seatUserIds.includes(userId)) throw new TablesError("not_a_player", "not_a_player", 403);
+        if (!table.seatUserIds.includes(userId))
+          throw new TablesError("not_a_player", "not_a_player", 403);
         if (table.currentGame?.status === "active") {
           return { tableId, gameRowId: table.currentGame.id };
         }
@@ -365,7 +397,7 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           throw new TablesError("rematch_unavailable", "rematch_unavailable");
         }
 
-        let module;
+        let module: GameModule;
         try {
           module = getModule(table.gameId);
         } catch (error) {
@@ -391,10 +423,7 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           createdAt,
         });
 
-        await tx
-          .update(gameTable)
-          .set({ status: "active" })
-          .where(eq(gameTable.id, tableId));
+        await tx.update(gameTable).set({ status: "active" }).where(eq(gameTable.id, tableId));
 
         return { tableId, gameRowId };
       });
@@ -491,7 +520,13 @@ export function createRoomRuntime(db: Database): TablesRuntime {
       } satisfies TableSync;
     },
 
-    async applyGameIntent({ tableId, userId, intent, randomInt = defaultRandomInt, now = () => new Date() }) {
+    async applyGameIntent({
+      tableId,
+      userId,
+      intent,
+      randomInt = defaultRandomInt,
+      now = () => new Date(),
+    }) {
       return db.transaction(async (tx) => {
         // Serialise intents per table: reduce() reads seq and state, then writes both.
         // Without this lock two concurrent intents compute from the same seq and
@@ -499,7 +534,12 @@ export function createRoomRuntime(db: Database): TablesRuntime {
         await lockTableById(tx, tableId);
         const table = await loadTableById(tx, tableId);
         if (!table) {
-          return { ok: false, code: "table_missing", message: "table_missing", seq: 0 } satisfies ApplyGameIntentResult;
+          return {
+            ok: false,
+            code: "table_missing",
+            message: "table_missing",
+            seq: 0,
+          } satisfies ApplyGameIntentResult;
         }
         if (!table.seatUserIds.includes(userId)) {
           return {
@@ -520,7 +560,7 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           } satisfies ApplyGameIntentResult;
         }
 
-        let module;
+        let module: GameModule;
         try {
           module = getModule(currentGame.gameId);
         } catch (error) {
@@ -604,24 +644,34 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           .set({ status: finished ? "finished" : "active" })
           .where(eq(gameTable.id, tableId));
 
+        const reducedState = rawGameState(reduced.state);
+        if (!reducedState) {
+          throw new TablesError("internal_error", "module returned no state", 500);
+        }
+
         return {
           ok: true,
           events,
           finished,
-          meta: toTableMeta(table, { ...currentGame, seq: nextSeq, status: finished ? "finished" : "active" }),
+          meta: toTableMeta(table, {
+            ...currentGame,
+            seq: nextSeq,
+            status: finished ? "finished" : "active",
+          }),
           seq: nextSeq,
-          state: rawGameState(reduced.state)!,
+          state: reducedState,
         } satisfies ApplyGameIntentResult;
       });
     },
   };
 }
 
-export type { TableRow, GameRow, SeatRow };
+export type { GameRow, SeatRow, TableRow };
 
 function defaultRandomInt(maxExclusive: number) {
   if (maxExclusive <= 0) throw new Error("maxExclusive");
   const values = new Uint32Array(1);
   crypto.getRandomValues(values);
-  return values[0]! % maxExclusive;
+  const [value = 0] = values;
+  return value % maxExclusive;
 }

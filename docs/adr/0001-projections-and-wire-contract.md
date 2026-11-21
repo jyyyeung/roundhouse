@@ -38,12 +38,12 @@ export type ViewerView =
 export interface GameModule {
   id: string;
   displayName: string;
-  intents: readonly string[];              // allowlist enforced at the wire boundary
+  intents: readonly string[]; // allowlist enforced at the wire boundary
   seatLimits: { min: number; max: number };
   createInitialState(config: Json, playerIds: string[]): Json;
   reduce(state: Json, intent: ClientIntent, ctx: ReduceContext): ReduceResult;
-  applyEvent(state: Json, event: GameEventPayload): Json;          // ADR 0002
-  projectStateFor(state: Json, viewer: ViewerView): Json;          // replaces getPublicSnapshot
+  applyEvent(state: Json, event: GameEventPayload): Json; // ADR 0002
+  projectStateFor(state: Json, viewer: ViewerView): Json; // replaces getPublicSnapshot
   isFinished(state: Json): boolean;
 }
 ```
@@ -138,7 +138,7 @@ back.
 
 Two follow-ups this ADR deliberately leaves open:
 
-- Chat messages embed the *sending viewer's* projected state as their snapshot, so the author's
+- Chat messages embed the _sending viewer's_ projected state as their snapshot, so the author's
   `you` index is stored in shared history. Harmless today (the chat UI reads dice and holds only),
   but a hidden-information game should store a spectator projection instead.
 - Spectators are refused at `subscribe` (`not_seated`) until M2-1 admits them; the projection

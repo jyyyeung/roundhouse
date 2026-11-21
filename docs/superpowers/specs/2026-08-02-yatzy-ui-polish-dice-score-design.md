@@ -12,16 +12,16 @@ Tighten table UI details without changing the overall theme:
 
 ## Decisions
 
-| Topic | Choice |
-|---|---|
-| Unscored, no preview | Em dash `—` |
-| Unscored, with preview | Preview number only |
-| Scored | Existing locked number |
-| Die style | Soft pips (bevel/gradient + CSS pip grid) |
-| Architecture | Shared `DieFace` with `variant: "soft" \| "classic"` (default `"soft"`) |
-| Unicode dice | Explicitly out — not a variant |
-| Style picker / persistence | Deferred follow-up |
-| Chat snapshot dice | Out of scope for this pass |
+| Topic                      | Choice                                                                  |
+| -------------------------- | ----------------------------------------------------------------------- |
+| Unscored, no preview       | Em dash `—`                                                             |
+| Unscored, with preview     | Preview number only                                                     |
+| Scored                     | Existing locked number                                                  |
+| Die style                  | Soft pips (bevel/gradient + CSS pip grid)                               |
+| Architecture               | Shared `DieFace` with `variant: "soft" \| "classic"` (default `"soft"`) |
+| Unicode dice               | Explicitly out — not a variant                                          |
+| Style picker / persistence | Deferred follow-up                                                      |
+| Chat snapshot dice         | Out of scope for this pass                                              |
 
 ## Design
 

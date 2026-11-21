@@ -40,10 +40,12 @@ apps/web/src/games/yatzy/
 ### Task 1: Cap dice size in `DiceTray`
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/DiceTray.tsx`
 - Modify: `apps/web/src/games/yatzy/DiceTray.test.tsx`
 
 **Interfaces:**
+
 - Consumes: existing `DiceTrayProps` unchanged
 - Produces: same `DiceTray` API; die buttons use fixed max size classes instead of full-width `aspect-square` growth
 
@@ -52,20 +54,20 @@ apps/web/src/games/yatzy/
 Add to `apps/web/src/games/yatzy/DiceTray.test.tsx`:
 
 ```tsx
-  it("caps die buttons so they do not stretch full column width", () => {
-    render(<DiceTray {...baseProps} />);
+it("caps die buttons so they do not stretch full column width", () => {
+  render(<DiceTray {...baseProps} />);
 
-    const die = screen.getByRole("button", { name: /hold die 1/i });
-    expect(die.className).toMatch(/size-12/);
-    expect(die.className).toMatch(/md:size-14/);
-    expect(die.className).not.toMatch(/aspect-square/);
-  });
+  const die = screen.getByRole("button", { name: /hold die 1/i });
+  expect(die.className).toMatch(/size-12/);
+  expect(die.className).toMatch(/md:size-14/);
+  expect(die.className).not.toMatch(/aspect-square/);
+});
 
-  it("centers the dice row", () => {
-    const { container } = render(<DiceTray {...baseProps} />);
-    const row = container.querySelector(".dice-row");
-    expect(row?.className).toMatch(/justify-center/);
-  });
+it("centers the dice row", () => {
+  const { container } = render(<DiceTray {...baseProps} />);
+  const row = container.querySelector(".dice-row");
+  expect(row?.className).toMatch(/justify-center/);
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -79,38 +81,38 @@ Expected: FAIL — missing `size-12` / `dice-row` / still has `aspect-square`
 In `DiceTray.tsx`, replace the dice grid with a capped, centered row:
 
 ```tsx
-      <div className="dice-row mt-4 flex flex-wrap justify-center gap-3">
-        {props.dice.map((value, index) => {
-          const held = props.holds[index];
+<div className="dice-row mt-4 flex flex-wrap justify-center gap-3">
+  {props.dice.map((value, index) => {
+    const held = props.holds[index];
 
-          return (
-            <motion.button
-              key={index}
-              type="button"
-              layout
-              className={[
-                "size-12 overflow-hidden rounded-[1.4rem] border p-1.5 shadow-sm transition md:size-14",
-                held
-                  ? "border-[var(--color-teal-deep)] bg-[var(--color-teal)] text-[var(--color-ink)]"
-                  : "border-slate-200 bg-white text-[var(--color-ink)]",
-              ].join(" ")}
-              animate={{
-                rotate: props.rollVersion > 0 ? [0, -8, 8, -5, 0] : 0,
-                y: props.rollVersion > 0 ? [0, -6, 0] : 0,
-                scale: held ? 1.04 : 1,
-              }}
-              transition={{ duration: 0.35, delay: index * 0.03 }}
-              whileTap={props.canToggleHolds ? { scale: 0.94 } : undefined}
-              onClick={() => props.onToggleHold(index)}
-              disabled={!props.canToggleHolds}
-              aria-pressed={held}
-              aria-label={held ? `Release die ${index + 1}` : `Hold die ${index + 1}`}
-            >
-              <DieFace value={value} />
-            </motion.button>
-          );
-        })}
-      </div>
+    return (
+      <motion.button
+        key={index}
+        type="button"
+        layout
+        className={[
+          "size-12 overflow-hidden rounded-[1.4rem] border p-1.5 shadow-sm transition md:size-14",
+          held
+            ? "border-[var(--color-teal-deep)] bg-[var(--color-teal)] text-[var(--color-ink)]"
+            : "border-slate-200 bg-white text-[var(--color-ink)]",
+        ].join(" ")}
+        animate={{
+          rotate: props.rollVersion > 0 ? [0, -8, 8, -5, 0] : 0,
+          y: props.rollVersion > 0 ? [0, -6, 0] : 0,
+          scale: held ? 1.04 : 1,
+        }}
+        transition={{ duration: 0.35, delay: index * 0.03 }}
+        whileTap={props.canToggleHolds ? { scale: 0.94 } : undefined}
+        onClick={() => props.onToggleHold(index)}
+        disabled={!props.canToggleHolds}
+        aria-pressed={held}
+        aria-label={held ? `Release die ${index + 1}` : `Hold die ${index + 1}`}
+      >
+        <DieFace value={value} />
+      </motion.button>
+    );
+  })}
+</div>;
 ```
 
 Keep the section header / Roll button markup unchanged. Optional: slightly reduce section padding (`p-4` instead of `p-5`) — only if it does not break existing tests.
@@ -137,10 +139,12 @@ EOF
 ### Task 2: Densify `ScoreSheet` and enable desktop in-panel scroll
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/ScoreSheet.tsx`
 - Modify: `apps/web/src/games/yatzy/ScoreSheet.test.tsx`
 
 **Interfaces:**
+
 - Consumes: existing `ScoreSheetProps` unchanged
 - Produces: same API; root section exposes scroll/dense classes for desktop grid fill
 
@@ -149,26 +153,26 @@ EOF
 Add to `apps/web/src/games/yatzy/ScoreSheet.test.tsx`:
 
 ```tsx
-  it("uses dense cell padding and desktop scroll shell", () => {
-    const { container } = render(
-      <ScoreSheet
-        state={baseState()}
-        playerLabels={{ "user-a": "You", "user-b": "Player 2" }}
-        currentUserId="user-a"
-        canScore
-        onScore={vi.fn()}
-      />,
-    );
+it("uses dense cell padding and desktop scroll shell", () => {
+  const { container } = render(
+    <ScoreSheet
+      state={baseState()}
+      playerLabels={{ "user-a": "You", "user-b": "Player 2" }}
+      currentUserId="user-a"
+      canScore
+      onScore={vi.fn()}
+    />,
+  );
 
-    const section = container.querySelector("section");
-    expect(section?.className).toMatch(/md:min-h-0/);
-    expect(section?.className).toMatch(/md:overflow-y-auto/);
-    expect(section?.className).toMatch(/md:h-full/);
+  const section = container.querySelector("section");
+  expect(section?.className).toMatch(/md:min-h-0/);
+  expect(section?.className).toMatch(/md:overflow-y-auto/);
+  expect(section?.className).toMatch(/md:h-full/);
 
-    const onesButton = screen.getByRole("button", { name: /score ones/i });
-    expect(onesButton.className).toMatch(/py-2/);
-    expect(onesButton.className).not.toMatch(/py-3/);
-  });
+  const onesButton = screen.getByRole("button", { name: /score ones/i });
+  expect(onesButton.className).toMatch(/py-2/);
+  expect(onesButton.className).not.toMatch(/py-3/);
+});
 ```
 
 Keep existing preview / dash tests intact.
@@ -229,10 +233,12 @@ EOF
 ### Task 3: Responsive `YatzyTable` — grid, collapsible banner, standings
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/YatzyTable.tsx`
 - Create: `apps/web/src/games/yatzy/YatzyTable.test.tsx`
 
 **Interfaces:**
+
 - Consumes: existing `YatzyTableProps`; `DiceTray`; `ScoreSheet`; `ChatPanel`; `totalScore`
 - Produces: same public props; internal `statusExpanded` state (boolean, default `false`)
 
@@ -397,9 +403,13 @@ export function YatzyTable(props: YatzyTableProps) {
           <section className="rounded-[2rem] bg-[linear-gradient(135deg,var(--color-coral),var(--color-mango))] p-4 text-white shadow-[0_20px_50px_rgba(238,108,77,0.32)] md:p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/80">{props.state.ruleset}</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/80">
+                  {props.state.ruleset}
+                </p>
                 <div className="mt-2 flex items-center gap-2 md:mt-3">
-                  <h1 className="font-display text-2xl leading-none md:text-4xl">{statusHeadline}</h1>
+                  <h1 className="font-display text-2xl leading-none md:text-4xl">
+                    {statusHeadline}
+                  </h1>
                   <button
                     type="button"
                     className="rounded-xl bg-white/20 px-2 py-1 text-xs font-semibold text-white backdrop-blur md:hidden"
@@ -437,7 +447,9 @@ export function YatzyTable(props: YatzyTableProps) {
                         active ? "bg-white text-[var(--color-ink)]" : "bg-white/15 text-white",
                       ].join(" ")}
                     >
-                      <span className={online ? "text-[var(--color-teal)]" : "text-white/40"}>●</span>{" "}
+                      <span className={online ? "text-[var(--color-teal)]" : "text-white/40"}>
+                        ●
+                      </span>{" "}
                       {playerLabels[playerId] ?? playerId}
                     </div>
                   );
@@ -450,12 +462,20 @@ export function YatzyTable(props: YatzyTableProps) {
             dice={props.state.dice}
             holds={props.state.holds}
             rollsLeft={props.state.rollsLeft}
-            canRoll={isCurrentPlayer && props.state.phase !== "finished" && props.state.rollsLeft > 0}
-            canToggleHolds={isCurrentPlayer && props.state.phase !== "finished" && !props.state.dice.every((die) => die === 0)}
+            canRoll={
+              isCurrentPlayer && props.state.phase !== "finished" && props.state.rollsLeft > 0
+            }
+            canToggleHolds={
+              isCurrentPlayer &&
+              props.state.phase !== "finished" &&
+              !props.state.dice.every((die) => die === 0)
+            }
             rollVersion={props.rollVersion}
             onRoll={() => props.onIntent("roll", {})}
             onToggleHold={(index) => {
-              const nextHolds = props.state.holds.map((held, heldIndex) => (heldIndex === index ? !held : held));
+              const nextHolds = props.state.holds.map((held, heldIndex) =>
+                heldIndex === index ? !held : held,
+              );
               props.onIntent("set_holds", { holds: nextHolds });
             }}
           />
@@ -464,7 +484,9 @@ export function YatzyTable(props: YatzyTableProps) {
             data-testid="standings"
             className="hidden rounded-[1.5rem] border border-white/70 bg-white/85 p-4 shadow-[0_20px_60px_rgba(26,26,26,0.1)] backdrop-blur md:block"
           >
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">Standings</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">
+              Standings
+            </p>
             <div className="mt-3 grid gap-2">
               {props.state.playerIds.map((playerId) => (
                 <motion.div
@@ -472,8 +494,12 @@ export function YatzyTable(props: YatzyTableProps) {
                   layout
                   className="flex items-center justify-between rounded-2xl bg-[var(--color-cream)] px-3 py-2"
                 >
-                  <span className="font-semibold text-[var(--color-ink)]">{playerLabels[playerId] ?? playerId}</span>
-                  <span className="font-display text-xl text-[var(--color-ink)]">{totalScore(props.state, playerId)}</span>
+                  <span className="font-semibold text-[var(--color-ink)]">
+                    {playerLabels[playerId] ?? playerId}
+                  </span>
+                  <span className="font-display text-xl text-[var(--color-ink)]">
+                    {totalScore(props.state, playerId)}
+                  </span>
                 </motion.div>
               ))}
             </div>
@@ -505,6 +531,7 @@ export function YatzyTable(props: YatzyTableProps) {
 ```
 
 Notes for the implementer:
+
 - Remove the old full-width stacked standings block that always rendered.
 - Expand toggle is **`md:hidden`** so desktop never needs it; details use `hidden` + `md:block` (plus `block` when expanded).
 - Sticky right column is optional polish that supports in-panel sheet scroll; keep if tests pass.
@@ -541,14 +568,14 @@ EOF
 
 ## Spec coverage (self-review)
 
-| Spec requirement | Task |
-|---|---|
-| Desktop side-by-side ~42/58 | Task 3 |
-| Capped dice, no blow-up | Task 1 |
-| Mobile compact status strip + expand | Task 3 |
-| Dense mobile score rows | Task 2 |
-| Standings desktop-only under dice | Task 3 |
-| Sheet in-panel scroll on desktop | Task 2 (+ sticky wrapper in Task 3) |
-| No logic/chat/DieFace/lobby changes | All tasks |
-| Unit tests for banner + standings | Task 3 |
-| Existing preview / die tests still pass | Task 2 Step 4 / Task 3 Step 4 |
+| Spec requirement                        | Task                                |
+| --------------------------------------- | ----------------------------------- |
+| Desktop side-by-side ~42/58             | Task 3                              |
+| Capped dice, no blow-up                 | Task 1                              |
+| Mobile compact status strip + expand    | Task 3                              |
+| Dense mobile score rows                 | Task 2                              |
+| Standings desktop-only under dice       | Task 3                              |
+| Sheet in-panel scroll on desktop        | Task 2 (+ sticky wrapper in Task 3) |
+| No logic/chat/DieFace/lobby changes     | All tasks                           |
+| Unit tests for banner + standings       | Task 3                              |
+| Existing preview / die tests still pass | Task 2 Step 4 / Task 3 Step 4       |

@@ -40,10 +40,12 @@ apps/web/src/games/yatzy/
 ### Task 1: `DieFace` component
 
 **Files:**
+
 - Create: `apps/web/src/games/yatzy/DieFace.tsx`
 - Test: `apps/web/src/games/yatzy/DieFace.test.tsx`
 
 **Interfaces:**
+
 - Consumes: none
 - Produces: `export type DieFaceVariant = "soft" | "classic"`; `export function DieFace(props: { value: number; variant?: DieFaceVariant; className?: string }): JSX.Element`
 
@@ -118,7 +120,9 @@ const PIP_LAYOUT: Record<number, number[]> = {
 
 export function DieFace(props: DieFaceProps) {
   const variant = props.variant ?? "soft";
-  const clamped = Number.isFinite(props.value) ? Math.max(0, Math.min(6, Math.trunc(props.value))) : 0;
+  const clamped = Number.isFinite(props.value)
+    ? Math.max(0, Math.min(6, Math.trunc(props.value)))
+    : 0;
   const pips = PIP_LAYOUT[clamped] ?? [];
 
   return (
@@ -155,6 +159,7 @@ export function DieFace(props: DieFaceProps) {
 ```
 
 Notes for implementer:
+
 - Soft face draws its own light gradient so pips read on both white and teal held buttons. Held teal still comes from the outer tray button background around/behind this face — if contrast looks wrong in manual check, prefer making the soft face slightly translucent (`bg-white/70`) rather than inventing new colors.
 - Keep `aria-hidden` — parent tray button owns accessible name.
 
@@ -180,10 +185,12 @@ EOF
 ### Task 2: Wire `DieFace` into `DiceTray`
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/DiceTray.tsx`
 - Test: `apps/web/src/games/yatzy/DiceTray.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `DieFace` from `./DieFace` (`value`, default soft variant)
 - Produces: unchanged `DiceTray` props API
 
@@ -223,7 +230,10 @@ describe("DiceTray", () => {
     render(<DiceTray {...baseProps} />);
 
     expect(screen.getByRole("button", { name: /hold die 1/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /release die 2/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /release die 2/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 });
 ```
@@ -243,7 +253,7 @@ In `apps/web/src/games/yatzy/DiceTray.tsx`:
 3. Replace the button children `{DIE_FACES[value] ?? value}` with:
 
 ```tsx
-<DieFace value={value} />
+<DieFace value={value} />;
 ```
 
 4. Adjust the die button classes so text sizing for roman glyphs is gone and the face fills the tile. Replace the button `className` array with something equivalent to:
@@ -281,14 +291,17 @@ EOF
 ### Task 3: Simplify `ScoreSheet` cell labels
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/ScoreSheet.tsx`
 - Test: `apps/web/src/games/yatzy/ScoreSheet.test.tsx`
 
 **Interfaces:**
+
 - Consumes: existing `previewScore`, `formatCategory`, `categoriesFor` from `./model`
 - Produces: unchanged `ScoreSheet` props API; cell display rules below
 
 Display rules (exact):
+
 - `value !== null` → show `value`
 - else if `isClickable && preview !== null` → show `preview`
 - else → show `—`
@@ -467,9 +480,11 @@ EOF
 ### Task 4: Full web verification
 
 **Files:**
+
 - None new (regression only)
 
 **Interfaces:**
+
 - Consumes: Tasks 1–3 deliverables
 - Produces: green `@roundhouse/web` test + typecheck suite
 
@@ -488,6 +503,7 @@ Expected: exit 0
 - [ ] **Step 3: Manual smoke (if local app is running)**
 
 On the table route after a roll:
+
 - Dice show soft pips, not I–VI
 - Held die keeps teal chrome
 - Clickable open categories show a number only
@@ -504,18 +520,18 @@ Otherwise no commit — Tasks 1–3 already committed.
 
 ## Spec coverage checklist
 
-| Spec requirement | Task |
-|---|---|
-| Soft pip `DieFace` default | Task 1 |
-| `classic` variant branch (no unicode) | Task 1 |
-| Empty face for `value === 0` | Task 1 |
-| `DiceTray` uses `DieFace`, remove roman map | Task 2 |
-| Hold styling stays on outer button | Task 2 |
-| Scored → number; preview → number; else `—` | Task 3 |
-| No “Open” / “Would score” subtitle | Task 3 |
-| aria-label includes preview when relevant | Task 3 |
-| Tests updated/added | Tasks 1–3 |
-| Chat snapshot / style picker out of scope | Explicitly omitted |
+| Spec requirement                            | Task               |
+| ------------------------------------------- | ------------------ |
+| Soft pip `DieFace` default                  | Task 1             |
+| `classic` variant branch (no unicode)       | Task 1             |
+| Empty face for `value === 0`                | Task 1             |
+| `DiceTray` uses `DieFace`, remove roman map | Task 2             |
+| Hold styling stays on outer button          | Task 2             |
+| Scored → number; preview → number; else `—` | Task 3             |
+| No “Open” / “Would score” subtitle          | Task 3             |
+| aria-label includes preview when relevant   | Task 3             |
+| Tests updated/added                         | Tasks 1–3          |
+| Chat snapshot / style picker out of scope   | Explicitly omitted |
 
 ## Self-review notes
 

@@ -1,4 +1,4 @@
-import { type FormEvent } from "react";
+import type { FormEvent } from "react";
 
 export type ChatComposerProps = {
   draft: string;

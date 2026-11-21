@@ -13,5 +13,4 @@ export const auth = betterAuth({
   emailAndPassword: { enabled: true },
 });
 
-export const getSessionFromHeaders = (headers: Headers) =>
-  auth.api.getSession({ headers });
+export const getSessionFromHeaders = (headers: Headers) => auth.api.getSession({ headers });

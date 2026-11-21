@@ -1,4 +1,4 @@
-import { Ruleset, Dice, Category } from "./types";
+import type { Category, Dice, Ruleset } from "./types";
 
 function counts(dice: Dice) {
   const m: Record<number, number> = {};
@@ -10,11 +10,7 @@ function sum(dice: Dice) {
   return dice.reduce((a, b) => a + b, 0);
 }
 
-export function scoreCategory(
-  ruleset: Ruleset,
-  category: Category,
-  dice: Dice
-): number {
+export function scoreCategory(ruleset: Ruleset, category: Category, dice: Dice): number {
   const m = counts(dice);
   const faces = Object.keys(m).map((k) => Number(k));
 
@@ -83,9 +79,7 @@ export function scoreCategory(
     if (ruleset === "yatzy") {
       return want2.every((n) => set.has(n)) ? 20 : 0;
     } else {
-      return want1.every((n) => set.has(n)) || want2.every((n) => set.has(n))
-        ? 40
-        : 0;
+      return want1.every((n) => set.has(n)) || want2.every((n) => set.has(n)) ? 40 : 0;
     }
   }
 
@@ -106,4 +100,3 @@ export function scoreCategory(
 }
 
 export default scoreCategory;
-

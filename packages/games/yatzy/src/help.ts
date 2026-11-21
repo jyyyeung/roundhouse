@@ -38,7 +38,12 @@ export function getTurnHelp(): SurfaceHelp {
   };
 }
 
-function upperHelp(face: number, title: string, exampleDice: string, exampleScore: number): ScoreHelp {
+function upperHelp(
+  face: number,
+  title: string,
+  exampleDice: string,
+  exampleScore: number,
+): ScoreHelp {
   return {
     title,
     what: `Count dice showing ${face}.`,

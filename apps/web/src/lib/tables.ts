@@ -24,7 +24,10 @@ export function buildShareUrl(input: { webBaseUrl: string; tableId: string; code
 }
 
 async function readApiError(response: Response) {
-  const body = (await response.json().catch(() => null)) as { message?: string; code?: string } | null;
+  const body = (await response.json().catch(() => null)) as {
+    message?: string;
+    code?: string;
+  } | null;
   return body?.message ?? body?.code ?? `Request failed with ${response.status}`;
 }
 

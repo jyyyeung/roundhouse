@@ -19,7 +19,9 @@ const PIP_LAYOUT: Record<number, number[]> = {
 
 export function DieFace(props: DieFaceProps) {
   const variant = props.variant ?? "soft";
-  const clamped = Number.isFinite(props.value) ? Math.max(0, Math.min(6, Math.trunc(props.value))) : 0;
+  const clamped = Number.isFinite(props.value)
+    ? Math.max(0, Math.min(6, Math.trunc(props.value)))
+    : 0;
   const pips = PIP_LAYOUT[clamped] ?? [];
 
   return (
@@ -38,9 +40,10 @@ export function DieFace(props: DieFaceProps) {
     >
       {Array.from({ length: 9 }, (_, index) => {
         const active = pips.includes(index);
+        const pipId = `pip-${index}`;
         return (
           <span
-            key={index}
+            key={pipId}
             data-pip={active ? "" : undefined}
             className={
               active

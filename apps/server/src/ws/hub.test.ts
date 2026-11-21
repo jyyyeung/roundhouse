@@ -4,6 +4,7 @@ import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
+
 vi.mock("../db/client", () => ({ db: {} }));
 vi.mock("./persistence", async () => {
   const actual = await vi.importActual<typeof import("./persistence")>("./persistence");
@@ -247,9 +248,7 @@ describe("ws hub access control", () => {
     await socket.emitMessage({ v: 2, type: "subscribe", tableId: "table-1" });
     await socket.emitMessage({ v: 2, type: "chatPage", tableId: "table-1" });
 
-    const frame = socket
-      .frames()
-      .find((candidate) => candidate.type === "chatPage");
+    const frame = socket.frames().find((candidate) => candidate.type === "chatPage");
 
     expect(frame).toEqual({
       hasMore: true,
@@ -312,7 +311,10 @@ describe("ws hub snapshot projection", () => {
       softSeatCap: 4,
       status: "active",
     };
-    const finishedState = yatzyModule.createInitialState({ ruleset: "yatzy" }, ["user-a", "user-b"]);
+    const finishedState = yatzyModule.createInitialState({ ruleset: "yatzy" }, [
+      "user-a",
+      "user-b",
+    ]);
 
     let nextUserId = "user-a";
     const hub = createWsHub({
@@ -325,7 +327,9 @@ describe("ws hub snapshot projection", () => {
           seq: 5,
           state: finishedState as unknown as RawGameState,
         }),
-        getTableSnapshot: vi.fn().mockResolvedValue({ meta, seq: 0, state: null, tableId: "table-1" }),
+        getTableSnapshot: vi
+          .fn()
+          .mockResolvedValue({ meta, seq: 0, state: null, tableId: "table-1" }),
       }),
       getSessionFromHeaders: async () => ({ user: { id: nextUserId } }),
     });
@@ -385,7 +389,9 @@ describe("ws hub message boundary", () => {
   function makeHub(userId: string | null = "user-a") {
     return createWsHub({
       runtime: makeRuntime({
-        getTableSnapshot: vi.fn().mockResolvedValue({ meta, seq: 0, state: null, tableId: "table-1" }),
+        getTableSnapshot: vi
+          .fn()
+          .mockResolvedValue({ meta, seq: 0, state: null, tableId: "table-1" }),
       }),
       getSessionFromHeaders: async () => (userId ? { user: { id: userId } } : null),
     });
@@ -426,7 +432,9 @@ describe("ws hub message boundary", () => {
   it("reports a frame that fails the schema with the field that failed", async () => {
     const socket = await connect(makeHub());
 
-    await socket.emitRaw(JSON.stringify({ tableId: "table-1", type: "subscribe", v: 2, extra: true }));
+    await socket.emitRaw(
+      JSON.stringify({ tableId: "table-1", type: "subscribe", v: 2, extra: true }),
+    );
 
     // Unknown keys are stripped rather than rejected, so this one still works.
     expect(socket.frames().some((frame) => frame.type === "snapshot")).toBe(true);
@@ -469,8 +477,10 @@ describe("ws hub sync v2", () => {
     softSeatCap: 4,
     status: "active",
   };
-  const activeState = yatzyModule.createInitialState({ ruleset: "yatzy" }, meta.seatUserIds) as unknown as
-    RawGameState;
+  const activeState = yatzyModule.createInitialState(
+    { ruleset: "yatzy" },
+    meta.seatUserIds,
+  ) as unknown as RawGameState;
 
   function makeHub(overrides: Partial<TablesRuntime> = {}, userId = "user-a") {
     let seq = 0;
@@ -480,7 +490,9 @@ describe("ws hub sync v2", () => {
           seq += 1;
           return { events: [], finished: false, meta, ok: true, seq, state: activeState };
         }),
-        getTableSnapshot: vi.fn().mockResolvedValue({ meta, seq: 0, state: activeState, tableId: "table-1" }),
+        getTableSnapshot: vi
+          .fn()
+          .mockResolvedValue({ meta, seq: 0, state: activeState, tableId: "table-1" }),
         ...overrides,
       }),
       getSessionFromHeaders: async () => ({ user: { id: userId } }),

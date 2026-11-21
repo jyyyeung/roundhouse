@@ -45,10 +45,12 @@ apps/web/src/routes/
 ### Task 1: `ChatComposer`
 
 **Files:**
+
 - Create: `apps/web/src/games/yatzy/ChatComposer.tsx`
 - Create: `apps/web/src/games/yatzy/ChatComposer.test.tsx`
 
 **Interfaces:**
+
 - Consumes: none
 - Produces:
 
@@ -95,7 +97,13 @@ describe("ChatComposer", () => {
 
     onSend.mockClear();
     rerender(
-      <ChatComposer draft="   " onDraftChange={onDraftChange} canSend onSend={onSend} variant="panel" />,
+      <ChatComposer
+        draft="   "
+        onDraftChange={onDraftChange}
+        canSend
+        onSend={onSend}
+        variant="panel"
+      />,
     );
     expect(screen.getByRole("button", { name: /send message/i })).toBeDisabled();
   });
@@ -213,10 +221,12 @@ EOF
 ### Task 2: Modeful `ChatPanel`
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/ChatPanel.tsx`
 - Create: `apps/web/src/games/yatzy/ChatPanel.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `ChatComposer` from Task 1; `ChatDiceChips`; `readChatSnapshot`; `TableChatMessage`
 - Produces:
 
@@ -306,7 +316,7 @@ Rewrite `apps/web/src/games/yatzy/ChatPanel.tsx` to:
     canSend={props.canSend}
     onSend={props.onSend}
   />
-</aside>
+</aside>;
 ```
 
 4. Overlay branch: keep `AnimatePresence` + backdrop (`aria-label="Close chat"`) + sliding `aside` + Close button; only when `props.open`. Footer = same `ChatComposer variant="panel"`.
@@ -380,12 +390,14 @@ EOF
 ### Task 3: Wire `YatzyTable` + widen table shell
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/YatzyTable.tsx`
 - Modify: `apps/web/src/games/yatzy/YatzyTable.test.tsx`
 - Modify: `apps/web/src/routes/table.tsx` (active shell `max-w-5xl` → `max-w-5xl xl:max-w-7xl`)
 - Regression: `pnpm --filter @roundhouse/web test src/routes/table.test.tsx src/games/yatzy/`
 
 **Interfaces:**
+
 - Consumes: `ChatPanel` (Task 2), `ChatComposer` (Task 1)
 - Produces: same public `YatzyTableProps`; internal `chatOpen`, `draft`, `chatMode` (`"dock" | "overlay"`)
 
@@ -528,7 +540,11 @@ export function YatzyTable(props: YatzyTableProps) {
           {/* ... rest of board ... */}
         </div>
 
-        <div className={chatMode === "dock" ? "hidden min-h-0 xl:block xl:h-[calc(100dvh-6rem)]" : "contents"}>
+        <div
+          className={
+            chatMode === "dock" ? "hidden min-h-0 xl:block xl:h-[calc(100dvh-6rem)]" : "contents"
+          }
+        >
           {/* For overlay, ChatPanel is fixed portal-like; keep it as sibling.
               Simpler approach: always render ChatPanel as next sibling of board
               inside the shell; dock uses grid cell, overlay uses fixed positioning
@@ -619,16 +635,16 @@ EOF
 
 ## Spec coverage (self-review)
 
-| Spec requirement | Task |
-|---|---|
-| `xl+` docked right rail outside board | Task 3 |
-| Below `xl` overlay drawer | Task 2 + 3 |
-| Mobile float when overlay closed; hide when open | Task 3 |
-| Shared draft | Task 1–3 |
-| Banner Chat `xl:hidden` | Task 3 |
-| Shell `xl:max-w-7xl` | Task 3 |
-| `ChatComposer` extraction | Task 1 |
-| Modeful `ChatPanel` | Task 2 |
-| No protocol / unread / chips changes | All tasks |
-| Unit tests dock/overlay/float | Tasks 2–3 |
-| `table.test` chat snapshots still pass | Task 3 Step 4 |
+| Spec requirement                                 | Task          |
+| ------------------------------------------------ | ------------- |
+| `xl+` docked right rail outside board            | Task 3        |
+| Below `xl` overlay drawer                        | Task 2 + 3    |
+| Mobile float when overlay closed; hide when open | Task 3        |
+| Shared draft                                     | Task 1–3      |
+| Banner Chat `xl:hidden`                          | Task 3        |
+| Shell `xl:max-w-7xl`                             | Task 3        |
+| `ChatComposer` extraction                        | Task 1        |
+| Modeful `ChatPanel`                              | Task 2        |
+| No protocol / unread / chips changes             | All tasks     |
+| Unit tests dock/overlay/float                    | Tasks 2–3     |
+| `table.test` chat snapshots still pass           | Task 3 Step 4 |

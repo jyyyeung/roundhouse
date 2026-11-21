@@ -82,6 +82,8 @@ export function createFakeDb(seed: FakeDbSeed) {
             offset() {
               return chain;
             },
+            // A fake drizzle query has to be awaitable, so it must be thenable.
+            // biome-ignore lint/suspicious/noThenProperty: awaitable fake query
             then(onFulfilled: unknown, onRejected: unknown) {
               return Promise.resolve(rows).then(
                 onFulfilled as (value: unknown) => unknown,

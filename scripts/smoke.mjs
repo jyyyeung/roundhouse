@@ -70,7 +70,11 @@ async function signIn(email) {
 async function checkUnauthenticatedUpgrade() {
   const url = `${baseUrl.replace(/^http/, "ws")}/ws`;
   if (typeof WebSocket === "undefined") {
-    check("ws upgrade without a session is refused", false, "global WebSocket missing (needs Node 22+)");
+    check(
+      "ws upgrade without a session is refused",
+      false,
+      "global WebSocket missing (needs Node 22+)",
+    );
     return;
   }
   // The server answers with an `error` frame and then closes 4401. Both matter: the
@@ -96,7 +100,9 @@ async function checkUnauthenticatedUpgrade() {
   });
   check(
     "ws upgrade without a session is refused",
-    seen.frame?.type === "error" && seen.frame?.code === "not_authenticated" && seen.close === "4401:not_authenticated",
+    seen.frame?.type === "error" &&
+      seen.frame?.code === "not_authenticated" &&
+      seen.close === "4401:not_authenticated",
     `frame=${JSON.stringify(seen.frame)} close=${seen.close}`,
   );
 }
@@ -123,7 +129,11 @@ async function main() {
   cookieA = signedIn.cookie || cookieA;
 
   ({ body, response } = await jsonRequest("/api/tables/mine", { cookie: cookieA, method: "GET" }));
-  check("GET /api/tables/mine with a session", response.ok, `${response.status} ${body.slice(0, 80)}`);
+  check(
+    "GET /api/tables/mine with a session",
+    response.ok,
+    `${response.status} ${body.slice(0, 80)}`,
+  );
 
   ({ response } = await jsonRequest("/api/auth/sign-in/email", {
     body: { email: emailA, password: "wrong-password-99999" },
@@ -131,7 +141,11 @@ async function main() {
   check("wrong password is rejected", response.status === 401, `status ${response.status}`);
 
   ({ response } = await jsonRequest("/api/tables/mine", { method: "GET" }));
-  check("unauthenticated /api/tables/mine is 401", response.status === 401, `status ${response.status}`);
+  check(
+    "unauthenticated /api/tables/mine is 401",
+    response.status === 401,
+    `status ${response.status}`,
+  );
 
   ({ body, response } = await jsonRequest("/api/tables", {
     body: { config: { ruleset: "yatzy" }, gameId: "yatzy" },
@@ -144,21 +158,46 @@ async function main() {
   } catch {
     // Left undefined so the failure below reports the raw body.
   }
-  check("POST /api/tables", response.ok && Boolean(tableId && code), `${response.status} ${body.slice(0, 160)}`);
+  check(
+    "POST /api/tables",
+    response.ok && Boolean(tableId && code),
+    `${response.status} ${body.slice(0, 160)}`,
+  );
 
   if (code) {
-    ({ body, response } = await jsonRequest("/api/tables/join", { body: { code }, cookie: cookieB }));
-    check("POST /api/tables/join by invite code", response.ok, `${response.status} ${body.slice(0, 160)}`);
+    ({ body, response } = await jsonRequest("/api/tables/join", {
+      body: { code },
+      cookie: cookieB,
+    }));
+    check(
+      "POST /api/tables/join by invite code",
+      response.ok,
+      `${response.status} ${body.slice(0, 160)}`,
+    );
 
-    ({ body, response } = await jsonRequest("/api/tables/mine", { cookie: cookieB, method: "GET" }));
-    check("joined table is visible to the second player", response.ok && body.includes(tableId ?? ""), `${response.status}`);
+    ({ body, response } = await jsonRequest("/api/tables/mine", {
+      cookie: cookieB,
+      method: "GET",
+    }));
+    check(
+      "joined table is visible to the second player",
+      response.ok && body.includes(tableId ?? ""),
+      `${response.status}`,
+    );
   }
 
   ({ response } = await jsonRequest("/api/auth/sign-out", { cookie: cookieA }));
   check("sign-out (empty body POST)", response.ok, `status ${response.status}`);
 
-  ({ body, response } = await jsonRequest("/api/auth/get-session", { cookie: cookieA, method: "GET" }));
-  check("get-session after sign-out is empty", body.trim() === "null", `${response.status} ${body.slice(0, 60)}`);
+  ({ body, response } = await jsonRequest("/api/auth/get-session", {
+    cookie: cookieA,
+    method: "GET",
+  }));
+  check(
+    "get-session after sign-out is empty",
+    body.trim() === "null",
+    `${response.status} ${body.slice(0, 60)}`,
+  );
 
   await checkUnauthenticatedUpgrade();
 

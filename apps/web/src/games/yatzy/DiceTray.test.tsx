@@ -1,7 +1,7 @@
+import { getTurnHelp } from "@roundhouse/game-yatzy";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { getTurnHelp } from "@roundhouse/game-yatzy";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DiceTray } from "./DiceTray";
 
@@ -63,7 +63,10 @@ describe("DiceTray", () => {
     render(<DiceTray {...baseProps} />);
 
     expect(screen.getByRole("button", { name: /hold die 1/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /release die 2/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /release die 2/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("caps die buttons so they do not stretch full column width", () => {

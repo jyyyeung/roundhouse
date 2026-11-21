@@ -57,7 +57,9 @@ describe("room runtime applyGameIntent", () => {
     expect(result.ok).toBe(true);
 
     const lockIndex = calls.findIndex((call) => call.op === "execute");
-    const gameSelectIndex = calls.findIndex((call) => call.op === "select" && call.table === "game");
+    const gameSelectIndex = calls.findIndex(
+      (call) => call.op === "select" && call.table === "game",
+    );
 
     expect(lockIndex).toBeGreaterThanOrEqual(0);
     expect(calls[lockIndex]?.sql).toMatch(/for update/i);
@@ -284,7 +286,8 @@ describe("room runtime per-viewer projection", () => {
 
     const snapshot = await runtime.getTableSnapshot({ asUserId: "user-z", tableId });
 
-    expect((snapshot?.state as Record<string, unknown>).you).toBeNull();
-    expect((snapshot?.state as Record<string, unknown>).currentPlayerId).toBe("user-a");
+    const view = snapshot?.state as Record<string, unknown>;
+    expect(view.you).toBeNull();
+    expect(view.currentPlayerId).toBe("user-a");
   });
 });

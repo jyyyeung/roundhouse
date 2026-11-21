@@ -1,5 +1,5 @@
 import * as Popover from "@radix-ui/react-popover";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 type InfoTipProps = {
   label: string;
@@ -51,6 +51,7 @@ export function InfoTip(props: InfoTipProps) {
     closeTimer.current = setTimeout(() => setOpen(false), 150);
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clear the pending timer on unmount only
   useEffect(() => () => clearCloseTimer(), []);
 
   return (

@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ClientMessage, Json, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import type { ClientMessage, Json, TableMeta } from "@roundhouse/game-core";
 import { PROTOCOL_VERSION } from "@roundhouse/game-core";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { renderGameView } from "../games/registry";
 import type { TableChatMessage } from "../games/yatzy/model";
-import { getRecentTables, rematchTable, joinTable, normalizeJoinCode, startTable } from "../lib/tables";
+import {
+  getRecentTables,
+  joinTable,
+  normalizeJoinCode,
+  rematchTable,
+  startTable,
+} from "../lib/tables";
 import { connectTableWs, type TableWsConnection } from "../lib/ws";
 
 type SessionLike = {
@@ -18,7 +24,12 @@ type SessionLike = {
 
 function getErrorMessage(error: unknown) {
   if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
     return error.message;
   }
   return "Something went sideways. Try again.";
@@ -104,7 +115,10 @@ export function TablePage({ session }: { session: SessionLike }) {
   const [loadingOlderChat, setLoadingOlderChat] = useState(false);
 
   const rulesetLabel = useMemo(() => {
-    return meta?.config && typeof meta.config === "object" && "ruleset" in meta.config && meta.config.ruleset === "yahtzee"
+    return meta?.config &&
+      typeof meta.config === "object" &&
+      "ruleset" in meta.config &&
+      meta.config.ruleset === "yahtzee"
       ? "Yahtzee"
       : "Yatzy";
   }, [meta?.config]);
@@ -161,6 +175,7 @@ export function TablePage({ session }: { session: SessionLike }) {
     if (!requestChatPage(oldest.id)) setLoadingOlderChat(false);
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one connection per table; every dependency is a ref or handled inside the effect
   useEffect(() => {
     let alive = true;
     let connection: TableWsConnection | null = null;
@@ -207,7 +222,11 @@ export function TablePage({ session }: { session: SessionLike }) {
       if (!hasSnapshotRef.current) {
         setLoading(true);
       }
-      setError(hasSnapshotRef.current ? "Connection lost — reconnecting…" : `Could not connect (${reason}). Retrying…`);
+      setError(
+        hasSnapshotRef.current
+          ? "Connection lost — reconnecting…"
+          : `Could not connect (${reason}). Retrying…`,
+      );
 
       const delay = Math.min(8_000, 400 * 2 ** attempt);
       attempt += 1;
@@ -405,8 +424,12 @@ export function TablePage({ session }: { session: SessionLike }) {
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-md items-center px-4 py-8">
         <section className="w-full rounded-[2rem] border border-white/70 bg-white/85 p-6 text-center shadow-[0_20px_60px_rgba(26,26,26,0.14)] backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--color-coral)]">Connecting</p>
-          <h1 className="mt-3 font-display text-4xl text-[var(--color-ink)]">Loading table magic...</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--color-coral)]">
+            Connecting
+          </p>
+          <h1 className="mt-3 font-display text-4xl text-[var(--color-ink)]">
+            Loading table magic...
+          </h1>
         </section>
       </div>
     );
@@ -416,10 +439,15 @@ export function TablePage({ session }: { session: SessionLike }) {
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-md items-center px-4 py-8">
         <section className="w-full rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(26,26,26,0.14)] backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--color-coral)]">Table unavailable</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--color-coral)]">
+            Table unavailable
+          </p>
           <h1 className="mt-3 font-display text-4xl text-[var(--color-ink)]">{tableId}</h1>
           {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
-          <Link className="mt-5 inline-flex rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)]" to="/lobby">
+          <Link
+            className="mt-5 inline-flex rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)]"
+            to="/lobby"
+          >
             Back to lobby
           </Link>
         </section>
@@ -431,26 +459,41 @@ export function TablePage({ session }: { session: SessionLike }) {
     <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 xl:max-w-7xl">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Table {meta.code}</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">
+            Table {meta.code}
+          </p>
           <h1 className="mt-2 font-display text-4xl text-[var(--color-ink)]">{rulesetLabel}</h1>
         </div>
-        <Link className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-[var(--color-ink)] shadow-sm" to="/lobby">
+        <Link
+          className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-[var(--color-ink)] shadow-sm"
+          to="/lobby"
+        >
           Back to lobby
         </Link>
       </header>
 
       {meta.status === "lobby" ? (
         <section className="mt-5 rounded-[2rem] border border-white/70 bg-white/88 p-6 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">Waiting room</p>
-          <h2 className="mt-3 font-display text-3xl text-[var(--color-ink)]">{meta.seatUserIds.length}/{meta.softSeatCap} seated</h2>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-coral)]">
+            Waiting room
+          </p>
+          <h2 className="mt-3 font-display text-3xl text-[var(--color-ink)]">
+            {meta.seatUserIds.length}/{meta.softSeatCap} seated
+          </h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {meta.seatUserIds.map((playerId, index) => (
               <article key={playerId} className="rounded-3xl bg-[var(--color-cream)] px-4 py-4">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-coral)]">Seat {index + 1}</p>
-                <p className="mt-2 font-semibold text-[var(--color-ink)]">
-                  {playerId === currentUserId ? session?.user?.name || "You" : `Player ${index + 1}`}
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-coral)]">
+                  Seat {index + 1}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">{playerId === meta.hostUserId ? "Host" : "Ready"}</p>
+                <p className="mt-2 font-semibold text-[var(--color-ink)]">
+                  {playerId === currentUserId
+                    ? session?.user?.name || "You"
+                    : `Player ${index + 1}`}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {playerId === meta.hostUserId ? "Host" : "Ready"}
+                </p>
               </article>
             ))}
           </div>
@@ -465,10 +508,16 @@ export function TablePage({ session }: { session: SessionLike }) {
                 {busyAction === "start" ? "Starting..." : "Start game"}
               </button>
             ) : (
-              <p className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-600">Waiting for the host to start.</p>
+              <p className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-600">
+                Waiting for the host to start.
+              </p>
             )}
           </div>
-          {error ? <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p> : null}
+          {error ? (
+            <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+              {error}
+            </p>
+          ) : null}
         </section>
       ) : (
         <div data-testid="table-active-shell" className="mt-5 pb-24 md:pb-0">
@@ -498,7 +547,11 @@ export function TablePage({ session }: { session: SessionLike }) {
             </div>
           ) : null}
 
-          {error ? <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p> : null}
+          {error ? (
+            <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+              {error}
+            </p>
+          ) : null}
         </div>
       )}
     </div>

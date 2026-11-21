@@ -1,5 +1,5 @@
-import { motion } from "motion/react";
 import { getTurnHelp } from "@roundhouse/game-yatzy";
+import { motion } from "motion/react";
 import { InfoTip } from "../../ui/InfoTip";
 
 import { DieFace } from "./DieFace";
@@ -22,17 +22,19 @@ export function DiceTray(props: DiceTrayProps) {
     <section className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.1)] backdrop-blur">
       <div className="flex items-center justify-between gap-3">
         <div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">Dice tray</p>
-              <InfoTip label="About the dice tray">
-                <div className="space-y-1">
-                  <p className="font-semibold">{turnHelp.title}</p>
-                  {turnHelp.body.map((line, index) => (
-                    <p key={`line-${index}`}>{line}</p>
-                  ))}
-                </div>
-              </InfoTip>
-            </div>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">
+              Dice tray
+            </p>
+            <InfoTip label="About the dice tray">
+              <div className="space-y-1">
+                <p className="font-semibold">{turnHelp.title}</p>
+                {turnHelp.body.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            </InfoTip>
+          </div>
           <p className="mt-2 text-sm text-slate-600">{props.rollsLeft} rolls left</p>
         </div>
         <motion.button
@@ -47,12 +49,15 @@ export function DiceTray(props: DiceTrayProps) {
       </div>
 
       <div className="dice-row mt-4 flex flex-wrap justify-center gap-3">
+        {/* Each die is pinned to its slot, so the slot is its identity. */}
         {props.dice.map((value, index) => {
           const held = props.holds[index];
+          // A die belongs to its slot, so the slot is the identity.
+          const slotId = `die-${index}`;
 
           return (
             <motion.button
-              key={index}
+              key={slotId}
               type="button"
               layout
               className={[

@@ -41,11 +41,13 @@ apps/web/src/
 ### Task 1: Surface help in `@roundhouse/game-yatzy`
 
 **Files:**
+
 - Modify: `packages/games/yatzy/src/help.ts`
 - Modify: `packages/games/yatzy/src/help.test.ts`
 - Modify: `packages/games/yatzy/src/index.ts`
 
 **Interfaces:**
+
 - Produces:
   - `export type SurfaceHelp = { title: string; body: string[] }`
   - `export function getRulesetCompareHelp(): SurfaceHelp`
@@ -145,10 +147,12 @@ git commit -m "feat(game-yatzy): add ruleset and turn surface help"
 ### Task 2: Wire `DiceTray`
 
 **Files:**
+
 - Modify: `apps/web/src/games/yatzy/DiceTray.tsx`
 - Modify: `apps/web/src/games/yatzy/DiceTray.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `getTurnHelp`, `InfoTip`
 - Produces: ⓘ with `label="About the dice tray"` beside the Dice tray header
 
@@ -212,7 +216,9 @@ const turnHelp = getTurnHelp();
 // …
 <div>
   <div className="flex items-center gap-1.5">
-    <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">Dice tray</p>
+    <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">
+      Dice tray
+    </p>
     <InfoTip label="About the dice tray">
       <div className="space-y-1">
         <p className="font-semibold">{turnHelp.title}</p>
@@ -223,7 +229,7 @@ const turnHelp = getTurnHelp();
     </InfoTip>
   </div>
   <p className="mt-2 text-sm text-slate-600">{props.rollsLeft} rolls left</p>
-</div>
+</div>;
 ```
 
 Keep Roll button and die buttons unchanged.
@@ -245,10 +251,12 @@ git commit -m "feat(web): add dice tray turn help tip"
 ### Task 3: Wire lobby Ruleset tip
 
 **Files:**
+
 - Modify: `apps/web/src/routes/lobby.tsx`
 - Modify: `apps/web/src/routes/lobby.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `getRulesetCompareHelp`, `InfoTip`
 - Produces: ⓘ with `label="About rulesets"` beside the Ruleset label
 
@@ -302,10 +310,8 @@ const rulesetHelp = getRulesetCompareHelp();
       </div>
     </InfoTip>
   </span>
-  <select /* unchanged */>
-    …
-  </select>
-</label>
+  <select /* unchanged */>…</select>
+</label>;
 ```
 
 `getRulesetCompareHelp()` may be called at module scope or inside the component — either is fine (static data). Prefer inside render or a module const; do not depend on selected `ruleset` state.
@@ -326,13 +332,13 @@ git commit -m "feat(web): add lobby ruleset contrast tip"
 
 ## Spec coverage
 
-| Spec requirement | Task |
-|---|---|
-| Ruleset ⓘ short static contrast | 1 + 3 |
-| Dice tray ⓘ turn/hold/score | 1 + 2 |
-| Copy in `@roundhouse/game-yatzy` | 1 |
-| Reuse `InfoTip` | 2 + 3 |
-| No selection-dependent ruleset tip | 3 |
-| No bonus Yahtzee / no scoring changes | all |
-| Package + lobby + tray tests | 1–3 |
-| Waiting room / presence / chat out of scope | — |
+| Spec requirement                            | Task  |
+| ------------------------------------------- | ----- |
+| Ruleset ⓘ short static contrast             | 1 + 3 |
+| Dice tray ⓘ turn/hold/score                 | 1 + 2 |
+| Copy in `@roundhouse/game-yatzy`            | 1     |
+| Reuse `InfoTip`                             | 2 + 3 |
+| No selection-dependent ruleset tip          | 3     |
+| No bonus Yahtzee / no scoring changes       | all   |
+| Package + lobby + tray tests                | 1–3   |
+| Waiting room / presence / chat out of scope | —     |

@@ -1,11 +1,10 @@
+import { getRulesetCompareHelp } from "@roundhouse/game-yatzy";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
-
-import { LobbyPage } from "./lobby";
-import { getRulesetCompareHelp } from "@roundhouse/game-yatzy";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as tables from "../lib/tables";
+import { LobbyPage } from "./lobby";
 
 vi.mock("../lib/tables", async () => {
   const actual = await vi.importActual<typeof import("../lib/tables")>("../lib/tables");

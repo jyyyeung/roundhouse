@@ -68,4 +68,3 @@ export interface GameModule {
   projectStateFor(state: RawGameState, viewer: ViewerView): Json;
   isFinished(state: Json): boolean;
 }
-

@@ -49,6 +49,9 @@ updates:
       time: "06:00"
       timezone: "Etc/UTC"
     labels: ["dependencies", "infra"]
+    groups:
+      docker-base-images:
+        patterns: ["*"]
     commit-message:
       prefix: "chore(docker)"
 
@@ -60,8 +63,25 @@ updates:
       time: "06:00"
       timezone: "Etc/UTC"
     labels: ["dependencies", "infra"]
+    groups:
+      docker-base-images:
+        patterns: ["*"]
     commit-message:
       prefix: "chore(docker)"
 
-  # No github-actions entry yet: there are no workflows. Add one together with
-  # the first workflow in M0-6, or Dependabot silently updates nothing.
+  # The workflows pin major versions (actions/checkout@v5 and friends); this keeps
+  # those majors current without turning every bump into its own PR.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    labels: ["dependencies", "infra"]
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"

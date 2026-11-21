@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { yatzyCategories, yahtzeeCategories } from "./categories";
+import { yahtzeeCategories, yatzyCategories } from "./categories";
 import { getRulesetCompareHelp, getScoreHelp, getTurnHelp, type ScoreHelpKey } from "./help";
 
 const footers: ScoreHelpKey[] = ["upper_total", "bonus", "total"];

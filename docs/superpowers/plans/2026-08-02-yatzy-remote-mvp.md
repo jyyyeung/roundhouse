@@ -99,14 +99,17 @@
 ### Task 1: Monorepo scaffold
 
 **Files:**
+
 - Create: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.gitignore`, `packages/game-core/package.json`, `packages/games/yatzy/package.json`, `apps/server/package.json`, `apps/web/package.json`
 
 **Interfaces:**
+
 - Produces: workspace packages `@roundhouse/game-core`, `@roundhouse/game-yatzy`, `@roundhouse/server`, `@roundhouse/web` resolvable via pnpm
 
 - [ ] **Step 1: Create root workspace files**
 
 `pnpm-workspace.yaml`:
+
 ```yaml
 packages:
   - "apps/*"
@@ -115,6 +118,7 @@ packages:
 ```
 
 Root `package.json`:
+
 ```json
 {
   "name": "yatzy",
@@ -131,6 +135,7 @@ Root `package.json`:
 ```
 
 `tsconfig.base.json`:
+
 ```json
 {
   "compilerOptions": {
@@ -149,6 +154,7 @@ Root `package.json`:
 ```
 
 `.gitignore`:
+
 ```
 node_modules
 dist
@@ -163,6 +169,7 @@ apps/web/dev-dist
 Each package gets `package.json` + `tsconfig.json` extending base, `src/index.ts` exporting a placeholder, and vitest script.
 
 `packages/game-core/package.json`:
+
 ```json
 {
   "name": "@roundhouse/game-core",
@@ -207,10 +214,12 @@ git commit -m "chore: scaffold pnpm monorepo workspaces"
 ### Task 2: `game-core` — module interface + protocol
 
 **Files:**
+
 - Create: `packages/game-core/src/module.ts`, `events.ts`, `intents.ts`, `protocol.ts`, `codes.ts`, `index.ts`
 - Test: `packages/game-core/src/codes.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `GameModule` interface (below)
   - `EventEnvelope`, `ClientIntent`, WS `ServerMessage` / `ClientMessage`
@@ -219,6 +228,7 @@ git commit -m "chore: scaffold pnpm monorepo workspaces"
 - [ ] **Step 1: Write failing invite-code test**
 
 `packages/game-core/src/codes.test.ts`:
+
 ```ts
 import { describe, expect, it } from "vitest";
 import { SAFE_ALPHABET, generateInviteCode } from "./codes";
@@ -248,6 +258,7 @@ Expected: FAIL — cannot find module `./codes`.
 - [ ] **Step 3: Implement codes + core types**
 
 `packages/game-core/src/codes.ts`:
+
 ```ts
 export const SAFE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -262,6 +273,7 @@ export function generateInviteCode(length = 6): string {
 ```
 
 `packages/game-core/src/module.ts`:
+
 ```ts
 export type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
 
@@ -298,6 +310,7 @@ export interface GameModule {
 ```
 
 `packages/game-core/src/protocol.ts`:
+
 ```ts
 import type { Json } from "./module";
 
@@ -354,10 +367,12 @@ git commit -m "feat(game-core): add GameModule interface and WS protocol types"
 ### Task 3: Yatzy scoring (pure functions)
 
 **Files:**
+
 - Create: `packages/games/yatzy/src/types.ts`, `categories.ts`, `score.ts`
 - Test: `packages/games/yatzy/src/score.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing from game-core yet (pure scoring)
 - Produces:
   - `Ruleset = "yatzy" | "yahtzee"`
@@ -436,11 +451,13 @@ git commit -m "feat(yatzy): add pure scoring for Yatzy and Yahtzee"
 ### Task 4: Yatzy turn machine (`reduce` + module)
 
 **Files:**
+
 - Create: `packages/games/yatzy/src/reduce.ts`, `module.ts`, `index.ts`
 - Test: `packages/games/yatzy/src/reduce.test.ts`
 - Modify: wire `yatzyModule: GameModule`
 
 **Interfaces:**
+
 - Consumes: `GameModule`, `ReduceContext` from `@roundhouse/game-core`
 - Produces: `yatzyModule` with intents:
   - `{ type: "roll", payload: {} }`
@@ -448,13 +465,14 @@ git commit -m "feat(yatzy): add pure scoring for Yatzy and Yahtzee"
   - `{ type: "score", payload: { category: string } }`
 
 State shape (JSON):
+
 ```ts
 type YatzyState = {
   ruleset: "yatzy" | "yahtzee";
   playerIds: string[];
   currentPlayerIndex: number;
   rollsLeft: number; // 0..3; start turn at 3, must roll before score unless house rule — MVP: must roll at least once (rollsLeft starts 3, after first roll max 2 left)
-  dice: number[];    // length 5, 0 = not yet rolled this turn
+  dice: number[]; // length 5, 0 = not yet rolled this turn
   holds: boolean[];
   sheets: Record<string, Record<string, number | null>>;
   phase: "playing" | "finished";
@@ -496,23 +514,26 @@ git commit -m "feat(yatzy): implement turn reduce machine and GameModule"
 ### Task 5: Database schema + Drizzle
 
 **Files:**
+
 - Create: `apps/server/src/db/schema.ts`, `client.ts`, `drizzle.config.ts`, `apps/server/src/env.ts`
 - Modify: `apps/server/package.json` (drizzle-orm, postgres, drizzle-kit, zod, dotenv)
 
 **Interfaces:**
+
 - Produces tables: `user`, `session`, `account`, `verification` (Better Auth), `game_table`, `table_player`, `game`, `game_event`, `chat_message`
 
 - [ ] **Step 1: Define env schema**
 
 `apps/server/src/env.ts`:
+
 ```ts
 import { z } from "zod";
 
- const envSchema = z.object({
+const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.string().url(), // e.g. http://localhost:3001
-  PUBLIC_WEB_URL: z.string().url(),  // e.g. http://localhost:5173
+  PUBLIC_WEB_URL: z.string().url(), // e.g. http://localhost:5173
   PORT: z.coerce.number().default(3001),
 });
 
@@ -537,11 +558,15 @@ export const gameTable = pgTable("game_table", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
-export const tablePlayer = pgTable("table_player", {
-  tableId: text("table_id").notNull(),
-  userId: text("user_id").notNull(),
-  seatIndex: integer("seat_index").notNull(),
-}, (t) => ({ pk: primaryKey({ columns: [t.tableId, t.userId] }) }));
+export const tablePlayer = pgTable(
+  "table_player",
+  {
+    tableId: text("table_id").notNull(),
+    userId: text("user_id").notNull(),
+    seatIndex: integer("seat_index").notNull(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.tableId, t.userId] }) }),
+);
 
 export const game = pgTable("game", {
   id: text("id").primaryKey(),
@@ -597,11 +622,13 @@ git commit -m "feat(server): add Drizzle schema for tables, games, events, chat"
 ### Task 6: Better Auth (email/password)
 
 **Files:**
+
 - Create: `apps/server/src/auth.ts`
 - Modify: `apps/server/src/index.ts` (mount handler)
 - Create: `apps/web/src/lib/auth-client.ts`
 
 **Interfaces:**
+
 - Produces: `auth` instance; HTTP routes under `/api/auth/*`; session cookie usable from web origin; helper `getSessionFromHeaders(headers)` / cookie for WS upgrade
 
 - [ ] **Step 1: Implement server auth**
@@ -652,10 +679,12 @@ git commit -m "feat(auth): add Better Auth email/password"
 ### Task 7: HTTP table APIs (create / join / start / rematch)
 
 **Files:**
+
 - Create: `apps/server/src/http/tables.ts`, `apps/server/src/modules/registry.ts`, `apps/server/src/room/runtime.ts`
 - Test: `apps/server/src/http/tables.test.ts` (integration with test DB or vitest + pg; if heavy, unit-test runtime helpers with mocked db)
 
 **Interfaces:**
+
 - Consumes: `yatzyModule`, `generateInviteCode`, session user
 - Produces:
   - `POST /api/tables` `{ gameId, config, softSeatCap? }` → `{ tableId, code }`
@@ -708,11 +737,13 @@ git commit -m "feat(server): table create, join, start, and rematch APIs"
 ### Task 8: WebSocket hub + game intents + reconnect
 
 **Files:**
+
 - Create: `apps/server/src/ws/hub.ts`, `handlers.ts`
 - Modify: `apps/server/src/index.ts` (upgrade), `room/runtime.ts`
 - Test: `apps/server/src/ws/handlers.test.ts`
 
 **Interfaces:**
+
 - Consumes: `ClientMessage` / `ServerMessage`, `GameModule.reduce`, session from cookie on upgrade
 - Produces: authenticated WS; `subscribe` → snapshot; `intent` → validate → reduce → persist events → broadcast; idempotent `actionId` cache per table (TTL/map)
 
@@ -729,6 +760,7 @@ Maintain `Map<tableId, Set<WebSocket>>` and `Map<tableId, Set<userId>>` presence
 Reconnect path is just `subscribe` again (full snapshot).
 
 RNG:
+
 ```ts
 function randomInt(maxExclusive: number): number {
   if (maxExclusive <= 0) throw new Error("maxExclusive");
@@ -753,10 +785,12 @@ git commit -m "feat(server): websocket rooms with authoritative game intents"
 ### Task 9: Chat with server snapshots
 
 **Files:**
+
 - Modify: `apps/server/src/ws/handlers.ts`
 - Test: `apps/server/src/ws/chat.test.ts`
 
 **Interfaces:**
+
 - Consumes: `module.getPublicSnapshot(state)`
 - Produces: `chat` ClientMessage → persist `chat_message` + `chat_sent` event → broadcast `ServerMessage` type `chat`
 
@@ -784,10 +818,12 @@ git commit -m "feat(server): realtime chat with server-built game snapshots"
 ### Task 10: Web lobby + auth screens
 
 **Files:**
+
 - Create: `apps/web` Vite React app with Tailwind, router (`login`, `lobby`), API helpers
 - Modify: `apps/web/vite.config.ts` proxy `/api` → server
 
 **Interfaces:**
+
 - Consumes: auth client, table HTTP APIs
 - Produces: working sign-up/sign-in; create table (pick ruleset); join by code; list mine; navigate to `/t/:tableId`
 
@@ -819,10 +855,12 @@ git commit -m "feat(web): auth screens and lobby create/join"
 ### Task 11: Yatzy table UI + chat sheet
 
 **Files:**
+
 - Create: `apps/web/src/games/yatzy/*`, `apps/web/src/games/registry.tsx`, `apps/web/src/routes/table.tsx`, `apps/web/src/lib/ws.ts`
 - Add: Motion animations for roll/hold/score; shadcn Sheet for chat
 
 **Interfaces:**
+
 - Consumes: WS protocol, yatzy public snapshot shape
 - Produces: playable table; only current player enables controls; chat bubbles with dice strip
 
@@ -833,7 +871,7 @@ export function connectTableWs(opts: {
   apiUrl: string; // http → ws
   tableId: string;
   onMessage: (msg: ServerMessage) => void;
-}): { send: (m: ClientMessage) => void; close: () => void }
+}): { send: (m: ClientMessage) => void; close: () => void };
 ```
 
 Open with `credentials: "include"` cookies (browser WS sends cookies same-site). On open, send `subscribe`.
@@ -844,9 +882,9 @@ Load meta via snapshot; if lobby show seat list + Start (host); if active/finish
 
 - [ ] **Step 3: YatzyTable**
 
-- `ScoreSheet` — all players columns; tap category on your turn to score  
-- `DiceTray` — tap die to toggle hold; Roll button; Motion shake on roll  
-- Turn banner + presence dots  
+- `ScoreSheet` — all players columns; tap category on your turn to score
+- `DiceTray` — tap die to toggle hold; Roll button; Motion shake on roll
+- Turn banner + presence dots
 - Chat Sheet — messages + snapshot strip (`dice`/`holds`/`rollsLeft`)
 
 Send intents with unique `actionId` (`crypto.randomUUID()`).
@@ -867,6 +905,7 @@ git commit -m "feat(web): yatzy table play surface and chat snapshots"
 ### Task 12: PWA installability
 
 **Files:**
+
 - Modify: `apps/web/vite.config.ts`, `apps/web/index.html`, `apps/web/public/manifest.webmanifest`, icons
 
 - [ ] **Step 1: Add vite-plugin-pwa**
@@ -881,9 +920,11 @@ VitePWA({
     start_url: "/",
     background_color: "#FFF8E7",
     theme_color: "#E4572E",
-    icons: [/* 192 + 512 png */],
+    icons: [
+      /* 192 + 512 png */
+    ],
   },
-})
+});
 ```
 
 - [ ] **Step 2: Verify**
@@ -902,6 +943,7 @@ git commit -m "feat(web): enable installable PWA manifest and service worker"
 ### Task 13: Docker Compose self-host path
 
 **Files:**
+
 - Create: `docker-compose.yml`, `apps/server/Dockerfile`, `apps/web/Dockerfile` (or nginx serving `web` dist + proxy `/api` and `/ws`), `.env.example`, `README.md` (dev + compose)
 
 - [ ] **Step 1: Compose file**
@@ -911,6 +953,7 @@ Services: `db` (postgres:16), `server`, `web`.
 Env from `.env.example` mirrored.
 
 `.env.example`:
+
 ```
 DATABASE_URL=postgres://yatzy:yatzy@db:5432/yatzy
 BETTER_AUTH_SECRET=change-me-to-a-32+char-secret-value
@@ -954,13 +997,13 @@ Expected: all green.
 
 - [ ] **Step 2: Manual acceptance (from spec success criteria)**
 
-1. Two users on phone-sized viewports sign up  
-2. Create Yatzy table + join via code/link  
-3. Play full live game  
-4. Repeat with Yahtzee ruleset  
-5. Chat message shows dice snapshot  
-6. Rematch  
-7. Add to Home Screen path documented  
+1. Two users on phone-sized viewports sign up
+2. Create Yatzy table + join via code/link
+3. Play full live game
+4. Repeat with Yahtzee ruleset
+5. Chat message shows dice snapshot
+6. Rematch
+7. Add to Home Screen path documented
 8. `docker compose up` works on clean machine with `.env`
 
 - [ ] **Step 3: Commit any fixes; tag optional `mvp-remote-1`
@@ -969,28 +1012,28 @@ Expected: all green.
 
 ## Spec coverage (self-review)
 
-| Spec item | Task(s) |
-|-----------|---------|
-| PWA phone-first | 10–12 |
-| Accounts required / self-hostable auth | 6, 13 |
-| Live remote MVP | 7–11 |
-| Yatzy + Yahtzee configurable | 3–4, 7, 10 |
-| Pluggable game modules | 2, 4, 7 |
-| Chat + server dice snapshot | 9, 11 |
-| Authoritative server + events | 5, 8 |
-| Reconnect snapshot | 8 |
-| Rematch | 7, 11 |
-| Docker Compose self-host | 13 |
-| Invite codes safe alphabet | 2, 7 |
-| Host starts / soft cap 4 | 7 |
-| Spectator/replay/async/crews | **out of scope** (later plans) |
+| Spec item                              | Task(s)                        |
+| -------------------------------------- | ------------------------------ |
+| PWA phone-first                        | 10–12                          |
+| Accounts required / self-hostable auth | 6, 13                          |
+| Live remote MVP                        | 7–11                           |
+| Yatzy + Yahtzee configurable           | 3–4, 7, 10                     |
+| Pluggable game modules                 | 2, 4, 7                        |
+| Chat + server dice snapshot            | 9, 11                          |
+| Authoritative server + events          | 5, 8                           |
+| Reconnect snapshot                     | 8                              |
+| Rematch                                | 7, 11                          |
+| Docker Compose self-host               | 13                             |
+| Invite codes safe alphabet             | 2, 7                           |
+| Host starts / soft cap 4               | 7                              |
+| Spectator/replay/async/crews           | **out of scope** (later plans) |
 
 ## Follow-up plans (not this doc)
 
-1. Social watch (spectator + replay UI on event log)  
-2. Async mode + notifications  
-3. Crews + played-with scoreboards  
-4. Second game module proof + polished self-host docs  
+1. Social watch (spectator + replay UI on event log)
+2. Async mode + notifications
+3. Crews + played-with scoreboards
+4. Second game module proof + polished self-host docs
 
 ---
 

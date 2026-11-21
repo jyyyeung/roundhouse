@@ -35,7 +35,7 @@ export type GameEventPayload = { type: string; payload: Json };
 
 interface GameModule {
   reduce(state: Json, intent: ClientIntent, ctx: ReduceContext): ReduceResult; // produces events
-  applyEvent(state: Json, event: GameEventPayload): Json;                      // folds one event
+  applyEvent(state: Json, event: GameEventPayload): Json; // folds one event
 }
 ```
 
@@ -110,7 +110,7 @@ checkpoint is a cache. Not built now; noted so it is not discovered late.
   every row, gives no per-player projection for spectator, and makes `seq`-based sync and replay two
   different mechanisms. Rejected: it is a snapshot log wearing an event log's clothes.
 - **Re-run `reduce` from recorded intents instead of folding events.** Requires storing every intent
-  and every resolved RNG draw, and re-runs all validation during replay — replay can then *fail*,
+  and every resolved RNG draw, and re-runs all validation during replay — replay can then _fail_,
   which is the wrong property for a read-side feature. Folding events cannot fail.
 - **Keep chat in `game_event`, filter on read.** Rejected: seq pollution is the whole problem;
   filtering consumers preserves the bug.

@@ -4,7 +4,6 @@ import * as persistence from "./persistence";
 import { listChatMessagesForTable, persistChatMessageToDb, toChatWire } from "./persistence";
 
 describe("chat paging", () => {
-
   function row(id: string) {
     return {
       createdAt: new Date("2026-08-02T08:00:00.000Z"),
@@ -29,6 +28,7 @@ describe("chat paging", () => {
           from: () => chain,
           limit: () => chain,
           orderBy: () => chain,
+          // biome-ignore lint/suspicious/noThenProperty: awaitable fake query
           then: (resolve: unknown) => Promise.resolve(rows).then(resolve as never),
           where: () => chain,
         };

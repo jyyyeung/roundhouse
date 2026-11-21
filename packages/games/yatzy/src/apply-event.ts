@@ -16,11 +16,15 @@ function payloadOf(event: ReplayEvent): Record<string, unknown> {
 }
 
 function isDice(value: unknown): value is number[] {
-  return Array.isArray(value) && value.length === 5 && value.every((die) => typeof die === "number");
+  return (
+    Array.isArray(value) && value.length === 5 && value.every((die) => typeof die === "number")
+  );
 }
 
 function isHolds(value: unknown): value is boolean[] {
-  return Array.isArray(value) && value.length === 5 && value.every((hold) => typeof hold === "boolean");
+  return (
+    Array.isArray(value) && value.length === 5 && value.every((hold) => typeof hold === "boolean")
+  );
 }
 
 /**

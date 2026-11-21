@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
-import type { YatzyView } from "@roundhouse/game-yatzy";
 import type { Json, TableMeta } from "@roundhouse/game-core";
+import type { YatzyView } from "@roundhouse/game-yatzy";
+import { motion } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ChatComposer } from "./ChatComposer";
 import { ChatPanel } from "./ChatPanel";
 import { DiceTray } from "./DiceTray";
+import { type TableChatMessage, totalScore } from "./model";
 import { ScoreSheet } from "./ScoreSheet";
-import { totalScore, type TableChatMessage } from "./model";
 
 type YatzyTableProps = {
   meta: TableMeta;
@@ -85,9 +85,13 @@ export function YatzyTable(props: YatzyTableProps) {
             <section className="rounded-[2rem] bg-[linear-gradient(135deg,var(--color-coral),var(--color-mango))] p-4 text-white shadow-[0_20px_50px_rgba(238,108,77,0.32)] md:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/80">{props.state.ruleset}</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/80">
+                    {props.state.ruleset}
+                  </p>
                   <div className="mt-2 flex items-center gap-2 md:mt-3">
-                    <h1 className="font-display text-2xl leading-none md:text-4xl">{statusHeadline}</h1>
+                    <h1 className="font-display text-2xl leading-none md:text-4xl">
+                      {statusHeadline}
+                    </h1>
                     <button
                       type="button"
                       className="rounded-xl bg-white/20 px-2 py-1 text-xs font-semibold text-white backdrop-blur md:hidden"
@@ -108,7 +112,10 @@ export function YatzyTable(props: YatzyTableProps) {
                 </button>
               </div>
 
-              <div data-testid="status-details" className={[statusExpanded ? "block" : "hidden", "md:block"].join(" ")}>
+              <div
+                data-testid="status-details"
+                className={[statusExpanded ? "block" : "hidden", "md:block"].join(" ")}
+              >
                 <p className="mt-3 text-sm text-white/85">{statusHelper}</p>
                 <div className="mt-4 flex flex-wrap gap-3 md:mt-5">
                   {props.meta.seatUserIds.map((playerId) => {
@@ -123,7 +130,9 @@ export function YatzyTable(props: YatzyTableProps) {
                           active ? "bg-white text-[var(--color-ink)]" : "bg-white/15 text-white",
                         ].join(" ")}
                       >
-                        <span className={online ? "text-[var(--color-teal)]" : "text-white/40"}>●</span>{" "}
+                        <span className={online ? "text-[var(--color-teal)]" : "text-white/40"}>
+                          ●
+                        </span>{" "}
                         {playerLabels[playerId] ?? playerId}
                       </div>
                     );
@@ -136,12 +145,20 @@ export function YatzyTable(props: YatzyTableProps) {
               dice={props.state.dice}
               holds={props.state.holds}
               rollsLeft={props.state.rollsLeft}
-              canRoll={isCurrentPlayer && props.state.phase !== "finished" && props.state.rollsLeft > 0}
-              canToggleHolds={isCurrentPlayer && props.state.phase !== "finished" && !props.state.dice.every((die) => die === 0)}
+              canRoll={
+                isCurrentPlayer && props.state.phase !== "finished" && props.state.rollsLeft > 0
+              }
+              canToggleHolds={
+                isCurrentPlayer &&
+                props.state.phase !== "finished" &&
+                !props.state.dice.every((die) => die === 0)
+              }
               rollVersion={props.rollVersion}
               onRoll={() => props.onIntent("roll", {})}
               onToggleHold={(index) => {
-                const nextHolds = props.state.holds.map((held, heldIndex) => (heldIndex === index ? !held : held));
+                const nextHolds = props.state.holds.map((held, heldIndex) =>
+                  heldIndex === index ? !held : held,
+                );
                 props.onIntent("set_holds", { holds: nextHolds });
               }}
             />
@@ -150,7 +167,9 @@ export function YatzyTable(props: YatzyTableProps) {
               data-testid="standings"
               className="hidden rounded-[1.5rem] border border-white/70 bg-white/85 p-4 shadow-[0_20px_60px_rgba(26,26,26,0.1)] backdrop-blur md:block"
             >
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">Standings</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-coral)]">
+                Standings
+              </p>
               <div className="mt-3 grid gap-2">
                 {props.state.playerIds.map((playerId) => (
                   <motion.div
@@ -158,8 +177,12 @@ export function YatzyTable(props: YatzyTableProps) {
                     layout
                     className="flex items-center justify-between rounded-2xl bg-[var(--color-cream)] px-3 py-2"
                   >
-                    <span className="font-semibold text-[var(--color-ink)]">{playerLabels[playerId] ?? playerId}</span>
-                    <span className="font-display text-xl text-[var(--color-ink)]">{totalScore(props.state, playerId)}</span>
+                    <span className="font-semibold text-[var(--color-ink)]">
+                      {playerLabels[playerId] ?? playerId}
+                    </span>
+                    <span className="font-display text-xl text-[var(--color-ink)]">
+                      {totalScore(props.state, playerId)}
+                    </span>
                   </motion.div>
                 ))}
               </div>
@@ -200,7 +223,13 @@ export function YatzyTable(props: YatzyTableProps) {
           data-testid="chat-float-composer"
           className="fixed inset-x-0 bottom-0 z-20 border-t border-white/60 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(26,26,26,0.12)] backdrop-blur md:hidden"
         >
-          <ChatComposer variant="float" draft={draft} onDraftChange={setDraft} canSend onSend={handleSendChat} />
+          <ChatComposer
+            variant="float"
+            draft={draft}
+            onDraftChange={setDraft}
+            canSend
+            onSend={handleSendChat}
+          />
         </div>
       ) : null}
     </>

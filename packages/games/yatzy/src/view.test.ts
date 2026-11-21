@@ -1,8 +1,7 @@
 import type { RawGameState, ViewerView } from "@roundhouse/game-core";
 import { describe, expect, it } from "vitest";
-
-import type { YatzyState } from "./reduce";
 import { yatzyModule } from "./module";
+import type { YatzyState } from "./reduce";
 import { projectYatzyView } from "./view";
 
 const playerIds = ["p1", "p2", "p3"];
@@ -80,9 +79,7 @@ describe("projectYatzyView", () => {
 
   it("resolves currentPlayerId from the turn index", () => {
     expect(projectYatzyView(raw({ currentPlayerIndex: 2 }), spectator).currentPlayerId).toBe("p3");
-    expect(
-      projectYatzyView(raw({ currentPlayerIndex: 9 }), spectator).currentPlayerId,
-    ).toBeNull();
+    expect(projectYatzyView(raw({ currentPlayerIndex: 9 }), spectator).currentPlayerId).toBeNull();
   });
 
   it("carries the finished phase and winners through", () => {

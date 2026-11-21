@@ -73,9 +73,21 @@ test-integration:
 typecheck:
     pnpm typecheck
 
+# Lint + format + import order, one tool (Biome). CI runs this exact command.
+lint:
+    pnpm lint
+
+format:
+    pnpm format
+
 # Invariant I1: stored module state is projected in exactly one place (ADR 0001)
 check-projection:
     pnpm check:projection
+
+# Build both images and run the packaged stack on throwaway ports (:3101/:8180),
+# then tear it down. The only check that exercises the Dockerfiles and nginx.
+compose-smoke:
+    ./scripts/compose-smoke.sh
 
 # End-to-end smoke test against a running server. Override SMOKE_BASE_URL /
 # SMOKE_WEB_ORIGIN for a Compose stack (web on :8080).
