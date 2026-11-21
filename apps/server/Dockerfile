@@ -20,9 +20,9 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/server/package.json apps/server/package.json
 COPY apps/web/package.json apps/web/package.json
-COPY packages/game-core/package.json packages/game-core/package.json
-COPY packages/game-testkit/package.json packages/game-testkit/package.json
-COPY packages/games/yatzy/package.json packages/games/yatzy/package.json
+# The whole workspace, not a list: a new game package must not need a Dockerfile
+# edit, and the layer only carries sources this image will discard anyway.
+COPY packages packages
 
 # `...` pulls in the workspace dependencies of the server, and `--prod` drops
 # test-only packages, so the runtime image carries no test tooling.
@@ -45,8 +45,6 @@ COPY --from=deps /app/pnpm-workspace.yaml pnpm-workspace.yaml
 COPY --from=deps /app/tsconfig.base.json tsconfig.base.json
 
 COPY apps/server apps/server
-COPY packages/game-core packages/game-core
-COPY packages/games/yatzy packages/games/yatzy
 
 EXPOSE 3001
 

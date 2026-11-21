@@ -1,4 +1,5 @@
 import type { GameCatalogueEntry, GameModule } from "@roundhouse/game-core";
+import { duelModule } from "@roundhouse/game-duel";
 import { yatzyModule } from "@roundhouse/game-yatzy";
 
 /**
@@ -7,6 +8,7 @@ import { yatzyModule } from "@roundhouse/game-yatzy";
  * browser's view all follow from the module itself.
  */
 const modules: Record<string, GameModule> = {
+  [duelModule.id]: duelModule,
   [yatzyModule.id]: yatzyModule,
 };
 

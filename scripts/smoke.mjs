@@ -137,6 +137,18 @@ async function main() {
     `${catalogueResponse.status} ${JSON.stringify(catalogue).slice(0, 160)}`,
   );
 
+  // A second title proves "adding a game" is data, not a code path (ADR 0004):
+  // if this ever needs a server edit to appear, the catalogue is not derived.
+  const duel = catalogue.games?.find?.((entry) => entry.id === "duel");
+  check(
+    "GET /api/games (second title)",
+    Boolean(duel) &&
+      duel.playerCount?.min === 2 &&
+      duel.playerCount?.max === 2 &&
+      duel.defaultConfig?.rounds === 3,
+    JSON.stringify(duel ?? null).slice(0, 160),
+  );
+
   let { body, response } = await jsonRequest("/api/auth/sign-up/email", {
     body: { email: emailA, name: "smoke-a", password },
   });

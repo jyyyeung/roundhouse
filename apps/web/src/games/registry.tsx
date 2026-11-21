@@ -1,7 +1,9 @@
 import type { Json, TableMeta } from "@roundhouse/game-core";
+import type { DuelView } from "@roundhouse/game-duel";
 import type { YatzyView } from "@roundhouse/game-yatzy";
 import type { ComponentType } from "react";
 import type { TableChatMessage } from "../lib/chat";
+import { DuelTable } from "./duel/DuelTable";
 import { YatzyConfigControls, yatzyTableTitle } from "./yatzy/YatzyConfigControls";
 import { YatzyTable } from "./yatzy/YatzyTable";
 
@@ -50,7 +52,26 @@ function YatzyViewForTable(props: GameViewProps) {
   return <YatzyTable {...props} state={props.state as YatzyView} />;
 }
 
+/**
+ * Duel's view takes only the props it uses: it has no chat panel and nothing to
+ * configure, so `GameViewProps` is narrowed by the component's own signature.
+ */
+function DuelViewForTable(props: GameViewProps) {
+  return (
+    <DuelTable
+      state={props.state as DuelView}
+      meta={props.meta}
+      currentUserId={props.currentUserId}
+      onlineUserIds={props.onlineUserIds}
+      onIntent={props.onIntent}
+    />
+  );
+}
+
 const gameUi: Record<string, GameUi> = {
+  duel: {
+    View: DuelViewForTable,
+  },
   yatzy: {
     ConfigControls: YatzyConfigControls,
     View: YatzyViewForTable,

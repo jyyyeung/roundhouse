@@ -128,12 +128,14 @@ the tab.
   whatever the catalogue offers and asks the game for its own config controls; the table route no
   longer reads dice. Decided in [ADR 0004](adr/0004-games-are-data.md); a sixth guard rule
   (`no-game-branch`) fails the build when platform code names a game.
-- **M5-1** Second real title with hidden information —
-  [#40](https://github.com/jyyyeung/roundhouse/issues/40) — the only way to know the module registry
-  and client view registry actually work. One contract decision must land with it, recorded in
-  [`m0-7-module-contract-findings.md`](m0-7-module-contract-findings.md): project event payloads
-  per viewer (F2 — `apps/server/src/ws/hub.ts:389` and `:283` currently send raw payloads to every
-  seat).
+- **M5-1** ✅ Second real title with hidden information —
+  [#40](https://github.com/jyyyeung/roundhouse/issues/40). "Duel": two seats, three cards, both pick
+  in secret, the round reveals. Added as a package plus two registry lines, which is the proof M5-0
+  was for. The contract decision came out the other way from the expected F2 fix: instead of
+  projecting event payloads per viewer, an event is defined as a public fact and a pick enters the
+  log only when it is revealed ([ADR 0005](adr/0005-secrets-enter-the-log-at-the-reveal.md)), so the
+  hub is untouched. F2 stays open, narrowed to games that must log a private input before it is
+  public.
 - **M5-2** ✅ Authoring guide: [`adding-a-game.md`](adding-a-game.md) — the module contract, the two
   registry entries, the client view props and the conformance suite, with a checklist.
 
@@ -144,9 +146,10 @@ seasons/custom crew metrics, no unauthenticated guests, no second title _before_
 
 ## ADRs
 
-| ADR                                               | Decision                                                                                        |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [0001](adr/0001-projections-and-wire-contract.md) | Per-viewer projections, one server-side choke point, schemas as the single source of wire types |
-| [0002](adr/0002-event-log-as-replay-source.md)    | Events are replay input via `applyEvent`; game log is game-only                                 |
-| [0003](adr/0003-client-sync-model.md)             | Seq-versioned incremental sync with bounded resync                                              |
-| [0004](adr/0004-games-are-data.md)                | Games declare `playerCount`/config and register in two maps; platform code names no game        |
+| ADR                                                     | Decision                                                                                        |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [0001](adr/0001-projections-and-wire-contract.md)       | Per-viewer projections, one server-side choke point, schemas as the single source of wire types |
+| [0002](adr/0002-event-log-as-replay-source.md)          | Events are replay input via `applyEvent`; game log is game-only                                 |
+| [0003](adr/0003-client-sync-model.md)                   | Seq-versioned incremental sync with bounded resync                                              |
+| [0005](adr/0005-secrets-enter-the-log-at-the-reveal.md) | A secret is state until it is revealed; only public facts enter the event log                   |
+| [0004](adr/0004-games-are-data.md)                      | Games declare `playerCount`/config and register in two maps; platform code names no game        |

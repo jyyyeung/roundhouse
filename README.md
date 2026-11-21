@@ -1,6 +1,8 @@
 # Roundhouse
 
-Remote table games for friends — live rooms, chat with game context, pluggable modules (Yatzy/Yahtzee first).
+Remote table games for friends — live rooms, chat with game context, pluggable game modules. Two
+titles: **Yatzy/Yahtzee** (dice, turn-based) and **Duel** (simultaneous secret picks, hidden
+information).
 
 [![ci](https://github.com/jyyyeung/roundhouse/actions/workflows/ci.yml/badge.svg)](https://github.com/jyyyeung/roundhouse/actions/workflows/ci.yml)
 
@@ -45,7 +47,9 @@ To stop the stack, run `docker compose down`. Add `-v` if you also want to remov
 `playerCount`, `defaultConfig` and `configSchema` plus a `GameModule`, one line in
 `apps/server/src/modules/registry.ts`, one entry in `apps/web/src/games/registry.tsx`. The lobby, the
 `/api/games` catalogue and the table route pick it up with no further edits — see
-[ADR 0004](docs/adr/0004-games-are-data.md) for why the platform is not allowed to branch per game.
+[ADR 0004](docs/adr/0004-games-are-data.md) for why the platform is not allowed to branch per game,
+and [ADR 0005](docs/adr/0005-secrets-enter-the-log-at-the-reveal.md) for how a game keeps a secret
+off the wire (Duel is the worked example).
 
 ## Operations
 
