@@ -20,7 +20,7 @@ COPY packages/games/yatzy packages/games/yatzy
 
 RUN pnpm --filter @roundhouse/web build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.29-alpine
 
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
