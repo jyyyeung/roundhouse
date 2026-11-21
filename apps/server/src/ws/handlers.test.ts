@@ -233,3 +233,42 @@ describe("ws handlers", () => {
     expect(calls).toBe(2);
   });
 });
+
+describe("ws handlers action reservations", () => {
+  it("clears the reservation on any failure, not just illegal_action", async () => {
+    const runtimeBase = makeRuntime();
+    let calls = 0;
+    const runtime: WsRuntime = {
+      ...runtimeBase,
+      async applyGameIntent(input) {
+        calls++;
+        return await runtimeBase.applyGameIntent(input);
+      },
+    };
+
+    const actionIds = new Set<string>();
+    const handlers = createWsHandlers({
+      runtime,
+      isDuplicateAction: (_tableId, actionId) => actionIds.has(actionId),
+      rememberAction: (_tableId, actionId) => actionIds.add(actionId),
+      forgetAction: (_tableId, actionId) => actionIds.delete(actionId),
+      publishToTable: () => {},
+    });
+
+    const message = {
+      actionId: "action-missing-table",
+      intentType: "roll",
+      payload: {} satisfies Json,
+      tableId: "table-other",
+      type: "intent",
+      v: 1,
+    };
+
+    await handlers.onMessage({ send() {}, userId: "user-a" }, message);
+    // A transient failure must not wedge the action for ACTION_TTL_MS: the retry applies.
+    await handlers.onMessage({ send() {}, userId: "user-a" }, message);
+
+    expect(calls).toBe(2);
+    expect(actionIds.size).toBe(0);
+  });
+});

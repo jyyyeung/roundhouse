@@ -357,6 +357,10 @@ export function createRoomRuntime(db: Database): TablesRuntime {
 
     async applyGameIntent({ tableId, userId, intent, randomInt = defaultRandomInt, now = () => new Date() }) {
       return db.transaction(async (tx) => {
+        // Serialise intents per table: reduce() reads seq and state, then writes both.
+        // Without this lock two concurrent intents compute from the same seq and
+        // collide on game_event_game_row_id_seq_idx (or lose the state update).
+        await lockTableById(tx, tableId);
         const table = await loadTableById(tx, tableId);
         if (!table) {
           return { ok: false, code: "table_missing", message: "table_missing", seq: 0 } satisfies ApplyGameIntentResult;

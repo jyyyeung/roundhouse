@@ -55,12 +55,9 @@ export function createWsHandlers(deps: {
         });
 
         if (!result.ok) {
-          // If the apply failed with a non-idempotent error (illegal_action),
-          // clear the reservation so retries can proceed.
-          if (result.code === "illegal_action") {
-            // use forgetAction provided by the hub to remove reservation
-            forgetAction(message.tableId, message.actionId);
-          }
+          // Release the reservation on every failure path so a client retry is not
+          // silently dropped for ACTION_TTL_MS. Successful applies keep it (dedupe).
+          forgetAction(message.tableId, message.actionId);
 
           connection.send(
             errorMessage({
