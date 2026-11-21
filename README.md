@@ -50,4 +50,13 @@ Every push to `main` and every pull request runs four workflows:
 | `compose-smoke.yml` | the Docker images and nginx actually serve a working stack               |
 | `contracts.yml`     | the projection guard (invariant I1)                                      |
 
-`main` is protected: the checks above are required, changes land through a pull request, and force-pushes are disabled.
+`main` is protected: the five checks above are required, changes land through a pull
+request, and force-pushes are disabled.
+
+```sh
+git switch -c my-change
+git commit -am "feat: something"
+git push -u origin my-change
+gh pr create --fill
+gh pr merge --squash --delete-branch   # once the checks are green
+```
