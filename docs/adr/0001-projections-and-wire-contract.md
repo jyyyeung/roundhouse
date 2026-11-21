@@ -1,0 +1,107 @@
+# ADR 0001 — Per-viewer projections and a single wire contract
+
+- **Status:** Accepted
+- **Date:** 2026-11-21
+- **Invariants:** I1, I6
+- **Roadmap:** M0-1, M0-2
+
+## Context
+
+`GameModule` declares `getPublicSnapshot(state)` (`packages/game-core/src/module.ts:30`) and the
+name suggests a boundary, but no production code calls it — only
+`packages/games/yatzy/src/reduce.test.ts:307` does. The server ships the module's raw internal
+state: `apps/server/src/room/runtime.ts:354` returns `currentGame.state` verbatim, the hub puts it
+in a `snapshot` frame, and the client reads the internal shape directly
+(`apps/web/src/routes/table.tsx:202-203` destructures `state.dice`).
+
+Two problems follow.
+
+1. **The signature is wrong for the product.** `getPublicSnapshot(state)` has no viewer, so it
+   cannot express hidden information. Liar's Dice, Coup, secret bidding, or any card game cannot be
+   implemented without changing the interface — and a projection that ignores the viewer makes
+   spectator mode a second, parallel mechanism instead of the same one.
+2. **Types are declared twice.** `ClientMessage`/`ServerMessage` are hand-written TS unions
+   (`packages/game-core/src/protocol.ts`), parsed by `JSON.parse(...) as ClientMessage`
+   (`apps/server/src/ws/hub.ts:308`) and delivered to `onMessage(connection, message: any)`
+   (`apps/server/src/ws/handlers.ts:41`). A hand-written union plus an unchecked cast is a
+   declaration, not an enforcement.
+
+## Decision
+
+**Projections are per-viewer, and they are the only thing that crosses the wire.**
+
+```ts
+export type ViewerView =
+  | { kind: "player"; userId: string; seatIndex: number }
+  | { kind: "spectator"; userId: string };
+
+export interface GameModule {
+  id: string;
+  displayName: string;
+  intents: readonly string[];              // allowlist enforced at the wire boundary
+  seatLimits: { min: number; max: number };
+  createInitialState(config: Json, playerIds: string[]): Json;
+  reduce(state: Json, intent: ClientIntent, ctx: ReduceContext): ReduceResult;
+  applyEvent(state: Json, event: GameEventPayload): Json;          // ADR 0002
+  projectStateFor(state: Json, viewer: ViewerView): Json;          // replaces getPublicSnapshot
+  isFinished(state: Json): boolean;
+}
+```
+
+**One choke point on the server.** Every outbound state payload is produced by
+`projectSnapshot(module, state, viewer)` in `apps/server/src/room/` — snapshot frames, `applied`
+frames (ADR 0003), and replay frames all call it. Nothing else serialises module state. This is
+greppable and reviewable: no `state` field may be built outside that function.
+
+**Schemas are the single source of wire types.** `packages/game-core/src/wire.ts` defines Zod
+schemas for every client and server message; `ClientMessage`/`ServerMessage` become `z.infer`
+aliases. The client parses the same schemas it consumes, so a server-side rename breaks the build
+in the client instead of at runtime in a browser tab.
+
+**Intent allowlist.** `handlers.onMessage` rejects an `intentType` not in the active module's
+`intents` before `reduce` is called, so an unknown intent is a protocol error rather than
+`fail("unknown_intent")` from inside a game module.
+
+### What M0-2 shipped (implementation notes)
+
+- `ViewerView`, `projectStateFor`, and the branded `RawGameState` are in
+  `packages/game-core/src/module.ts`. The brand is the point: unprojected state is not assignable to
+  `Json`, so it cannot be dropped into a `state` field by mistake.
+- `apps/server/src/room/projection.ts` holds `viewerForUser`, `projectSnapshot`, and the single
+  `rawGameState` cast from the `jsonb` column.
+- `getTableSnapshot` takes `{ tableId, asUserId }` and returns state already projected for that
+  viewer; the hub's `publishSnapshot` projects once per connected socket. Chat snapshots are stored
+  projected for no viewer, so every reader sees the same board rather than the author's view.
+- `intents`, `seatLimits`, and `applyEvent` land with M0-1 and M0-3; the yatzy module keeps its
+  current `reduce` signature until M0-3 changes the event payloads.
+
+## Consequences
+
+**Positive**
+
+- Hidden-information games become expressible without touching rooms, transport, or persistence.
+- Spectator mode (M2-1) is the same function with a different `viewer`, not a second code path.
+- The client's coupling to module internals ends with `projectStateFor` — its shape becomes the
+  contract, and `packages/game-testkit` can test it (M0-7).
+- Zod at the boundary removes the only `any` that reaches business logic and makes the schema fuzz
+  target in M0-6 meaningful.
+
+**Negative / costs**
+
+- Every module must now think about visibility explicitly. For fully-public games (Yatzy) the
+  projection is nearly identity, which is a trivial implementation but an extra hop per broadcast.
+- Projection runs per send rather than per state change. Cheapest correct version is per-request;
+  if it ever shows in profiles, memoise on `(state, seq, viewer.kind)` — do not pre-project into
+  storage.
+- Hard cutover of `v: 1` → absent users. There is exactly one deployment and no published client,
+  so no dual-version support is worth writing.
+
+## Alternatives considered
+
+- **Keep `getPublicSnapshot`, add `getSpectatorSnapshot`.** Rejected: two parallel projections drift,
+  and hidden information still has no per-player form.
+- **Filter fields with a denylist on the server.** Rejected: leak-by-default. Projections must be
+  allowlist-by-construction.
+- **Generate wire types from the server implementation (`ts-rest`, tRPC).** Rejected as heavier than
+  needed: the protocol is a handful of hand-authored messages over a raw WebSocket, and Zod already
+  gives runtime validation plus inference with zero framework.
