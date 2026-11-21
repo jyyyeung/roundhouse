@@ -49,6 +49,18 @@ export const chatWireSchema = z.object({
   userId: z.string(),
 });
 
+/**
+ * One game the server can host. The lobby renders this list instead of knowing
+ * which games exist, so adding a module never edits the web app.
+ */
+export const gameCatalogueEntrySchema = z.object({
+  defaultConfig: jsonSchema,
+  displayName: z.string(),
+  id: z.string(),
+  playerCount: z.object({ max: z.number().int(), min: z.number().int() }),
+});
+
+export const gameCatalogueSchema = z.array(gameCatalogueEntrySchema);
 export const eventEnvelopeSchema: z.ZodType<EventEnvelope> = z.object({
   actorId: z.string().nullable(),
   createdAt: z.string(),
@@ -62,6 +74,7 @@ export const eventEnvelopeSchema: z.ZodType<EventEnvelope> = z.object({
 
 export type TableMeta = z.infer<typeof tableMetaSchema>;
 export type ChatWire = z.infer<typeof chatWireSchema>;
+export type GameCatalogueEntry = z.infer<typeof gameCatalogueEntrySchema>;
 
 /** Protocol revision. A v1 client is refused by the parser, not tolerated. */
 export const PROTOCOL_VERSION = 2 as const;

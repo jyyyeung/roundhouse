@@ -2,7 +2,7 @@ import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it } from "vitest";
 
 import { createRoomRuntime, SYNC_REPLAY_LIMIT } from "./runtime";
-import { createFakeDb } from "./test-support/fake-db";
+import { createFakeDb, type FakeDbSeed } from "./test-support/fake-db";
 
 const tableId = "table-1";
 const playerIds = ["user-a", "user-b"];
@@ -37,7 +37,7 @@ function makeSeed() {
   };
 }
 
-function makeRuntime(seed = makeSeed()) {
+function makeRuntime(seed: FakeDbSeed = makeSeed()) {
   const fake = createFakeDb(seed);
   return { ...fake, runtime: createRoomRuntime(fake.db) };
 }
@@ -289,5 +289,122 @@ describe("room runtime per-viewer projection", () => {
     const view = snapshot?.state as Record<string, unknown>;
     expect(view.you).toBeNull();
     expect(view.currentPlayerId).toBe("user-a");
+  });
+});
+
+describe("room runtime seat and config enforcement", () => {
+  function createdTable(calls: { op: string; table?: string; row?: Record<string, unknown> }[]) {
+    return calls.find((call) => call.op === "insert" && call.table === "game_table")?.row;
+  }
+
+  it("defaults the seat cap to the module's own maximum", async () => {
+    // yatzy seats 2-6, so an untouched table may fill to six. The old default of
+    // four was a table-layer guess at a game-layer fact.
+    const { runtime, calls } = makeRuntime();
+
+    await runtime.createTable({
+      config: { ruleset: "yatzy" },
+      gameId: "yatzy",
+      userId: "user-a",
+    });
+
+    expect(createdTable(calls)).toMatchObject({ softSeatCap: 6, gameId: "yatzy" });
+  });
+
+  it("refuses a seat cap the module cannot seat", async () => {
+    const { runtime, calls } = makeRuntime();
+
+    await expect(
+      runtime.createTable({
+        config: { ruleset: "yatzy" },
+        gameId: "yatzy",
+        softSeatCap: 9,
+        userId: "user-a",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_seat_cap",
+      message: "yatzy seats 2-6 players, not 9",
+    });
+    expect(createdTable(calls)).toBeUndefined();
+  });
+
+  it("refuses a config the module's schema rejects", async () => {
+    const { runtime, calls } = makeRuntime();
+
+    await expect(
+      runtime.createTable({
+        config: { ruleset: "poker" },
+        gameId: "yatzy",
+        userId: "user-a",
+      }),
+    ).rejects.toMatchObject({ code: "invalid_config" });
+    expect(createdTable(calls)).toBeUndefined();
+  });
+
+  it("stores the config in the shape the module normalised, not the caller's", async () => {
+    const { runtime, calls } = makeRuntime();
+
+    // zod strips keys the module never declared, so a stray field cannot ride
+    // into the row and surprise the module later.
+    await runtime.createTable({
+      config: { ruleset: "yahtzee", surprise: true },
+      gameId: "yatzy",
+      userId: "user-a",
+    });
+
+    expect(createdTable(calls)).toMatchObject({ config: { ruleset: "yahtzee" } });
+  });
+
+  /** A table still in the lobby: `startTable` returns early for an active game. */
+  function lobbyWithSeats(seatCount: number) {
+    const seed = makeSeed();
+    return {
+      ...seed,
+      game: null,
+      seats: Array.from({ length: seatCount }, (_unused, seatIndex) => ({
+        seatIndex,
+        tableId,
+        userId: seatIndex === 0 ? "user-a" : `user-${seatIndex}`,
+      })),
+      table: { ...seed.table, softSeatCap: 6, status: "lobby" },
+    };
+  }
+
+  it("refuses to start with fewer players than the module needs", async () => {
+    const { runtime } = makeRuntime(lobbyWithSeats(1));
+
+    await expect(runtime.startTable({ tableId, userId: "user-a" })).rejects.toMatchObject({
+      code: "not_enough_players",
+    });
+  });
+
+  it("refuses to start with more players than the module can seat", async () => {
+    // Seven seats cannot exist through `joinTable` (the cap is six), but a
+    // seat-cap change or a direct row could produce one, and the module is the
+    // authority on what it can run.
+    const { runtime } = makeRuntime(lobbyWithSeats(7));
+
+    await expect(runtime.startTable({ tableId, userId: "user-a" })).rejects.toMatchObject({
+      code: "too_many_players",
+    });
+  });
+});
+
+describe("room runtime lobby list", () => {
+  it("summarises a table without shipping its stored game state", async () => {
+    const { runtime } = makeRuntime();
+
+    const [row] = await runtime.getMine({ userId: "user-a" });
+
+    // The lobby needs membership and progress; it must never receive the board.
+    // `getMine` used to hand back the whole `currentGame` row, jsonb state
+    // included, which per-viewer projection exists to prevent.
+    expect(row).toBeDefined();
+    expect(row).not.toHaveProperty("currentGame");
+    expect(Object.keys(row ?? {})).not.toContain("state");
+    expect(JSON.stringify(row)).not.toContain("sheets");
+    expect(row?.seatUserIds).toEqual(playerIds);
+    expect(row?.seats).toHaveLength(2);
+    expect(row?.status).toBe("active");
   });
 });

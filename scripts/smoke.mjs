@@ -122,6 +122,21 @@ async function main() {
     `${ready.status} ${JSON.stringify(readyBody).slice(0, 160)}`,
   );
 
+  // The lobby is a client of this catalogue: it offers exactly what the server
+  // says it can host, so an empty or shapeless catalogue breaks the first screen.
+  const catalogueResponse = await fetch(`${baseUrl}/api/games`);
+  const catalogue = await catalogueResponse.json().catch(() => ({}));
+  const yatzy = catalogue.games?.find?.((entry) => entry.id === "yatzy");
+  check(
+    "GET /api/games",
+    catalogueResponse.ok &&
+      Boolean(yatzy) &&
+      yatzy.playerCount?.min === 2 &&
+      yatzy.playerCount?.max === 6 &&
+      yatzy.defaultConfig?.ruleset === "yatzy",
+    `${catalogueResponse.status} ${JSON.stringify(catalogue).slice(0, 160)}`,
+  );
+
   let { body, response } = await jsonRequest("/api/auth/sign-up/email", {
     body: { email: emailA, name: "smoke-a", password },
   });
@@ -157,8 +172,10 @@ async function main() {
     `status ${response.status}`,
   );
 
+  // No config: the module's own `defaultConfig` must fill it in, which is what
+  // keeps a new game from needing a branch in the create route.
   ({ body, response } = await jsonRequest("/api/tables", {
-    body: { config: { ruleset: "yatzy" }, gameId: "yatzy" },
+    body: { gameId: "yatzy" },
     cookie: cookieA,
   }));
   let tableId;

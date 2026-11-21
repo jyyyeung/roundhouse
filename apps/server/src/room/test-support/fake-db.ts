@@ -5,6 +5,8 @@ export type FakeDbCall = {
   op: "select" | "insert" | "update" | "execute";
   table?: string;
   sql?: string;
+  /** The row handed to `insert().values()`, so tests can assert what was written. */
+  row?: Record<string, unknown>;
 };
 
 export type FakeDbSeed = {
@@ -97,9 +99,9 @@ export function createFakeDb(seed: FakeDbSeed) {
       };
     },
     insert(table: unknown) {
-      calls.push({ op: "insert", table: tableName(table) });
       return {
-        values() {
+        values(row: Record<string, unknown>) {
+          calls.push({ op: "insert", table: tableName(table), row });
           return Promise.resolve(undefined);
         },
       };

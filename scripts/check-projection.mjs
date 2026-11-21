@@ -19,6 +19,13 @@ const CODE_FILE = /\.(ts|tsx|mts|cts|js|mjs)$/;
 const TEST_FILE = /\.(test|spec)\.(ts|tsx|mts|cts|js|mjs)$/;
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "coverage", ".git", ".pi", ".turbo"]);
 
+// Every game the server ships, read from disk so the guard keeps working when a
+// second title lands. Naming one of these in platform code means the platform
+// still has a branch per game.
+const GAME_IDS = readdirSync(join(repoRoot, "packages/games")).filter((entry) =>
+  statSync(join(repoRoot, "packages/games", entry)).isDirectory(),
+);
+
 const rules = [
   {
     allow: [SEAM],
@@ -56,6 +63,16 @@ const rules = [
       "the web app may only name the public view type (e.g. YatzyView). Naming stored state, " +
       "a GameModule or the projection function means a hidden field could reach the client.",
     pattern: /\b(RawGameState|YatzyState|GameModule|projectStateFor|getPublicSnapshot)\b/,
+  },
+  {
+    // Game folders own their own id; anywhere else it is a branch in disguise.
+    allowPrefixes: ["apps/server/src/modules/", "apps/web/src/games/"],
+    dirs: ["apps/server/src", "apps/web/src"],
+    id: "no-game-branch",
+    message:
+      "platform code may not name a specific game. Put the game in its module (packages/games/*) " +
+      "and reach it through a registry entry, so adding a game needs no change here.",
+    pattern: new RegExp(`["'\`](${GAME_IDS.join("|")})["'\`]`),
   },
   {
     allow: [],
@@ -96,7 +113,8 @@ for (const rule of rules) {
 
     for (const file of files) {
       const path = toRepoPath(file);
-      if (rule.allow.includes(path)) continue;
+      if (rule.allow?.includes(path)) continue;
+      if (rule.allowPrefixes?.some((prefix) => path.startsWith(prefix))) continue;
       if (!rule.allFiles && TEST_FILE.test(path)) continue;
 
       filesChecked += 1;

@@ -1,10 +1,10 @@
-export type Ruleset = "yatzy" | "yahtzee";
+import type { GameCatalogueEntry, Json } from "@roundhouse/game-core";
 
 export type RecentTable = {
   id: string;
   code: string;
   gameId: string;
-  config: { ruleset?: Ruleset } | null;
+  config: Json;
   status: "lobby" | "active" | "finished";
   hostUserId: string;
   softSeatCap: number;
@@ -52,12 +52,18 @@ export function getRecentTables() {
   return fetchJson<RecentTable[]>("/api/tables/mine");
 }
 
-export function createTable(input: { ruleset: Ruleset; softSeatCap?: number }) {
+/** The games this server hosts, as declared by its module registry. */
+export async function getGameCatalogue() {
+  const body = await fetchJson<{ games: GameCatalogueEntry[] }>("/api/games");
+  return body.games;
+}
+
+export function createTable(input: { gameId: string; config: Json; softSeatCap?: number }) {
   return fetchJson<{ tableId: string; code: string }>("/api/tables", {
     method: "POST",
     body: JSON.stringify({
-      gameId: "yatzy",
-      config: { ruleset: input.ruleset },
+      gameId: input.gameId,
+      config: input.config,
       softSeatCap: input.softSeatCap,
     }),
   });

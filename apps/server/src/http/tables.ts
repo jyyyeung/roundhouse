@@ -1,6 +1,7 @@
 import type { Json } from "@roundhouse/game-core";
 import { Hono } from "hono";
 import { z } from "zod";
+import { getModule } from "../modules/registry";
 import { TablesError, type TablesRuntime } from "../room/runtime";
 
 type Session = { user?: { id: string } } | null;
@@ -8,11 +9,8 @@ type GetSession = (headers: Headers) => Promise<Session> | Session;
 
 const createTableBodySchema = z.object({
   gameId: z.string().min(1),
-  config: z.unknown(),
+  config: z.unknown().optional(),
   softSeatCap: z.number().int().positive().optional(),
-});
-const yatzyConfigSchema = z.object({
-  ruleset: z.enum(["yatzy", "yahtzee"]),
 });
 
 const joinBodySchema = z.object({
@@ -31,15 +29,30 @@ function toTablesError(error: unknown) {
   return null;
 }
 
+/**
+ * Config validation belongs to the game, not to this router: the module that
+ * will run the game publishes the schema, and an unknown game id is refused
+ * before anything else happens. A caller that sends no config gets the module's
+ * default, which is what the catalogue advertises.
+ */
 function parseCreateTableBody(input: unknown) {
   const body = createTableBodySchema.parse(input);
-  if (body.gameId === "yatzy") {
-    return {
-      ...body,
-      config: yatzyConfigSchema.parse(body.config),
-    };
+  let module: ReturnType<typeof getModule>;
+  try {
+    module = getModule(body.gameId);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("unknown_game:")) {
+      throw new TablesError("unknown_game", error.message);
+    }
+    throw error;
   }
-  return body;
+  return {
+    gameId: body.gameId,
+    softSeatCap: body.softSeatCap,
+    config: (body.config === undefined
+      ? module.defaultConfig
+      : module.configSchema.parse(body.config)) as Json,
+  };
 }
 
 async function requireSession(
@@ -99,7 +112,7 @@ export function createTablesRouter(opts: {
       const result = await runtime.createTable({
         userId,
         gameId: body.gameId,
-        config: body.config as Json,
+        config: body.config,
         softSeatCap: body.softSeatCap,
       });
       return c.json(result, 201);

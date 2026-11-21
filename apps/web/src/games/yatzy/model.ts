@@ -7,14 +7,6 @@ import {
   yatzyCategories,
 } from "@roundhouse/game-yatzy";
 
-export type TableChatMessage = {
-  id: string;
-  userId: string;
-  text: string;
-  createdAt: string;
-  snapshot: unknown;
-};
-
 export function categoriesFor(ruleset: Ruleset) {
   return ruleset === "yahtzee" ? yahtzeeCategories : yatzyCategories;
 }

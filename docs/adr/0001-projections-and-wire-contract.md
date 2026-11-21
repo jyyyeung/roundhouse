@@ -144,6 +144,25 @@ Two follow-ups this ADR deliberately leaves open:
 - Spectators are refused at `subscribe` (`not_seated`) until M2-1 admits them; the projection
   already has the `{kind: "spectator"}` branch they will use.
 
+## Amendment (M5-0, #39): the lobby was shipping stored state
+
+Making the lobby read the catalogue turned up a hole the guard cannot see. `GET /api/tables/mine`
+returned `TableSummary[]`, and `TableSummary` carries `currentGame`, which is the whole `game` row —
+`state` jsonb included. So every member of a table received the entire board (all score sheets, the
+current player index) on the lobby screen, which is exactly what per-viewer projection exists to
+prevent. Yatzy publishes everything anyway, so nothing leaked in practice; a hidden-information
+game would have leaked hands.
+
+`getMine` now returns `LobbyTableSummary[]` (`apps/server/src/room/runtime.ts`), which is
+`TableSummary` minus `currentGame`, built by `toLobbySummary()`. The lobby needs membership and
+progress (`status`, `seatUserIds`, `softSeatCap`, `config`), never game state — anything a client
+must see goes through `projectStateFor` on the socket, not through a summary row. A runtime test
+asserts the payload has no `currentGame`/`state` and no `"sheets"`.
+
+This is the shape of the risk to look for next: the guard catches a _cast_ to stored state, but a
+route can still leak the row by returning it whole. When M2-1 adds spectators and M2-2 adds replay,
+every new read endpoint needs the same question asked: whose projection is this?
+
 ## Amendment (M0-7, #17): what the hidden-information spike changed
 
 `packages/game-testkit` puts the contract under test (`describeModuleConformance`) and a throwaway

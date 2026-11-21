@@ -122,14 +122,20 @@ the tab.
 
 ## M5 — Prove the platform
 
-- **M5-1** Second real title with hidden information — the only way to know the module registry
-  and client view registry actually work.
-  Two contract decisions must land with it, both recorded in
+- **M5-0** ✅ Make adding a game data-driven —
+  [#39](https://github.com/jyyyeung/roundhouse/issues/39). `GameModule` declares `playerCount`,
+  `defaultConfig` and `configSchema`; `GET /api/games` derives a catalogue; the lobby renders
+  whatever the catalogue offers and asks the game for its own config controls; the table route no
+  longer reads dice. Decided in [ADR 0004](adr/0004-games-are-data.md); a sixth guard rule
+  (`no-game-branch`) fails the build when platform code names a game.
+- **M5-1** Second real title with hidden information —
+  [#40](https://github.com/jyyyeung/roundhouse/issues/40) — the only way to know the module registry
+  and client view registry actually work. One contract decision must land with it, recorded in
   [`m0-7-module-contract-findings.md`](m0-7-module-contract-findings.md): project event payloads
   per viewer (F2 — `apps/server/src/ws/hub.ts:389` and `:283` currently send raw payloads to every
-  seat), and give the module a way to deal a shuffled opening position (F4 — `createInitialState` has
-  no `ReduceContext`).
-- **M5-2** `docs/game-modules.md` authoring guide + testkit usage.
+  seat).
+- **M5-2** ✅ Authoring guide: [`adding-a-game.md`](adding-a-game.md) — the module contract, the two
+  registry entries, the client view props and the conformance suite, with a checklist.
 
 ## Guardrails (still non-goals)
 
@@ -143,3 +149,4 @@ seasons/custom crew metrics, no unauthenticated guests, no second title _before_
 | [0001](adr/0001-projections-and-wire-contract.md) | Per-viewer projections, one server-side choke point, schemas as the single source of wire types |
 | [0002](adr/0002-event-log-as-replay-source.md)    | Events are replay input via `applyEvent`; game log is game-only                                 |
 | [0003](adr/0003-client-sync-model.md)             | Seq-versioned incremental sync with bounded resync                                              |
+| [0004](adr/0004-games-are-data.md)                | Games declare `playerCount`/config and register in two maps; platform code names no game        |

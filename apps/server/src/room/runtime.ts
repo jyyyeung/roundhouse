@@ -57,6 +57,15 @@ export type TableSummary = TableRow & {
   currentGame: GameRow | null;
 };
 
+/**
+ * What the lobby list may know about a table: its membership and progress, never
+ * the stored game state. `TableSummary` carries `currentGame.state` for the
+ * runtime's own use; shipping it to a browser would hand every seat the whole
+ * board, which per-viewer projection (ADR 0001) exists to prevent — and which a
+ * hidden-information game would make exploitable.
+ */
+export type LobbyTableSummary = Omit<TableSummary, "currentGame">;
+
 export type TablesRuntime = {
   createTable(input: {
     userId: string;
@@ -73,7 +82,7 @@ export type TablesRuntime = {
     userId: string;
     tableId: string;
   }): Promise<{ tableId: string; gameRowId: string }>;
-  getMine(input: { userId: string }): Promise<TableSummary[]>;
+  getMine(input: { userId: string }): Promise<LobbyTableSummary[]>;
   getTableSnapshot(input: {
     tableId: string;
     asUserId: string | null;
@@ -229,6 +238,11 @@ function toTableMeta(table: TableSummary, currentGame: GameRow | null): TableMet
   };
 }
 
+function toLobbySummary(table: TableSummary): LobbyTableSummary {
+  const { currentGame: _currentGame, ...summary } = table;
+  return summary;
+}
+
 async function loadRecentTables(db: DbLike, userId: string) {
   const hostedTables = await db
     .select()
@@ -259,24 +273,44 @@ async function loadRecentTables(db: DbLike, userId: string) {
     tables.map(async (row) => {
       const summary = await loadTableById(db, row.id);
       if (!summary) throw new TablesError("table_missing", "table_missing", 404);
-      return summary;
+      return toLobbySummary(summary);
     }),
   );
 }
 
 export function createRoomRuntime(db: Database): TablesRuntime {
   return {
-    async createTable({ userId, gameId, config, softSeatCap = 4 }) {
-      // Only the registry knows whether this game id exists; the returned module
-      // is not needed here, so this is a validation call, not a lookup.
+    async createTable({ userId, gameId, config, softSeatCap }) {
+      // The module owns the game's config shape and seat range, so both are read
+      // from it here rather than from the HTTP layer. This is the seam every test
+      // and every caller goes through, so the checks live here too: a module that
+      // cannot seat 4 players must not be reachable through a 4-seat default.
+      let module: GameModule;
       try {
-        getModule(gameId);
+        module = getModule(gameId);
       } catch (error) {
         if (error instanceof Error && error.message.startsWith("unknown_game:")) {
           throw new TablesError("unknown_game", error.message);
         }
         throw error;
       }
+
+      const seatCap = softSeatCap ?? module.playerCount.max;
+      if (seatCap < module.playerCount.min || seatCap > module.playerCount.max) {
+        throw new TablesError(
+          "invalid_seat_cap",
+          `${gameId} seats ${module.playerCount.min}-${module.playerCount.max} players, not ${seatCap}`,
+        );
+      }
+      const parsedConfig = module.configSchema.safeParse(config);
+      if (!parsedConfig.success) {
+        throw new TablesError(
+          "invalid_config",
+          parsedConfig.error.issues[0]?.message ?? "invalid_config",
+          400,
+        );
+      }
+      const tableConfig = parsedConfig.data as Json;
 
       return db.transaction(async (tx) => {
         const tableId = crypto.randomUUID();
@@ -287,10 +321,10 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           id: tableId,
           code,
           gameId,
-          config,
+          config: tableConfig,
           status: "lobby",
           hostUserId: userId,
-          softSeatCap,
+          softSeatCap: seatCap,
           createdAt,
         });
 
@@ -348,8 +382,6 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           return { tableId, gameRowId: table.currentGame.id };
         }
         if (table.status !== "lobby") throw new TablesError("table_not_lobby", "table_not_lobby");
-        if (table.seatUserIds.length < 2)
-          throw new TablesError("not_enough_players", "not_enough_players");
 
         let module: GameModule;
         try {
@@ -360,6 +392,14 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           }
           throw error;
         }
+
+        // The seat range is the module's, not the table's: `softSeatCap` caps how
+        // many may join, and the module decides what a legal game is.
+        const seats = table.seatUserIds.length;
+        if (seats < module.playerCount.min)
+          throw new TablesError("not_enough_players", "not_enough_players");
+        if (seats > module.playerCount.max)
+          throw new TablesError("too_many_players", "too_many_players");
         const state = module.createInitialState(
           { ...(table.config as object), tableId: table.id } as Json,
           table.seatUserIds,
