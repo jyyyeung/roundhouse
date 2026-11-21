@@ -1,3 +1,4 @@
+import type { RawGameState } from "@roundhouse/game-core";
 import { describe, expect, it, vi } from "vitest";
 import { yatzyCategories } from "./categories";
 import { yatzyModule } from "./module";
@@ -302,9 +303,11 @@ describe("reduce", () => {
 });
 
 describe("yatzyModule", () => {
-  it("creates initial state and public snapshot", () => {
+  it("creates initial state and projects a snapshot for each viewer", () => {
     const state = yatzyModule.createInitialState({ ruleset: "yahtzee" }, ["p1", "p2"]);
-    const snapshot = yatzyModule.getPublicSnapshot(state);
+    const raw = state as unknown as RawGameState;
+    const snapshot = yatzyModule.projectStateFor(raw, { kind: "player", seatIndex: 1, userId: "p2" });
+    const spectatorSnapshot = yatzyModule.projectStateFor(raw, { kind: "spectator", userId: null });
 
     expect(state).toMatchObject({
       ruleset: "yahtzee",
@@ -324,7 +327,9 @@ describe("yatzyModule", () => {
       holds: [false, false, false, false, false],
       phase: "playing",
       winnerIds: [],
+      you: 1,
     });
+    expect(spectatorSnapshot).toMatchObject({ you: null });
     expect(yatzyModule.isFinished(state)).toBe(false);
   });
 });

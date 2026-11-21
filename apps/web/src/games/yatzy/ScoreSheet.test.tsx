@@ -1,15 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getScoreHelp, type YatzyState } from "@roundhouse/game-yatzy";
+import { getScoreHelp, type YatzyView } from "@roundhouse/game-yatzy";
 
 import { ScoreSheet } from "./ScoreSheet";
 
-function baseState(overrides: Partial<YatzyState> = {}): YatzyState {
+function baseState(overrides: Partial<YatzyView> = {}): YatzyView {
   return {
+    gameId: "yatzy",
     ruleset: "yatzy",
     playerIds: ["user-a", "user-b"],
-    currentPlayerIndex: 0,
+    currentPlayerId: "user-a",
+    you: 0,
     rollsLeft: 2,
     dice: [1, 1, 1, 2, 3],
     holds: [false, false, false, false, false],

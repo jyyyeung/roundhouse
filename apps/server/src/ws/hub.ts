@@ -1,7 +1,9 @@
-import type { ClientMessage, ServerMessage } from "@roundhouse/game-core";
+import type { ClientMessage, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
 import type { IncomingMessage } from "node:http";
 import { WebSocket, type RawData } from "ws";
 
+import { getModule } from "../modules/registry";
+import { projectSnapshot, viewerForUser } from "../room/projection";
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
 import { createWsHandlers } from "./handlers";
 import { db } from "../db/client";
@@ -41,6 +43,7 @@ export function createWsHub(opts: {
   const handlers = createWsHandlers({
     runtime: opts.runtime,
     publishToTable,
+    publishSnapshot,
     isDuplicateAction(tableId, actionId) {
       pruneExpiredActions(tableId);
       return actionIdsByTable.get(tableId)?.has(actionId) ?? false;
@@ -147,7 +150,10 @@ export function createWsHub(opts: {
   };
 
   async function subscribe(socket: HubSocket, tableId: string) {
-    const snapshot = await opts.runtime.getTableSnapshot({ tableId });
+    const snapshot = await opts.runtime.getTableSnapshot({
+      asUserId: socket.userId ?? null,
+      tableId,
+    });
     if (!snapshot) {
       send(socket, {
         code: "table_missing",
@@ -261,6 +267,33 @@ export function createWsHub(opts: {
     }
   }
 
+  /**
+   * Fan one authoritative state out to the table, projected separately for every
+   * socket. This is the only place game state becomes a `snapshot` frame, so a
+   * viewer only ever receives what its own projection allows.
+   */
+  function publishSnapshot(
+    tableId: string,
+    input: { seq: number; state: RawGameState; meta: TableMeta },
+  ) {
+    const sockets = socketsByTable.get(tableId);
+    if (!sockets) return;
+
+    const module = moduleOrNull(input.meta.gameId);
+    if (!module) return;
+
+    for (const socket of sockets) {
+      const viewer = viewerForUser(input.meta.seatUserIds, socket.userId ?? null);
+      send(socket, {
+        meta: input.meta,
+        seq: input.seq,
+        state: projectSnapshot(module, input.state, viewer),
+        tableId,
+        type: "snapshot",
+        v: 1,
+      });
+    }
+  }
   function publishPresence(tableId: string) {
     publishToTable(tableId, {
       onlineUserIds: [...(userIdsByTable.get(tableId) ?? [])].sort(),
@@ -302,6 +335,15 @@ function sendSnapshot(socket: WebSocket, snapshot: TableSnapshot) {
     v: 1,
   });
 }
+
+function moduleOrNull(gameId: string) {
+  try {
+    return getModule(gameId);
+  } catch {
+    return null;
+  }
+}
+
 
 function parseClientMessage(raw: RawData): ClientMessage | null {
   try {

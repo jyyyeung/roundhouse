@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TableMeta } from "@roundhouse/game-core";
-import type { YatzyState } from "@roundhouse/game-yatzy";
+import type { YatzyView } from "@roundhouse/game-yatzy";
 
 import { YatzyTable } from "./YatzyTable";
 
@@ -35,11 +35,13 @@ function baseMeta(overrides: Partial<TableMeta> = {}): TableMeta {
   };
 }
 
-function baseState(overrides: Partial<YatzyState> = {}): YatzyState {
+function baseState(overrides: Partial<YatzyView> = {}): YatzyView {
   return {
+    gameId: "yatzy",
     ruleset: "yatzy",
     playerIds: ["user-a", "user-b"],
-    currentPlayerIndex: 0,
+    currentPlayerId: "user-a",
+    you: 0,
     rollsLeft: 2,
     dice: [1, 2, 3, 4, 5],
     holds: [false, false, false, false, false],

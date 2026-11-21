@@ -1,4 +1,4 @@
-import { scoreCategory, yatzyCategories, yahtzeeCategories, type Ruleset, type Sheet, type YatzyState } from "@roundhouse/game-yatzy";
+import { scoreCategory, yatzyCategories, yahtzeeCategories, type Ruleset, type Sheet, type YatzyView } from "@roundhouse/game-yatzy";
 
 export type TableChatMessage = {
   id: string;
@@ -25,14 +25,14 @@ export function upperTotal(sheet: Sheet) {
   );
 }
 
-export function totalScore(state: YatzyState, playerId: string) {
+export function totalScore(state: YatzyView, playerId: string) {
   const sheet = state.sheets[playerId];
   if (!sheet) return 0;
 
   return categoriesFor(state.ruleset).reduce((sum, category) => sum + (sheet[category] ?? 0), 0) + (sheet.bonus ?? 0);
 }
 
-export function previewScore(state: YatzyState, category: string) {
+export function previewScore(state: YatzyView, category: string) {
   if (state.dice.every((die) => die === 0)) return null;
   return scoreCategory(state.ruleset, category as never, state.dice as [number, number, number, number, number]);
 }

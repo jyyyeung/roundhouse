@@ -1,15 +1,35 @@
 import { asc, desc, eq, inArray, sql } from "drizzle-orm";
-import type { ClientIntent, EventEnvelope, Json, TableMeta } from "@roundhouse/game-core";
+import type { ClientIntent, EventEnvelope, Json, RawGameState, TableMeta, ViewerView } from "@roundhouse/game-core";
 import { generateInviteCode } from "@roundhouse/game-core";
 
 import type { Database } from "../db/client";
 import { game, gameEvent, gameTable, tablePlayer } from "../db/schema";
 import { getModule } from "../modules/registry";
+import { projectSnapshot, rawGameState, viewerForUser } from "./projection";
 
 type TableRow = typeof gameTable.$inferSelect;
 type GameRow = typeof game.$inferSelect;
 type SeatRow = typeof tablePlayer.$inferSelect;
 type DbLike = Pick<Database, "select" | "insert" | "update" | "transaction" | "execute">;
+
+/**
+ * Projects stored game state for one viewer. Returns null (rather than throwing)
+ * when the table has no game yet or its module is not registered: a lobby table
+ * is a legitimate state, and a broken gameId must not take the whole broadcast
+ * down with it.
+ */
+function projectForViewer(currentGame: GameRow | null, viewer: ViewerView): Json {
+  if (!currentGame) return null;
+
+  let module;
+  try {
+    module = getModule(currentGame.gameId);
+  } catch {
+    return null;
+  }
+
+  return projectSnapshot(module, rawGameState(currentGame.state), viewer);
+}
 
 export class TablesError extends Error {
   constructor(
@@ -39,7 +59,7 @@ export type TablesRuntime = {
   startTable(input: { userId: string; tableId: string }): Promise<{ tableId: string; gameRowId: string }>;
   rematchTable(input: { userId: string; tableId: string }): Promise<{ tableId: string; gameRowId: string }>;
   getMine(input: { userId: string }): Promise<TableSummary[]>;
-  getTableSnapshot(input: { tableId: string }): Promise<TableSnapshot | null>;
+  getTableSnapshot(input: { tableId: string; asUserId: string | null }): Promise<TableSnapshot | null>;
   applyGameIntent(input: {
     tableId: string;
     userId: string;
@@ -63,7 +83,8 @@ export type ApplyGameIntentResult =
       finished: boolean;
       meta: TableMeta;
       seq: number;
-      state: Json;
+      // Unprojected: the caller must project per socket before sending.
+      state: RawGameState;
     }
   | {
       ok: false;
@@ -342,16 +363,17 @@ export function createRoomRuntime(db: Database): TablesRuntime {
       return loadRecentTables(db, userId);
     },
 
-    async getTableSnapshot({ tableId }) {
+    async getTableSnapshot({ tableId, asUserId }) {
       const table = await loadTableById(db, tableId);
       if (!table) return null;
-
       const currentGame = table.currentGame;
+      const meta = toTableMeta(table, currentGame);
+
       return {
         tableId,
-        meta: toTableMeta(table, currentGame),
+        meta,
         seq: currentGame?.seq ?? 0,
-        state: (currentGame?.state ?? null) as Json,
+        state: projectForViewer(currentGame, viewerForUser(table.seatUserIds, asUserId)),
       };
     },
 
@@ -462,7 +484,7 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           finished,
           meta: toTableMeta(table, { ...currentGame, seq: nextSeq, status: finished ? "finished" : "active" }),
           seq: nextSeq,
-          state: reduced.state,
+          state: rawGameState(reduced.state)!,
         } satisfies ApplyGameIntentResult;
       });
     },

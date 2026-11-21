@@ -1,4 +1,4 @@
-import type { EventEnvelope, Json, ServerMessage, TableMeta } from "@roundhouse/game-core";
+import type { EventEnvelope, Json, RawGameState, ServerMessage, TableMeta } from "@roundhouse/game-core";
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it } from "vitest";
 
@@ -56,7 +56,7 @@ function makeRuntime(): WsRuntime {
         finished: yatzyModule.isFinished(state),
         meta,
         seq,
-        state,
+        state: state as unknown as RawGameState,
       };
     },
   };
@@ -69,6 +69,7 @@ describe("ws handlers", () => {
     const runtime = makeRuntime();
     const handlers = createWsHandlers({
       runtime,
+      publishSnapshot: () => {},
       isDuplicateAction: () => false,
       rememberAction: () => {},
       forgetAction: () => {},
@@ -106,7 +107,7 @@ describe("ws handlers", () => {
     ]);
     expect(published).toEqual([]);
 
-    const snapshot = await runtime.getTableSnapshot({ tableId: "table-1" });
+    const snapshot = await runtime.getTableSnapshot({ asUserId: null, tableId: "table-1" });
     expect(snapshot?.seq).toBe(0);
   });
 
@@ -126,6 +127,7 @@ describe("ws handlers", () => {
     const actionIds = new Set<string>();
     const handlers = createWsHandlers({
       runtime,
+      publishSnapshot: () => {},
       isDuplicateAction: (_tableId, actionId) => actionIds.has(actionId),
       rememberAction: (_tableId, actionId) => actionIds.add(actionId),
       forgetAction: (_tableId, actionId) => actionIds.delete(actionId),
@@ -189,6 +191,7 @@ describe("ws handlers", () => {
     const actionIds = new Set<string>();
     const handlers = createWsHandlers({
       runtime,
+      publishSnapshot: () => {},
       isDuplicateAction: (_tableId, actionId) => actionIds.has(actionId),
       rememberAction: (_tableId, actionId) => actionIds.add(actionId),
       forgetAction: (_tableId, actionId) => actionIds.delete(actionId),
@@ -249,6 +252,7 @@ describe("ws handlers action reservations", () => {
     const actionIds = new Set<string>();
     const handlers = createWsHandlers({
       runtime,
+      publishSnapshot: () => {},
       isDuplicateAction: (_tableId, actionId) => actionIds.has(actionId),
       rememberAction: (_tableId, actionId) => actionIds.add(actionId),
       forgetAction: (_tableId, actionId) => actionIds.delete(actionId),

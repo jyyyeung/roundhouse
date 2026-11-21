@@ -1,11 +1,11 @@
 import { motion } from "motion/react";
-import { getScoreHelp, type ScoreHelp, type ScoreHelpKey, type YatzyState } from "@roundhouse/game-yatzy";
+import { getScoreHelp, type ScoreHelp, type ScoreHelpKey, type YatzyView } from "@roundhouse/game-yatzy";
 
 import { InfoTip } from "../../ui/InfoTip";
 import { categoriesFor, formatCategory, previewScore, totalScore, upperTotal } from "./model";
 
 type ScoreSheetProps = {
-  state: YatzyState;
+  state: YatzyView;
   playerLabels: Record<string, string>;
   currentUserId: string | null;
   canScore: boolean;
@@ -23,7 +23,7 @@ function HelpBody(props: { help: ScoreHelp }) {
   );
 }
 
-function LabelWithHelp(props: { text: string; helpKey: ScoreHelpKey; ruleset: YatzyState["ruleset"] }) {
+function LabelWithHelp(props: { text: string; helpKey: ScoreHelpKey; ruleset: YatzyView["ruleset"] }) {
   const help = getScoreHelp(props.ruleset, props.helpKey);
   return (
     <div className="flex items-center gap-1.5">

@@ -12,4 +12,6 @@ export type {
   YahtzeeCategory,
   Category,
 } from "./types";
+export { projectYatzyView } from "./view";
+export type { YatzyView } from "./view";
 export type { YatzyState, Sheet } from "./reduce";

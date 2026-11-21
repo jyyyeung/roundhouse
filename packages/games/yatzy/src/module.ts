@@ -1,8 +1,8 @@
-import { GameModule, Json } from "@roundhouse/game-core";
+import { GameModule, Json, RawGameState, ViewerView } from "@roundhouse/game-core";
 import { yahtzeeCategories, yatzyCategories } from "./categories";
 import { reduce, type YatzyState } from "./reduce";
 import { Ruleset } from "./types";
-
+import { projectYatzyView } from "./view";
 function categoriesFor(ruleset: Ruleset) {
   return ruleset === "yatzy" ? yatzyCategories : yahtzeeCategories;
 }
@@ -36,20 +36,8 @@ function createInitialState(config: Json, playerIds: string[]) {
   } satisfies YatzyState;
 }
 
-function getPublicSnapshot(state: Json) {
-  const current = state as YatzyState;
-
-  return {
-    gameId: "yatzy",
-    ruleset: current.ruleset,
-    dice: current.dice,
-    holds: current.holds,
-    rollsLeft: current.rollsLeft,
-    currentPlayerId: current.playerIds[current.currentPlayerIndex],
-    sheets: current.sheets,
-    phase: current.phase,
-    winnerIds: current.winnerIds,
-  };
+function projectStateFor(state: RawGameState, viewer: ViewerView) {
+  return projectYatzyView(state, viewer) as unknown as Json;
 }
 
 function isFinished(state: Json) {
@@ -61,6 +49,6 @@ export const yatzyModule: GameModule = {
   displayName: "Yatzy",
   createInitialState,
   reduce,
-  getPublicSnapshot,
+  projectStateFor,
   isFinished,
 };

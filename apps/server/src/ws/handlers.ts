@@ -1,4 +1,10 @@
-import { intentFromClientMessage, type ClientMessage, type ServerMessage } from "@roundhouse/game-core";
+import {
+  intentFromClientMessage,
+  type ClientMessage,
+  type RawGameState,
+  type ServerMessage,
+  type TableMeta,
+} from "@roundhouse/game-core";
 
 import type { ApplyGameIntentResult, TablesRuntime } from "../room/runtime";
 
@@ -13,6 +19,11 @@ export type WsConnection = {
 export function createWsHandlers(deps: {
   runtime: WsRuntime;
   publishToTable: (tableId: string, message: ServerMessage) => void;
+  /**
+   * Broadcasts projection-safe game state. The hub fans this out per socket,
+   * projecting for each viewer; handlers never build a state frame themselves.
+   */
+  publishSnapshot: (tableId: string, input: { seq: number; state: RawGameState; meta: TableMeta }) => void;
   isDuplicateAction: (tableId: string, actionId: string) => boolean;
   rememberAction: (tableId: string, actionId: string) => void;
   forgetAction: (tableId: string, actionId: string) => void;
@@ -32,7 +43,7 @@ export function createWsHandlers(deps: {
     createdAt: Date;
   }) => Promise<{ id: string }>;
 }) {
-  const { isDuplicateAction, publishToTable, rememberAction, forgetAction, runtime } = deps;
+  const { isDuplicateAction, publishSnapshot, publishToTable, rememberAction, forgetAction, runtime } = deps;
 
   // rate limit state: tableId -> userId -> timestamps (ms)
   const rateLimits = new Map<string, Map<string, number[]>>();
@@ -73,14 +84,7 @@ export function createWsHandlers(deps: {
         // Successful apply keeps the reservation (TTL managed by hub).
         broadcastEvents(message.tableId, result, publishToTable);
         if (result.finished) {
-          publishToTable(message.tableId, {
-            meta: result.meta,
-            seq: result.seq,
-            state: result.state,
-            tableId: message.tableId,
-            type: "snapshot",
-            v: 1,
-          });
+          publishSnapshot(message.tableId, result);
         }
         return;
       }
@@ -89,7 +93,9 @@ export function createWsHandlers(deps: {
         const actionId = message.actionId;
         const tableId = message.tableId!;
         const userId = connection.userId;
-        const snapshot = await runtime.getTableSnapshot({ tableId });
+        // The chat snapshot is shared by every reader, so it is projected for no
+        // particular viewer rather than for the author.
+        const snapshot = await runtime.getTableSnapshot({ asUserId: null, tableId });
 
         if (!snapshot) {
           connection.send(

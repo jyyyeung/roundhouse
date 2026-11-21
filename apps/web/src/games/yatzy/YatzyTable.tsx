@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import type { YatzyState } from "@roundhouse/game-yatzy";
+import type { YatzyView } from "@roundhouse/game-yatzy";
 import type { Json, TableMeta } from "@roundhouse/game-core";
 
 import { ChatComposer } from "./ChatComposer";
@@ -11,7 +11,7 @@ import { totalScore, type TableChatMessage } from "./model";
 
 type YatzyTableProps = {
   meta: TableMeta;
-  state: YatzyState;
+  state: YatzyView;
   currentUserId: string | null;
   onlineUserIds: string[];
   messages: TableChatMessage[];
@@ -45,7 +45,7 @@ export function YatzyTable(props: YatzyTableProps) {
   const [statusExpanded, setStatusExpanded] = useState(false);
   const chatDocked = useXlChatDock();
   const chatMode = chatDocked ? "dock" : "overlay";
-  const currentPlayerId = props.state.playerIds[props.state.currentPlayerIndex] ?? null;
+  const currentPlayerId = props.state.currentPlayerId;
   const isCurrentPlayer = Boolean(props.currentUserId && currentPlayerId === props.currentUserId);
 
   const playerLabels = useMemo(() => {

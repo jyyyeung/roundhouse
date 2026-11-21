@@ -1,4 +1,4 @@
-import type { Json, ServerMessage } from "@roundhouse/game-core";
+import type { Json, RawGameState, ServerMessage } from "@roundhouse/game-core";
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it, vi } from "vitest";
 
@@ -38,6 +38,7 @@ describe("ws chat", () => {
     let persisted: any = null;
     const handlers = createWsHandlers({
       runtime,
+      publishSnapshot: () => {},
       isDuplicateAction: () => false,
       rememberAction: () => {},
       forgetAction: () => {},
@@ -71,7 +72,7 @@ describe("ws chat", () => {
 
     expect(persisted).not.toBeNull();
     // persisted.snapshot.state should equal server state (not client-supplied fake)
-    const serverSnapshot = await runtime.getTableSnapshot({ tableId: "table-1" });
+    const serverSnapshot = await runtime.getTableSnapshot({ asUserId: null, tableId: "table-1" });
     expect(persisted.snapshot.state).toEqual(serverSnapshot?.state);
     // published a chat ServerMessage
     const chat = published.find((m) => m.type === "chat");
@@ -95,6 +96,7 @@ describe("ws chat", () => {
     const appendGameEvent = vi.fn();
     const handlers = createWsHandlers({
       runtime: makeRuntime(),
+      publishSnapshot: () => {},
       isDuplicateAction: () => false,
       rememberAction: () => {},
       forgetAction: () => {},

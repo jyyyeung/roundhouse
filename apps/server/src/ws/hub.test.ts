@@ -1,4 +1,6 @@
 import type { IncomingMessage } from "node:http";
+import type { RawGameState, TableMeta } from "@roundhouse/game-core";
+import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
@@ -227,5 +229,71 @@ describe("ws hub access control", () => {
         }),
       ]),
     );
+  });
+});
+
+describe("ws hub snapshot projection", () => {
+  it("projects game state separately for each connected viewer", async () => {
+    const meta: TableMeta = {
+      code: "ABCD23",
+      config: { ruleset: "yatzy" },
+      gameId: "yatzy",
+      hostUserId: "user-a",
+      seatUserIds: ["user-a", "user-b"],
+      softSeatCap: 4,
+      status: "active",
+    };
+    const finishedState = yatzyModule.createInitialState({ ruleset: "yatzy" }, ["user-a", "user-b"]);
+
+    let nextUserId = "user-a";
+    const hub = createWsHub({
+      runtime: makeRuntime({
+        applyGameIntent: vi.fn().mockResolvedValue({
+          events: [],
+          finished: true,
+          meta,
+          ok: true,
+          seq: 5,
+          state: finishedState as unknown as RawGameState,
+        }),
+        getTableSnapshot: vi.fn().mockResolvedValue({ meta, seq: 0, state: null, tableId: "table-1" }),
+      }),
+      getSessionFromHeaders: async () => ({ user: { id: nextUserId } }),
+    });
+
+    const socketA = new MockSocket();
+    await hub.handleConnection(socketA as any, { headers: {} } as IncomingMessage);
+    await socketA.emitMessage({ tableId: "table-1", type: "subscribe", v: 1 });
+
+    nextUserId = "user-b";
+    const socketB = new MockSocket();
+    await hub.handleConnection(socketB as any, { headers: {} } as IncomingMessage);
+    await socketB.emitMessage({ tableId: "table-1", type: "subscribe", v: 1 });
+
+    socketA.sent.length = 0;
+    socketB.sent.length = 0;
+
+    await socketA.emitMessage({
+      actionId: "action-1",
+      intentType: "roll",
+      payload: {},
+      tableId: "table-1",
+      type: "intent",
+      v: 1,
+    });
+
+    const snapshotFor = (socket: MockSocket) =>
+      socket.sent
+        .map((message) => JSON.parse(message))
+        .find((message) => message.type === "snapshot");
+
+    const frameA = snapshotFor(socketA);
+    const frameB = snapshotFor(socketB);
+
+    expect(frameA.state.you).toBe(0);
+    expect(frameB.state.you).toBe(1);
+    // The internal shape must not cross the wire: only YatzyView fields do.
+    expect(frameA.state.tableId).toBeUndefined();
+    expect(frameA.state.currentPlayerIndex).toBeUndefined();
   });
 });

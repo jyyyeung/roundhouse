@@ -133,7 +133,7 @@ describe("TablePage", () => {
         state: {
           ruleset: "yatzy",
           playerIds: ["user-a", "user-b"],
-          currentPlayerIndex: 0,
+          currentPlayerId: "user-a",
           rollsLeft: 3,
           dice: [1, 2, 3, 4, 5],
           holds: [false, false, false, false, false],
@@ -210,7 +210,7 @@ describe("TablePage", () => {
         state: {
           ruleset: "yatzy",
           playerIds: ["user-a", "user-b"],
-          currentPlayerIndex: 0,
+          currentPlayerId: "user-a",
           rollsLeft: 1,
           dice: [1, 2, 3, 4, 5],
           holds: [true, false, true, false, true],
@@ -270,7 +270,7 @@ describe("TablePage", () => {
         state: {
           ruleset: "yatzy",
           playerIds: ["user-a", "user-b"],
-          currentPlayerIndex: 0,
+          currentPlayerId: "user-a",
           rollsLeft: 3,
           dice: [1, 2, 3, 4, 5],
           holds: [false, false, false, false, false],

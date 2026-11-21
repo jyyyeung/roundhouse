@@ -1,5 +1,5 @@
 import type { Json, TableMeta } from "@roundhouse/game-core";
-import type { YatzyState } from "@roundhouse/game-yatzy";
+import type { YatzyView } from "@roundhouse/game-yatzy";
 
 import { YatzyTable } from "./yatzy/YatzyTable";
 import type { TableChatMessage } from "./yatzy/model";
@@ -20,7 +20,7 @@ export function renderGameView(props: GameViewProps) {
     return (
       <YatzyTable
         meta={props.meta}
-        state={props.state as YatzyState}
+        state={props.state as YatzyView}
         currentUserId={props.currentUserId}
         onlineUserIds={props.onlineUserIds}
         messages={props.messages}

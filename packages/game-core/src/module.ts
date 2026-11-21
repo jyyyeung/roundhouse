@@ -22,12 +22,33 @@ export type ReduceContext = {
   playerIds: string[];
 };
 
+/**
+ * Who is looking at a table. Every state that crosses the wire is projected for
+ * exactly one viewer, so a module never has to decide what "public" means.
+ */
+export type ViewerView =
+  | { kind: "player"; userId: string; seatIndex: number }
+  | { kind: "spectator"; userId: string | null };
+
+declare const rawGameStateBrand: unique symbol;
+
+/**
+ * Unprojected module state as stored server-side. Branded so it is not
+ * assignable to `Json`: raw state may only reach a client by passing through
+ * `projectStateFor` (see `apps/server/src/room/projection.ts`).
+ */
+export type RawGameState = { readonly [rawGameStateBrand]: true };
+
 export interface GameModule {
   id: string;
   displayName: string;
   createInitialState(config: Json, playerIds: string[]): Json;
   reduce(state: Json, intent: { type: string; payload: Json }, ctx: ReduceContext): ReduceResult;
-  getPublicSnapshot(state: Json): Json;
+  /**
+   * The only way module state becomes client-visible: returns exactly what
+   * `viewer` is allowed to see, never the raw state.
+   */
+  projectStateFor(state: RawGameState, viewer: ViewerView): Json;
   isFinished(state: Json): boolean;
 }
 
