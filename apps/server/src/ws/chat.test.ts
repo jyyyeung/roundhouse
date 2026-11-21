@@ -49,7 +49,6 @@ describe("ws chat", () => {
         persisted = { tableId, userId, text, snapshot };
         return { id: "msg-1", createdAt: new Date().toISOString() };
       },
-      appendGameEvent: async () => ({ id: "ev-1" }),
     });
 
     await handlers.onMessage(
@@ -89,7 +88,6 @@ describe("ws chat", () => {
     const published: ServerMessage[] = [];
     const sent: ServerMessage[] = [];
     const persistChatMessage = vi.fn();
-    const appendGameEvent = vi.fn();
     const handlers = createWsHandlers({
       runtime: makeRuntime(),
       publishApplied: () => {},
@@ -100,7 +98,6 @@ describe("ws chat", () => {
         published.push(message);
       },
       persistChatMessage,
-      appendGameEvent,
     });
 
     await handlers.onMessage(
@@ -131,7 +128,38 @@ describe("ws chat", () => {
     ]);
     expect(published).toEqual([]);
     expect(persistChatMessage).not.toHaveBeenCalled();
-    expect(appendGameEvent).not.toHaveBeenCalled();
+  });
+
+  // M0-3: chat is not a game event. The handlers have no game-event writer to
+  // reach, so a chat message can never advance `game.seq` or add a
+  // `game_event` row — the only writes it makes are chat rows.
+  it("never touches game state when a message is sent", async () => {
+    const runtime = makeRuntime();
+    const applyGameIntent = vi.spyOn(runtime, "applyGameIntent");
+    const handlers = createWsHandlers({
+      runtime,
+      forgetAction: () => {},
+      isDuplicateAction: () => false,
+      publishApplied: () => {},
+      publishToTable: () => {},
+      rememberAction: () => {},
+      persistChatMessage: async () => ({ createdAt: new Date().toISOString(), id: "msg-1" }),
+    });
+
+    await handlers.onMessage(
+      { send() {}, userId: "user-a" },
+      {
+        actionId: "action-chat",
+        tableId: "table-1",
+        text: "hello",
+        type: "chat",
+        v: 2,
+      } satisfies ClientTableMessage,
+    );
+
+    expect(applyGameIntent).not.toHaveBeenCalled();
+    const after = await runtime.getTableSnapshot({ asUserId: null, tableId: "table-1" });
+    expect(after?.seq).toBe(0);
   });
 });
 

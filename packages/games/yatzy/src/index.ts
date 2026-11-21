@@ -1,5 +1,7 @@
 export { scoreCategory } from "./score";
 export { reduce } from "./reduce";
+export { applyYatzyEvent } from "./apply-event";
+export type { ReplayEvent } from "./apply-event";
 export { yatzyModule } from "./module";
 export { yatzyCategories, yahtzeeCategories } from "./categories";
 export { getScoreHelp, getRulesetCompareHelp, getTurnHelp } from "./help";

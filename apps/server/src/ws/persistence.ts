@@ -2,9 +2,12 @@ import { and, desc, eq, lt, or } from "drizzle-orm";
 import type { ChatWire, Json } from "@roundhouse/game-core";
 
 import type { Database } from "../db/client";
-import { chatMessage, game, gameEvent } from "../db/schema";
+import { chatMessage } from "../db/schema";
 
-type DbLike = Pick<Database, "select" | "insert" | "update" | "transaction">;
+// Chat may only ever insert chat rows. Dropping `update` and `transaction` from
+// this type is deliberate: the chat path has no way to touch `game` or
+// `game_event`, so it cannot bump `seq` (M0-3).
+type DbLike = Pick<Database, "select" | "insert">;
 
 /** Newest page of chat, and the page size an older page asks for. */
 export const CHAT_PAGE_SIZE = 50;
@@ -102,45 +105,3 @@ export function toChatWire(row: {
   };
 }
 
-export async function appendGameEventToDb(
-  dbLike: DbLike & { select: any },
-  input: {
-    tableId: string;
-    gameId?: string;
-    payload: unknown;
-    actorId: string;
-    createdAt: Date;
-  },
-) {
-  return await dbLike.transaction(async (tx: any) => {
-    const [current] = await tx
-      .select()
-      .from(game)
-      .where(eq(game.tableId, input.tableId))
-      .orderBy(desc(game.createdAt), desc(game.id))
-      .limit(1);
-    if (!current) return { id: "" };
-
-    const [lastEvent] = await tx
-      .select()
-      .from(gameEvent)
-      .where(eq(gameEvent.gameRowId, current.id))
-      .orderBy(desc(gameEvent.seq))
-      .limit(1);
-    const nextSeq = (lastEvent?.seq ?? current.seq) + 1;
-    const id = crypto.randomUUID();
-    await tx.insert(gameEvent).values({
-      id,
-      gameRowId: current.id,
-      tableId: input.tableId,
-      gameId: input.gameId ?? current.gameId,
-      seq: nextSeq,
-      type: "chat_sent",
-      actorId: input.actorId,
-      payload: input.payload,
-      createdAt: input.createdAt,
-    });
-    await tx.update(game).set({ seq: nextSeq }).where(eq(game.id, current.id));
-    return { id };
-  });
-}

@@ -41,13 +41,6 @@ export function createWsHandlers(deps: {
     snapshot: unknown;
     createdAt: Date;
   }) => Promise<{ id: string; createdAt: string }>;
-  appendGameEvent?: (input: {
-    tableId: string;
-    gameId?: string;
-    payload: unknown;
-    actorId: string;
-    createdAt: Date;
-  }) => Promise<{ id: string }>;
 }) {
   const { isDuplicateAction, publishApplied, publishToTable, rememberAction, forgetAction, runtime } = deps;
 
@@ -180,20 +173,6 @@ export function createWsHandlers(deps: {
           }
         }
 
-        // if a game row exists (we have server state), append game_event chat_sent if hook available
-        if (snapshot.state != null && typeof deps.appendGameEvent === "function") {
-          try {
-            await deps.appendGameEvent({
-              tableId,
-              gameId: snapshot.meta.gameId,
-              payload: { chatMessageId, text },
-              actorId: userId,
-              createdAt,
-            });
-          } catch {
-            // ignore
-          }
-        }
 
         // One frame, every socket. The author's own socket is included so a
         // second tab of the same user stays consistent; the client merges by

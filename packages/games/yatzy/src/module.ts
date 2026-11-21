@@ -1,6 +1,7 @@
-import { GameModule, Json, RawGameState, ViewerView } from "@roundhouse/game-core";
+import { EventEnvelope, GameModule, Json, RawGameState, ViewerView } from "@roundhouse/game-core";
 import { yahtzeeCategories, yatzyCategories } from "./categories";
 import { reduce, type YatzyState } from "./reduce";
+import { applyYatzyEvent } from "./apply-event";
 import { Ruleset } from "./types";
 import { yatzyIntents } from "./intents";
 import { projectYatzyView } from "./view";
@@ -41,6 +42,10 @@ function projectStateFor(state: RawGameState, viewer: ViewerView) {
   return projectYatzyView(state, viewer) as unknown as Json;
 }
 
+function applyEvent(state: Json, event: EventEnvelope) {
+  return applyYatzyEvent(state, event) as unknown as Json;
+}
+
 function isFinished(state: Json) {
   return (state as YatzyState).phase === "finished";
 }
@@ -52,5 +57,6 @@ export const yatzyModule: GameModule = {
   createInitialState,
   reduce,
   projectStateFor,
+  applyEvent,
   isFinished,
 };

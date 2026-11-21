@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { listChatMessagesForTable, toChatWire } from "./persistence";
+import * as persistence from "./persistence";
+import { listChatMessagesForTable, persistChatMessageToDb, toChatWire } from "./persistence";
 
 describe("chat paging", () => {
 
@@ -73,3 +74,42 @@ describe("chat paging", () => {
     });
   });
 });
+
+describe("chat persistence surface", () => {
+  it("writes one chat row and nothing else", async () => {
+    const written: string[] = [];
+    const db: any = {
+      insert: (table: { [key: symbol]: unknown }) => {
+        written.push(tableName(table));
+        return { values: async () => undefined };
+      },
+    };
+
+    await persistChatMessageToDb(db, {
+      createdAt: new Date("2026-08-02T08:00:00.000Z"),
+      snapshot: { tableId: "table-1" },
+      tableId: "table-1",
+      text: "hello",
+      userId: "user-a",
+    });
+
+    expect(written).toEqual(["chat_message"]);
+  });
+
+  // M0-3: chat is not a game event. The chat path has no writer for `game` or
+  // `game_event`, so a message can never advance `game.seq` — replay therefore
+  // only ever sees game transitions.
+  it("exposes no game-event writer", () => {
+    expect(Object.keys(persistence).sort()).toEqual([
+      "CHAT_PAGE_SIZE",
+      "listChatMessagesForTable",
+      "persistChatMessageToDb",
+      "toChatWire",
+    ]);
+  });
+});
+
+function tableName(table: { [key: symbol]: unknown }) {
+  const symbol = Object.getOwnPropertySymbols(table).find((key) => String(key).includes("Name"));
+  return symbol ? String(table[symbol]) : "unknown";
+}

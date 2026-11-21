@@ -84,6 +84,26 @@ checkpoint is a cache. Not built now; noted so it is not discovered late.
   replayed); if that matters, backfill `dice_rolled` from state at write time is impossible after the
   fact, so accept it and move on.
 
+## Implementation notes (M0-3, #13)
+
+- `applyEvent` lives in `packages/games/yatzy/src/apply-event.ts` and is exposed on `GameModule`.
+  It folds `dice_rolled {dice, rollsLeft}`, `dice_held {holds}`, `category_scored
+  {category, score, nextPlayerId}`, `turn_advanced {currentPlayerId}`, `game_finished {winnerIds}`,
+  reusing the reducer's own `applyBonus`/`resetTurn` so the two paths cannot disagree about scoring
+  or whose turn it is.
+- An event type the module does not recognise leaves state untouched instead of throwing. That is
+  what makes a pre-migration log harmless: rows written before this change can still be replayed
+  (they simply contribute nothing), and replay can never fail on data it did not write.
+- `chat_sent` is gone from the write path. `apps/server/src/ws/persistence.ts` no longer imports
+  `game` or `game_event`, and its `DbLike` is `Pick<Database, "select" | "insert">` — the chat path
+  cannot bump `seq` even by accident.
+- **Migration note.** No backfill, by design. `game_event` rows written before commit `M0-3` carry
+  `dice_rolled` with an empty payload, so those games cannot be replayed to the exact dice — the
+  draws were never recorded and cannot be recovered from state after the fact. Replay correctness
+  holds for every game created after this change. Old `chat_sent` rows stay in the log with a `seq`
+  of their own; replay ignores them (see above), so a legacy game's `seq` numbering still folds
+  consistently, it just cannot reproduce dice.
+
 ## Alternatives considered
 
 - **Store `stateAfter` on every event.** Simplest replay (read the last one), but duplicates state in

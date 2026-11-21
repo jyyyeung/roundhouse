@@ -11,7 +11,6 @@ import { db } from "../db/client";
 import {
   type ChatPage,
   persistChatMessageToDb,
-  appendGameEventToDb,
   listChatMessagesForTable,
 } from "./persistence";
 type Session = { user?: { id: string } } | null;
@@ -48,13 +47,6 @@ export function createWsHub(opts: {
       snapshot: unknown;
       createdAt: Date;
     }) => persistChatMessageToDb(db, input),
-    appendGameEvent: (input: {
-      tableId: string;
-      gameId?: string;
-      payload: unknown;
-      actorId: string;
-      createdAt: Date;
-    }) => appendGameEventToDb(db, input),
   };
 
   const handlers = createWsHandlers({

@@ -153,7 +153,7 @@ export function reduce(state: unknown, intent: { type: string; payload: unknown 
           actorId: ctx.actorId,
           tableId: tableId(current),
           gameId: "yatzy",
-          payload: {},
+          payload: { dice: [...dice], rollsLeft: current.rollsLeft - 1 },
           type: "dice_rolled",
         },
       ]
@@ -212,7 +212,11 @@ export function reduce(state: unknown, intent: { type: string; payload: unknown 
         actorId: ctx.actorId,
         tableId: tableId(current),
         gameId: "yatzy",
-        payload: { category, score },
+        payload: {
+          category,
+          nextPlayerId: currentPlayerId(advancedState),
+          score,
+        },
         type: "category_scored",
       },
       {
@@ -240,4 +244,7 @@ export function reduce(state: unknown, intent: { type: string; payload: unknown 
   return fail("unknown_intent");
 }
 
+// Replay primitives shared with `apply-event.ts`: folding an event has to use
+// the same scoring and turn rules as reducing an intent, or replay drifts.
+export { applyBonus, cloneState, createSheet, resetTurn };
 export type { YatzyState, Sheet };

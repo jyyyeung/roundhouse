@@ -54,6 +54,14 @@ export interface GameModule {
   createInitialState(config: Json, playerIds: string[]): Json;
   reduce(state: Json, intent: { type: string; payload: Json }, ctx: ReduceContext): ReduceResult;
   /**
+   * Folds one recorded event back into raw state. Pure by contract: no
+   * randomness, no clock, no lookups — everything a replay needs is in the event
+   * itself. `reduce` and `applyEvent` are the two halves of the replay source
+   * (ADR 0002): `reduce(S, I).events.reduce(applyEvent, S)` equals
+   * `reduce(S, I).state`. No I/O code may call this; only replay does.
+   */
+  applyEvent(state: Json, event: EventEnvelope): Json;
+  /**
    * The only way module state becomes client-visible: returns exactly what
    * `viewer` is allowed to see, never the raw state.
    */

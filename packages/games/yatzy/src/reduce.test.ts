@@ -64,7 +64,7 @@ describe("reduce", () => {
         {
           actorId: "p1",
           gameId: "yatzy",
-          payload: {},
+          payload: { dice: [1, 2, 3, 4, 5], rollsLeft: 2 },
           tableId: "yatzy",
           type: "dice_rolled",
         },
@@ -205,7 +205,7 @@ describe("reduce", () => {
       {
         actorId: "p1",
         gameId: "yatzy",
-        payload: { category: "ones", score: 2 },
+        payload: { category: "ones", nextPlayerId: "p2", score: 2 },
         tableId: "yatzy",
         type: "category_scored",
       },
