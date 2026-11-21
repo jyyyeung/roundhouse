@@ -46,7 +46,7 @@ services:
       server:
         condition: service_started
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_PORT:-8080}:81"
 
 volumes:
   postgres-data:
