@@ -104,6 +104,10 @@ Notes on the shape of this milestone:
 **Exit criteria:** a stranger with an invite link can sign up, play, leave, come back, and
 recover a password, without reading source.
 
+**Status: complete.** All five issues shipped (#43, #44, #45, #46, #47) between `c72527f` and
+`f5dade5`; the exit criteria are covered by `scripts/smoke.mjs` (sign-up, join, leave, reset) and
+the self-hosting guide now means the same stranger can be handed a URL rather than a repository.
+
 ## M2 — Read-side community
 
 - **M2-1** Spectator: `projectStateFor` spectator variant, `subscribe` admits non-seated
