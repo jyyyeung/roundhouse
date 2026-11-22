@@ -745,3 +745,206 @@ describe("TablePage", () => {
     expect(mockedConnectTableWs).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("TablePage failure notices", () => {
+  let onMessage: ((message: ServerMessage) => void) | undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    onMessage = undefined;
+    mockedGetRecentTables.mockResolvedValue([]);
+    mockedConnectTableWs.mockImplementation((opts) => {
+      onMessage = opts.onMessage;
+      return { send: vi.fn(() => true), close: vi.fn(), isOpen: vi.fn(() => true) };
+    });
+    Object.defineProperty(globalThis, "crypto", {
+      value: { randomUUID: vi.fn(() => "action-123") },
+      configurable: true,
+    });
+  });
+
+  async function openTable() {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta(),
+        state: null,
+      });
+    });
+  }
+
+  it("explains a full table instead of showing the server's code", async () => {
+    await openTable();
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "error",
+        code: "table_full",
+        message: "table_full",
+        tableId: "table-123",
+      });
+    });
+
+    expect(await screen.findByText(/this table is full/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^table_full$/)).not.toBeInTheDocument();
+  });
+
+  it("asks for an email confirmation when the server requires one", async () => {
+    await openTable();
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "error",
+        code: "needs_verify",
+        message: "needs_verify",
+        tableId: "table-123",
+      });
+    });
+
+    expect(await screen.findByText(/confirm your email to play/i)).toBeInTheDocument();
+  });
+
+  it("keeps the server's own words for a code it cannot translate", async () => {
+    await openTable();
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "error",
+        code: "invalid_request",
+        message: "Holds must be five booleans",
+        tableId: "table-123",
+      });
+    });
+
+    expect(await screen.findByText(/holds must be five booleans/i)).toBeInTheDocument();
+  });
+
+  it("announces a finished game and still offers a rematch", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta({ status: "finished" }),
+        state: activeState({ phase: "finished", winnerIds: ["user-a"] }),
+      });
+    });
+
+    expect(await screen.findByText(/game over/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /rematch/i })).toBeInTheDocument();
+  });
+});
+
+describe("TablePage seat labels", () => {
+  let onMessage: ((message: ServerMessage) => void) | undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    onMessage = undefined;
+    mockedGetRecentTables.mockResolvedValue([]);
+    mockedConnectTableWs.mockImplementation((opts) => {
+      onMessage = opts.onMessage;
+      return { send: vi.fn(() => true), close: vi.fn(), isOpen: vi.fn(() => true) };
+    });
+    Object.defineProperty(globalThis, "crypto", {
+      value: { randomUUID: vi.fn(() => "action-123") },
+      configurable: true,
+    });
+  });
+
+  it("labels the lobby seats with the same rule every game view uses", async () => {
+    renderTablePage({ user: { id: "user-b", name: "Bob" } });
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta(),
+        state: null,
+      });
+    });
+
+    expect(await screen.findByText("You")).toBeInTheDocument();
+    expect(screen.getByText("Player 1")).toBeInTheDocument();
+    // Avatars are generated from the id, so both seats carry initials.
+    expect(screen.getAllByText("US")).toHaveLength(2);
+  });
+});
+
+describe("TablePage turn clarity and sound", () => {
+  let onMessage: ((message: ServerMessage) => void) | undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    onMessage = undefined;
+    mockedGetRecentTables.mockResolvedValue([]);
+    mockedConnectTableWs.mockImplementation((opts) => {
+      onMessage = opts.onMessage;
+      return { send: vi.fn(() => true), close: vi.fn(), isOpen: vi.fn(() => true) };
+    });
+    Object.defineProperty(globalThis, "crypto", {
+      value: { randomUUID: vi.fn(() => "action-123") },
+      configurable: true,
+    });
+  });
+
+  function snapshotWith(state: ReturnType<typeof activeState> | null) {
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta({ status: "active" }),
+        state,
+      });
+    });
+  }
+
+  it("says whose turn it is from the projected state", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    snapshotWith(activeState());
+
+    expect(await screen.findByTestId("turn-banner")).toHaveTextContent("Your turn");
+  });
+
+  it("names the player everyone is waiting on", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    snapshotWith(activeState({ currentPlayerId: "user-b" }));
+
+    expect(await screen.findByTestId("turn-banner")).toHaveTextContent("Waiting on Player 2");
+  });
+
+  it("shows no turn banner for a game with no current player", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    snapshotWith(activeState({ currentPlayerId: undefined }));
+
+    expect(await screen.findByTestId("table-active-shell")).toBeInTheDocument();
+    expect(screen.queryByTestId("turn-banner")).not.toBeInTheDocument();
+  });
+
+  it("puts a labelled sound switch in the table header", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    snapshotWith(activeState());
+
+    const toggle = await screen.findByRole("button", { name: /turn sound on/i });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
+});

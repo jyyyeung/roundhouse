@@ -3,6 +3,8 @@ import type { YatzyView } from "@roundhouse/game-yatzy";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TableChatMessage } from "../../lib/chat";
+import { feedback } from "../../lib/feedback";
+import { avatarFor, avatarStyle, seatLabels } from "../../lib/seats";
 import { ChatComposer } from "./ChatComposer";
 import { ChatPanel } from "./ChatPanel";
 import { DiceTray } from "./DiceTray";
@@ -43,6 +45,48 @@ function useRollVersion(dice: readonly number[]) {
   return version;
 }
 
+/**
+ * Sound for the four moments a yatzy turn has. Feedback is a diff of the
+ * projected state the tray and the sheet already render, so it needs no new
+ * event, no new field, and no knowledge on the server that a phone buzzed.
+ *
+ * Order matters: a finished game outranks a score (the final score is also a
+ * score change), and a score outranks a hold (scoring ends the turn).
+ */
+function useYatzyFeedback(state: YatzyView) {
+  const previous = useRef<YatzyView | null>(null);
+
+  useEffect(() => {
+    const prior = previous.current;
+    previous.current = state;
+    if (!prior) return;
+
+    if (prior.phase !== "finished" && state.phase === "finished") {
+      feedback.play("win");
+      return;
+    }
+    if (scoreSignature(prior.sheets) !== scoreSignature(state.sheets)) {
+      feedback.play("score");
+      return;
+    }
+    if (prior.holds.some((held, index) => held !== state.holds[index])) {
+      feedback.play("hold");
+      return;
+    }
+    if (
+      prior.rollsLeft !== state.rollsLeft ||
+      prior.dice.some((die, at) => die !== state.dice[at])
+    ) {
+      feedback.play("roll");
+    }
+  }, [state]);
+}
+
+/** Sheets are small records of numbers; a string compare is enough to notice one. */
+function scoreSignature(sheets: YatzyView["sheets"]) {
+  return JSON.stringify(sheets);
+}
+
 function useXlChatDock() {
   const [dock, setDock] = useState(() =>
     typeof window !== "undefined" && typeof window.matchMedia === "function"
@@ -72,14 +116,11 @@ export function YatzyTable(props: YatzyTableProps) {
   const currentPlayerId = props.state.currentPlayerId;
   const isCurrentPlayer = Boolean(props.currentUserId && currentPlayerId === props.currentUserId);
 
-  const playerLabels = useMemo(() => {
-    return Object.fromEntries(
-      props.meta.seatUserIds.map((playerId, index) => [
-        playerId,
-        playerId === props.currentUserId ? "You" : `Player ${index + 1}`,
-      ]),
-    ) as Record<string, string>;
-  }, [props.currentUserId, props.meta.seatUserIds]);
+  const playerLabels = useMemo(
+    () => seatLabels(props.meta.seatUserIds, props.currentUserId),
+    [props.currentUserId, props.meta.seatUserIds],
+  );
+  useYatzyFeedback(props.state);
 
   const statusHeadline =
     props.state.phase === "finished"
@@ -146,14 +187,25 @@ export function YatzyTable(props: YatzyTableProps) {
                     return (
                       <div
                         key={playerId}
+                        data-testid={`seat-chip-${playerId}`}
                         className={[
-                          "rounded-full px-4 py-2 text-sm font-semibold",
+                          "flex items-center gap-2 rounded-full py-1.5 pr-4 pl-1.5 text-sm font-semibold",
                           active ? "bg-white text-[var(--color-ink)]" : "bg-white/15 text-white",
+                          active && playerId === props.currentUserId
+                            ? "ring-2 ring-[var(--color-ink)]"
+                            : "",
                         ].join(" ")}
                       >
-                        <span className={online ? "text-[var(--color-teal)]" : "text-white/40"}>
+                        <span
+                          aria-hidden="true"
+                          className="flex size-7 items-center justify-center rounded-full text-[0.65rem] font-bold text-white"
+                          style={avatarStyle(playerId)}
+                        >
+                          {avatarFor(playerId).initials}
+                        </span>
+                        <span className={online ? "text-[var(--color-teal)]" : "opacity-50"}>
                           ●
-                        </span>{" "}
+                        </span>
                         {playerLabels[playerId] ?? playerId}
                       </div>
                     );

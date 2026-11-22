@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { renderGameView, tableTitleFor } from "../games/registry";
 import type { TableChatMessage } from "../lib/chat";
+import { avatarFor, avatarStyle, seatLabels } from "../lib/seats";
 import {
   getRecentTables,
   joinTable,
@@ -15,6 +16,9 @@ import {
   startTable,
 } from "../lib/tables";
 import { connectTableWs, type TableWsConnection } from "../lib/ws";
+import { SoundToggle } from "../ui/SoundToggle";
+import { type NoticeKind, noticeKindForCode, TableNotice } from "../ui/TableNotice";
+import { TurnBanner } from "../ui/TurnBanner";
 
 type SessionLike = {
   user?: {
@@ -103,7 +107,9 @@ export function TablePage({ session }: { session: SessionLike }) {
   const [state, setState] = useState<unknown>(null);
   const [messages, setMessages] = useState<TableChatMessage[]>([]);
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  // A failure carries the server's code as well as its prose: the code picks the
+  // notice kind, the prose is the fallback for codes this build does not know.
+  const [error, setError] = useState<{ code?: string; message: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<"start" | "rematch" | "leave" | "kick" | null>(null);
   const [hasMoreChat, setHasMoreChat] = useState(false);
@@ -115,9 +121,13 @@ export function TablePage({ session }: { session: SessionLike }) {
   const [evicted, setEvicted] = useState<"kicked" | "left" | null>(null);
   const evictedRef = useRef<"kicked" | "left" | null>(null);
 
+  function fail(message: string, code?: string) {
+    setError({ code, message });
+  }
+
   function sendOrFlag(message: ClientMessage) {
     const ok = connectionRef.current?.send(message) ?? false;
-    if (!ok) setError("Connection lost — reconnecting…");
+    if (!ok) fail("Connection lost — reconnecting…");
     return ok;
   }
 
@@ -198,7 +208,7 @@ export function TablePage({ session }: { session: SessionLike }) {
           return true;
         }
         setLoading(false);
-        setError(message);
+        fail(message);
         return false;
       }
     }
@@ -210,14 +220,14 @@ export function TablePage({ session }: { session: SessionLike }) {
       if (evictedRef.current) return;
       if (reason === "not_authenticated") {
         setLoading(false);
-        setError("Session expired — sign in again, then reopen the table.");
+        fail("Session expired — sign in again, then reopen the table.");
         return;
       }
 
       if (!hasSnapshotRef.current) {
         setLoading(true);
       }
-      setError(
+      fail(
         hasSnapshotRef.current
           ? "Connection lost — reconnecting…"
           : `Could not connect (${reason}). Retrying…`,
@@ -334,7 +344,7 @@ export function TablePage({ session }: { session: SessionLike }) {
               setError(null);
               return;
             }
-            setError(message.message);
+            fail(message.message, message.code);
           }
         },
         onConnectionLost(reason) {
@@ -369,7 +379,7 @@ export function TablePage({ session }: { session: SessionLike }) {
       } catch (caughtError) {
         if (!alive) return;
         setLoading(false);
-        setError(getErrorMessage(caughtError));
+        fail(getErrorMessage(caughtError));
       }
     }
 
@@ -393,7 +403,7 @@ export function TablePage({ session }: { session: SessionLike }) {
       await startTable({ tableId });
       refreshSnapshot();
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      fail(getErrorMessage(caughtError));
     } finally {
       setBusyAction(null);
     }
@@ -406,7 +416,7 @@ export function TablePage({ session }: { session: SessionLike }) {
       await rematchTable({ tableId });
       refreshSnapshot();
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      fail(getErrorMessage(caughtError));
     } finally {
       setBusyAction(null);
     }
@@ -420,7 +430,7 @@ export function TablePage({ session }: { session: SessionLike }) {
       setConfirmLeave(false);
       navigate("/lobby");
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      fail(getErrorMessage(caughtError));
     } finally {
       setBusyAction(null);
     }
@@ -434,7 +444,7 @@ export function TablePage({ session }: { session: SessionLike }) {
       setConfirmKick(null);
       refreshSnapshot();
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      fail(getErrorMessage(caughtError));
     } finally {
       setBusyAction(null);
     }
@@ -457,20 +467,13 @@ export function TablePage({ session }: { session: SessionLike }) {
 
   if (!meta) {
     return (
-      <div className="mx-auto flex min-h-dvh w-full max-w-md items-center px-4 py-8">
-        <section className="w-full rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(26,26,26,0.14)] backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--color-coral)]">
-            Table unavailable
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-3 px-4 py-8">
+        <TableNotice kind={noticeKindForCode(error?.code) ?? "not-found"} />
+        {error && !noticeKindForCode(error.code) ? (
+          <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            {error.message}
           </p>
-          <h1 className="mt-3 font-display text-4xl text-[var(--color-ink)]">{tableId}</h1>
-          {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
-          <Link
-            className="mt-5 inline-flex rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)]"
-            to="/lobby"
-          >
-            Back to lobby
-          </Link>
-        </section>
+        ) : null}
       </div>
     );
   }
@@ -480,28 +483,14 @@ export function TablePage({ session }: { session: SessionLike }) {
   if (evicted) {
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-md items-center px-4 py-8">
-        <section className="w-full rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(26,26,26,0.14)] backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--color-coral)]">
-            Seat closed
-          </p>
-          <h1 className="mt-3 font-display text-4xl text-[var(--color-ink)]">
-            {evicted === "kicked" ? "The host removed you" : "You left the table"}
-          </h1>
-          <p className="mt-3 text-sm text-slate-600">
-            {evicted === "kicked"
-              ? "You can join again with the invite code while the table still has room."
-              : "Your seat is free for someone else now."}
-          </p>
-          <Link
-            className="mt-5 inline-flex rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)]"
-            to="/lobby"
-          >
-            Back to lobby
-          </Link>
-        </section>
+        <TableNotice kind={evicted === "kicked" ? "kicked" : "closed"} />
       </div>
     );
   }
+
+  // One label implementation for the whole app: the lobby, the header and every
+  // game view read the same map, so "You" cannot mean two different seats.
+  const labels = seatLabels(meta.seatUserIds, currentUserId);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 xl:max-w-7xl">
@@ -513,8 +502,16 @@ export function TablePage({ session }: { session: SessionLike }) {
           <h1 className="mt-2 font-display text-4xl text-[var(--color-ink)]">
             {meta ? tableTitleFor(meta.gameId, meta.config) : "Table"}
           </h1>
+          {meta.status === "active" ? (
+            <TurnBanner
+              currentUserId={currentUserId}
+              seatUserIds={meta.seatUserIds}
+              state={state}
+            />
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <SoundToggle />
           {confirmLeave ? (
             <>
               <button
@@ -569,11 +566,18 @@ export function TablePage({ session }: { session: SessionLike }) {
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-coral)]">
                   Seat {index + 1}
                 </p>
-                <p className="mt-2 font-semibold text-[var(--color-ink)]">
-                  {playerId === currentUserId
-                    ? session?.user?.name || "You"
-                    : `Player ${index + 1}`}
-                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                    style={avatarStyle(playerId)}
+                  >
+                    {avatarFor(playerId).initials}
+                  </span>
+                  <p className="font-semibold text-[var(--color-ink)]">
+                    {labels[playerId] ?? playerId}
+                  </p>
+                </div>
                 <p className="mt-1 text-sm text-slate-500">
                   {playerId === meta.hostUserId ? "Host" : "Ready"}
                 </p>
@@ -626,9 +630,15 @@ export function TablePage({ session }: { session: SessionLike }) {
             )}
           </div>
           {error ? (
-            <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-              {error}
-            </p>
+            noticeKindForCode(error.code) ? (
+              <div className="mt-4">
+                <TableNotice kind={noticeKindForCode(error.code) as NoticeKind} />
+              </div>
+            ) : (
+              <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                {error.message}
+              </p>
+            )
           ) : null}
         </section>
       ) : (
@@ -646,22 +656,33 @@ export function TablePage({ session }: { session: SessionLike }) {
             onLoadOlderChat: loadOlderChat,
           })}
           {meta.status === "finished" ? (
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                type="button"
-                className="rounded-2xl bg-[var(--color-coral)] px-4 py-3 font-semibold text-white"
-                onClick={handleRematch}
-                disabled={busyAction === "rematch"}
-              >
-                {busyAction === "rematch" ? "Shuffling..." : "Rematch"}
-              </button>
-            </div>
+            <>
+              <div className="mt-5">
+                <TableNotice kind="finished" />
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  className="rounded-2xl bg-[var(--color-coral)] px-4 py-3 font-semibold text-white"
+                  onClick={handleRematch}
+                  disabled={busyAction === "rematch"}
+                >
+                  {busyAction === "rematch" ? "Shuffling..." : "Rematch"}
+                </button>
+              </div>
+            </>
           ) : null}
 
           {error ? (
-            <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-              {error}
-            </p>
+            noticeKindForCode(error.code) ? (
+              <div className="mt-4">
+                <TableNotice kind={noticeKindForCode(error.code) as NoticeKind} />
+              </div>
+            ) : (
+              <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                {error.message}
+              </p>
+            )
           ) : null}
         </div>
       )}
