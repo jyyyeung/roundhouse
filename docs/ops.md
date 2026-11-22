@@ -61,6 +61,38 @@ back to `info`.
 
 Chat text and player names are never logged.
 
+## Rate limits
+
+Two inputs a client can drive in a loop are budgeted, and so are the auth routes
+that compare a password or send mail.
+
+| Input                 | Key                  | Default    | Variable                                      |
+| --------------------- | -------------------- | ---------- | --------------------------------------------- |
+| Game intents          | `tableId:userId`     | 20 per 10s | `INTENT_RATE_LIMIT`, `INTENT_RATE_WINDOW_MS`  |
+| Chat messages         | `tableId:userId`     | 5 per 10s  | `CHAT_RATE_LIMIT`, `CHAT_RATE_WINDOW_MS`      |
+| Sign-in / sign-up     | `address`, per route | 10 per 60s | `AUTH_RATE_LIMIT`, `AUTH_RATE_WINDOW_SECONDS` |
+| Password reset / mail | `address`, per route | 10 per 60s | `AUTH_RATE_LIMIT`, `AUTH_RATE_WINDOW_SECONDS` |
+
+The window slides: a fixed bucket would hand out two budgets across one boundary,
+which is exactly when a retry loop is already running.
+
+A refused websocket frame is an `error` frame with `code: "rate_limited"` and
+`retryAfterMs`, and it writes nothing — no `game_event` row, no `seq` bump, and
+the `actionId` is not consumed, so the client's retry after the window is applied
+exactly once.
+
+Two properties worth knowing before you scale this:
+
+- **State is per-process memory.** Two replicas allow two budgets, and a restart
+  forgets every budget. That is deliberate for one box and wrong for a fleet; a
+  shared store is a change to `createLimiter`, not to its callers.
+- **`TRUST_PROXY` decides what "the client address" means.** Unset, the socket
+  address is used and any `x-forwarded-for` a client sends is ignored. Set to
+  `true`, the server rewrites the header from the socket address (`X-Forwarded-For`
+  from the proxy) and trusts it. The shipped Compose stack sets it because nginx
+  overwrites the header with `$remote_addr`; a server exposed directly must leave
+  it unset, or a client can choose its own bucket.
+
 ## Shutdown
 
 `SIGTERM` / `SIGINT` start a bounded, ordered shutdown:

@@ -8,9 +8,11 @@ import type {
 } from "@roundhouse/game-core";
 import { intentFromClientMessage, PROTOCOL_VERSION } from "@roundhouse/game-core";
 
+import { env } from "../env";
 import { createLogger, type Logger } from "../log";
 import type { TablesRuntime } from "../room/runtime";
 import { toChatWire } from "./persistence";
+import { createLimiter, type Limiter } from "./rate-limit";
 
 export type WsRuntime = Pick<TablesRuntime, "applyGameIntent" | "getTableSnapshot">;
 
@@ -44,6 +46,11 @@ export function createWsHandlers(deps: {
     snapshot: Json;
     createdAt: Date;
   }) => Promise<{ id: string; createdAt: string }>;
+  /**
+   * Budgets are injectable so tests can drive them from an injected clock, and so
+   * a future caller (a relay, a bot) can be given a different allowance.
+   */
+  limits?: { intent?: Limiter; chat?: Limiter };
 }) {
   const {
     isDuplicateAction,
@@ -55,13 +62,43 @@ export function createWsHandlers(deps: {
   } = deps;
   const log = deps.logger ?? createLogger({ fields: { component: "ws.handlers" } });
 
-  // rate limit state: tableId -> userId -> timestamps (ms)
-  const rateLimits = new Map<string, Map<string, number[]>>();
+  // Two inputs a client can drive in a loop, one limiter type. The defaults come
+  // from the environment so a deployment can tighten them without a rebuild;
+  // chat keeps its historical 5 messages per 10s.
+  const intentLimiter =
+    deps.limits?.intent ??
+    createLimiter({ limit: env.INTENT_RATE_LIMIT, windowMs: env.INTENT_RATE_WINDOW_MS });
+  const chatLimiter =
+    deps.limits?.chat ??
+    createLimiter({ limit: env.CHAT_RATE_LIMIT, windowMs: env.CHAT_RATE_WINDOW_MS });
 
   return {
     async onMessage(connection: WsConnection, message: ClientTableMessage) {
       if (message.type === "intent") {
         if (isDuplicateAction(message.tableId, message.actionId)) {
+          return;
+        }
+        // The budget is spent before the actionId is reserved. A refused intent
+        // must not mark its id as applied, or the retry after the window would be
+        // dropped as a duplicate and the move silently lost.
+        const budget = intentLimiter.take(`${message.tableId}:${connection.userId}`);
+        if (!budget.ok) {
+          connection.send(
+            errorMessage({
+              actionId: message.actionId,
+              code: "rate_limited",
+              message: "rate_limited",
+              retryAfterMs: budget.retryAfterMs,
+              tableId: message.tableId,
+            }),
+          );
+          log.warn("ws.intent_rate_limited", {
+            actionId: message.actionId,
+            intentType: message.intentType,
+            retryAfterMs: budget.retryAfterMs,
+            tableId: message.tableId,
+            userId: connection.userId,
+          });
           return;
         }
 
@@ -139,31 +176,20 @@ export function createWsHandlers(deps: {
           return;
         }
 
-        // rate-limit: ~5 msg / 10s / user / table
-        const now = Date.now();
-        const windowMs = 10_000;
-        const maxMsgs = 5;
-        let tableMap = rateLimits.get(tableId);
-        if (!tableMap) {
-          tableMap = new Map();
-          rateLimits.set(tableId, tableMap);
-        }
-        const userTimestamps = tableMap.get(userId) ?? [];
-        const recent = userTimestamps.filter((t) => now - t <= windowMs);
-        if (recent.length >= maxMsgs) {
+        // Chat budget: the same limiter, keyed per table and user.
+        const chatBudget = chatLimiter.take(`${tableId}:${userId}`);
+        if (!chatBudget.ok) {
           connection.send(
             errorMessage({
               actionId,
               code: "rate_limited",
               message: "rate_limited",
+              retryAfterMs: chatBudget.retryAfterMs,
               tableId,
             }),
           );
           return;
         }
-        recent.push(now);
-        tableMap.set(userId, recent);
-
         // truncate text to 500 chars
         // 500 chars keeps a single message readable on a phone-sized chat panel.
         const text = message.text.slice(0, 500);
@@ -243,11 +269,14 @@ function errorMessage(input: {
   message: string;
   tableId?: string;
   actionId?: string;
+  /** Present on a rate-limited refusal so the client knows when to retry. */
+  retryAfterMs?: number;
 }): ServerMessage {
   return {
     actionId: input.actionId,
     code: input.code,
     message: input.message,
+    retryAfterMs: input.retryAfterMs,
     tableId: input.tableId,
     type: "error",
     v: PROTOCOL_VERSION,

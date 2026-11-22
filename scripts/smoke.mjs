@@ -259,6 +259,23 @@ async function main() {
     `${response.status} ${body.slice(0, 60)}`,
   );
 
+  // An unlimited sign-in endpoint is an offline password guess with a network
+  // round trip. The budget has to be observable from outside: a unit test can
+  // prove the arithmetic, not that a deployed stack refuses the eleventh try.
+  const attempts = [];
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const limited = await jsonRequest("/api/auth/sign-in/email", {
+      body: { email: emailA, password: "wrong-password-99999" },
+    });
+    attempts.push(limited.response.status);
+  }
+  const firstLimited = attempts.indexOf(429);
+  check(
+    "rapid sign-ins are rate limited",
+    firstLimited !== -1 && attempts.slice(firstLimited).every((status) => status === 429),
+    `statuses ${attempts.join(",")}`,
+  );
+
   await checkUnauthenticatedUpgrade();
 
   const failed = results.filter((result) => !result.ok);

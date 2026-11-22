@@ -11,7 +11,7 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "check:projection": "node scripts/check-projection.mjs",
-    "test:integration": "pnpm --filter @roundhouse/server exec vitest run src/room/runtime.integration.test.ts"
+    "test:integration": "pnpm --filter @roundhouse/server exec vitest run integration --config vitest.integration.config.ts"
   },
   "pnpm": {
     "overrides": {

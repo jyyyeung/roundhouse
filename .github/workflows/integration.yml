@@ -54,4 +54,5 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Integration suite
-        run: pnpm --filter @roundhouse/server exec vitest run src/room/runtime.integration.test.ts
+        # Every `*.integration.test.ts`: runtime, auth limits and the intent budget.
+        run: pnpm --filter @roundhouse/server exec vitest run integration --config vitest.integration.config.ts

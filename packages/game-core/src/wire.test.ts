@@ -187,6 +187,22 @@ describe("server frames", () => {
     }
   });
 
+  it("carries a retry hint on a rate-limited error and refuses a negative one", () => {
+    const limited = {
+      code: "rate_limited",
+      message: "rate_limited",
+      retryAfterMs: 4200,
+      tableId: "table-1",
+      type: "error",
+      v: 2,
+    };
+    expect(serverMessageSchema.safeParse(limited).success).toBe(true);
+
+    // A retry hint is an elapsed-time budget; negative time would tell a client to
+    // retry before now.
+    expect(serverMessageSchema.safeParse({ ...limited, retryAfterMs: -1 }).success).toBe(false);
+  });
+
   it("rejects a snapshot whose status is not a real table status", () => {
     const frame = {
       meta: { ...meta, status: "paused" },

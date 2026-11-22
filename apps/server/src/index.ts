@@ -10,6 +10,7 @@ import { auth, getSessionFromHeaders } from "./auth";
 import { closeDatabase, db } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { env } from "./env";
+import { remoteAddressOf, resolveClientIp, withClientIp } from "./http/client-ip";
 import { createGamesRouter } from "./http/games";
 import { createTablesRouter } from "./http/tables";
 import { logger } from "./log";
@@ -81,7 +82,20 @@ app.use(
   }),
 );
 
-app.on(["POST", "GET", "OPTIONS"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+/**
+ * better-auth keys its limiter on `x-forwarded-for`, which the client controls.
+ * The header is replaced with the address we resolved before the request reaches
+ * it, so the budget is per real client when a proxy is trusted and per connection
+ * when none is (see `http/client-ip.ts`).
+ */
+app.on(["POST", "GET", "OPTIONS"], "/api/auth/*", async (c) => {
+  const ip = resolveClientIp({
+    forwardedFor: c.req.header("x-forwarded-for"),
+    remoteAddress: await remoteAddressOf(c),
+    trustProxy: env.TRUST_PROXY,
+  });
+  return auth.handler(withClientIp(c.req.raw, ip));
+});
 
 app.route("/api/games", createGamesRouter());
 

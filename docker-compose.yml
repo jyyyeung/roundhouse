@@ -30,6 +30,10 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8080}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:8080}
       PORT: ${PORT:-3001}
+      # nginx overwrites x-forwarded-for with the client address, so trusting it
+      # here gives each browser its own auth budget. A direct-exposed server
+      # (no web container) must leave this unset.
+      TRUST_PROXY: ${TRUST_PROXY:-true}
     ports:
       - "${SERVER_PORT:-3001}:3001"
     healthcheck:
