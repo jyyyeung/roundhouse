@@ -1,5 +1,7 @@
 name: contracts
 
+# Guards that read the tree without running it.
+#
 # Invariant I1: only `projectStateFor` output crosses the wire, from one seam.
 # The unit tests prove the projection strips hidden fields; this job proves that
 # no future code path can bypass the seam in the first place.
@@ -27,6 +29,15 @@ jobs:
           # needs pnpm installed. This job has no install step on purpose.
           package-manager-cache: false
 
-      # No install step: the guard reads source files, it does not run the app.
+      # No install step: both guards read source files, neither runs the app.
       - name: Projection guard
         run: node scripts/check-projection.mjs
+
+      # Every variable the app reads must be in the operator docs and the
+      # template. The guard's own tests come first so a broken guard fails here
+      # rather than silently passing on a scan that found nothing (#47).
+      - name: Env docs guard tests
+        run: node --test scripts/check-env-docs.test.mjs
+
+      - name: Env docs guard
+        run: node scripts/check-env-docs.mjs

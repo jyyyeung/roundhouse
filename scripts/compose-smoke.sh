@@ -81,6 +81,19 @@ log_file="$(mktemp)"
 compose logs --follow --no-color --since 1s server >"$log_file" 2>&1 &
 log_pid=$!
 
+# A fresh volume is the upgrade path in miniature: the image must finish
+# migrating before it starts listening, or the first request in a new release
+# races a schema that is still being created (#47, docs/self-hosting.md).
+startup_log="$(compose logs --no-color server 2>&1 || true)"
+if printf '%s\n' "$startup_log" | grep -q 'migrate.done' &&
+  printf '%s\n' "$startup_log" | awk '/migrate\.done/{m=NR} /server\.listening/{l=NR} END{exit !(m && l && m < l)}'; then
+  echo "ok    server migrated before it listened"
+else
+  echo "FAIL  server did not log migrate.done before server.listening"
+  printf '%s\n' "$startup_log" | tail -20
+  exit 1
+fi
+
 node scripts/wait-for-url.mjs "$api_origin/health" "api /health" --expect '"ok"' --timeout 120000
 node scripts/wait-for-url.mjs "$web_origin/" "web root" --expect '<div id="root">' --timeout 60000
 

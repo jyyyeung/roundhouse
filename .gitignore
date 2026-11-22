@@ -6,3 +6,5 @@ dist
 apps/web/dev-dist
 .worktrees
 .superpowers
+# Database dumps from `just backup` — they contain real player accounts.
+backups

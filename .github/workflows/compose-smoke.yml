@@ -29,6 +29,11 @@ jobs:
           # store to save.
           package-manager-cache: false
 
+      # Parse the TLS samples the self-hosting docs ship (#47). Docker is
+      # already here, which is why this lives in this job and not in contracts.
+      - name: Validate deploy samples
+        run: ./scripts/check-deploy-samples.sh
+
       # The script only needs Node's fetch for the waiters and the end-to-end
       # assertions; the application itself runs inside the images.
       - name: Run the packaged stack
