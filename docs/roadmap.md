@@ -110,18 +110,20 @@ the self-hosting guide now means the same stranger can be handed a URL rather th
 
 ## M2 — Read-side community
 
-- **M2-1** Spectator: `projectStateFor` spectator variant, `subscribe` admits non-seated
-  observers (per-table opt-in), presence distinguishes watchers from players.
-  Also fix the chat snapshot while here: `apps/server/src/ws/persistence.ts:32` stores the _sender's_
-  projection with each message, so a hidden-information game writes that player's hand into shared
-  history (findings F7 in [`m0-7-module-contract-findings.md`](m0-7-module-contract-findings.md)).
+- **M2-1** ✅ Watching: `subscribe` admits a non-seat when the host opened the table, every frame
+  is the spectator projection (`you: null`), presence keeps watchers out of `onlineUserIds`, and a
+  watcher's intent is refused as `not_a_player`. The chat snapshot is now projected for nobody, so a
+  hidden-information game no longer writes the author's hand into shared history — findings F7 in
+  [`m0-7-module-contract-findings.md`](m0-7-module-contract-findings.md). See
+  [ADR 0010](adr/0010-watching-is-a-projection-not-a-mode.md).
 - **M2-2** ✅ Turn replay scrub: the server folds `applyEvent` and serves one projected step per
   described event (`GET /api/tables/:id/replay`), and the web page scrubs those projections with
   the live game view in read-only mode ([ADR 0009](adr/0009-replay-is-a-projection.md)). No
   checkpoints: a 500-event replay is asserted under 200 ms.
 - **M2-3** Post-game summary card (final scores, best category, shareable image).
 
-**Exit criteria:** a finished game can be replayed turn by turn from the database alone.
+**Exit criteria:** a stranger with the link can watch a live table without a seat, and a finished
+game can be replayed turn by turn from the database alone.
 
 ## M3 — Async
 

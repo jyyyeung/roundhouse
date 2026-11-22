@@ -16,6 +16,7 @@ function makeRuntime(): WsRuntime {
     hostUserId: "user-a",
     seatUserIds: playerIds,
     softSeatCap: 4,
+    spectatorsAllowed: false,
   };
 
   const seq = 0;

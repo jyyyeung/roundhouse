@@ -64,6 +64,7 @@ function replayFixture(): TableReplay {
       hostUserId: "user-a",
       seatUserIds: ["user-a", "user-b"],
       softSeatCap: 6,
+      spectatorsAllowed: false,
     },
     turns: [
       {

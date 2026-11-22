@@ -34,10 +34,10 @@ const yatzyEntry = {
   defaultConfig: { ruleset: "yatzy" },
 };
 
-function renderLobby() {
+function renderLobby(viewerId?: string) {
   return render(
     <MemoryRouter>
-      <LobbyPage session={{ user: { name: "Ada", email: "ada@example.com" } }} />
+      <LobbyPage session={{ user: { email: "ada@example.com", id: viewerId, name: "Ada" } }} />
     </MemoryRouter>,
   );
 }
@@ -102,6 +102,7 @@ describe("LobbyPage layout", () => {
         status: "active",
         hostUserId: "user-a",
         softSeatCap: 4,
+        spectators: false,
         createdAt: "2026-08-02T00:00:00.000Z",
         seatUserIds: ["user-a", "user-b"],
       },
@@ -132,6 +133,38 @@ describe("LobbyPage layout", () => {
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("code=Z2YL8J"));
   });
 
+  it("offers Watch only on an open table the viewer is not sitting at", async () => {
+    const recent = (overrides: Record<string, unknown>) => ({
+      code: "Z2YL8J",
+      config: { ruleset: "yatzy" },
+      createdAt: "2026-08-02T00:00:00.000Z",
+      gameId: "yatzy",
+      hostUserId: "user-a",
+      id: "table-1",
+      seatUserIds: ["user-a", "user-b"],
+      softSeatCap: 4,
+      spectators: true,
+      status: "active",
+      ...overrides,
+    });
+    getRecentTables.mockResolvedValue([
+      recent({ id: "open-table" }),
+      recent({ id: "closed-table", spectators: false }),
+      recent({ id: "my-table", seatUserIds: ["user-a", "user-me"] }),
+      recent({ id: "lobby-table", status: "lobby" }),
+    ] as never);
+
+    renderLobby("user-me");
+
+    // Watching is a choice the host made, and a seat is not watching.
+    await waitFor(() => {
+      expect(screen.getByTestId("lobby-watch-open-table")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("lobby-watch-closed-table")).toBeNull();
+    expect(screen.queryByTestId("lobby-watch-my-table")).toBeNull();
+    expect(screen.queryByTestId("lobby-watch-lobby-table")).toBeNull();
+  });
+
   it("shows ruleset contrast help beside the picker", async () => {
     const user = userEvent.setup();
     const help = getRulesetCompareHelp();
@@ -160,7 +193,11 @@ describe("LobbyPage layout", () => {
     await user.click(screen.getByRole("button", { name: /^create table$/i }));
 
     await waitFor(() => {
-      expect(createTable).toHaveBeenCalledWith({ gameId: "yatzy", config: { ruleset: "yatzy" } });
+      expect(createTable).toHaveBeenCalledWith({
+        config: { ruleset: "yatzy" },
+        gameId: "yatzy",
+        spectators: false,
+      });
     });
   });
 

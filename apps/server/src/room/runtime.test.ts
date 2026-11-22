@@ -18,6 +18,7 @@ function makeSeed() {
       id: tableId,
       mode: "live",
       softSeatCap: 4,
+      spectatorsAllowed: false,
       status: "active",
     },
     seats: [
@@ -422,6 +423,7 @@ function lobbySeed(seatUserIds: string[]) {
       id: tableId,
       mode: "live",
       softSeatCap: 4,
+      spectatorsAllowed: false,
       status: "lobby",
     },
   };

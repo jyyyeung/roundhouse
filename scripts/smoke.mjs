@@ -233,6 +233,68 @@ async function main() {
     `${response.status} ${body.slice(0, 160)}`,
   );
 
+  // Watchers are opt-in per table (ADR 0010): the flag the host sent comes back
+  // on the row, and a table nobody opened stays closed.
+  if (tableId) {
+    ({ body, response } = await jsonRequest("/api/tables/mine", {
+      cookie: cookieA,
+      method: "GET",
+    }));
+    const mineRows = (() => {
+      try {
+        const parsed = JSON.parse(body);
+        return Array.isArray(parsed) ? parsed : (parsed.tables ?? []);
+      } catch {
+        return [];
+      }
+    })();
+    const created = mineRows.find((row) => row.id === tableId);
+    check(
+      "a table nobody opened is closed to watchers",
+      response.ok && created?.spectators === false,
+      `${response.status} spectators=${String(created?.spectators)}`,
+    );
+  }
+
+  ({ body, response } = await jsonRequest("/api/tables", {
+    body: { gameId: "yatzy", spectators: true },
+    cookie: cookieA,
+  }));
+  let watchedTableId;
+  try {
+    ({ tableId: watchedTableId } = JSON.parse(body));
+  } catch {
+    // Left undefined so the failure below reports the raw body.
+  }
+  check(
+    "POST /api/tables opens the table to watchers when asked",
+    response.ok && Boolean(watchedTableId),
+    `${response.status} ${body.slice(0, 160)}`,
+  );
+
+  if (watchedTableId) {
+    ({ body, response } = await jsonRequest("/api/tables/mine", {
+      cookie: cookieA,
+      method: "GET",
+    }));
+    const rows = (() => {
+      try {
+        const parsed = JSON.parse(body);
+        return Array.isArray(parsed) ? parsed : (parsed.tables ?? []);
+      } catch {
+        return [];
+      }
+    })();
+    const open = rows.find((row) => row.id === watchedTableId);
+    check(
+      "the open flag survives the round trip through /api/tables/mine",
+      response.ok && open?.spectators === true,
+      `${response.status} spectators=${String(open?.spectators)}`,
+    );
+    // Clean up so the next run's lobby is not full of smoke tables.
+    await jsonRequest(`/api/tables/${watchedTableId}/leave`, { cookie: cookieA });
+  }
+
   if (code) {
     ({ body, response } = await jsonRequest("/api/tables/join", {
       body: { code },

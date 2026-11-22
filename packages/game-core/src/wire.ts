@@ -38,6 +38,11 @@ export const tableMetaSchema = z.object({
   hostUserId: z.string(),
   seatUserIds: z.array(z.string()),
   softSeatCap: z.number().int(),
+  /**
+   * Whether someone without a seat may watch this table (M2-1, #56). A private
+   * table answers `not_seated` exactly as it always did.
+   */
+  spectatorsAllowed: z.boolean(),
   status: z.enum(["lobby", "active", "finished"]),
 });
 
@@ -184,6 +189,9 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     onlineUserIds: z.array(z.string()),
+    // Who is watching without a seat. A player is only ever listed in
+    // `onlineUserIds`, so the two lists never overlap (M2-1, #56).
+    spectatorUserIds: z.array(z.string()),
     tableId: idSchema,
     type: z.literal("presence"),
     v: z.literal(PROTOCOL_VERSION),

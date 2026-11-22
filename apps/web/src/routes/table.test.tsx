@@ -58,6 +58,7 @@ function baseMeta(overrides?: Partial<TableMeta>): TableMeta {
     hostUserId: "user-a",
     seatUserIds: ["user-a", "user-b"],
     softSeatCap: 4,
+    spectatorsAllowed: false,
     ...overrides,
   };
 }
@@ -145,6 +146,56 @@ describe("TablePage", () => {
       value: originalCrypto,
       configurable: true,
     });
+  });
+
+  it("renders a watcher's board with a watching badge and no way to leave", async () => {
+    renderTablePage({ user: { id: "user-watch", name: "Watcher" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 1,
+        meta: baseMeta({ status: "active", spectatorsAllowed: true }),
+        // The spectator projection: the board, with no seat of its own.
+        state: activeState({ you: null }),
+      });
+    });
+
+    expect(await screen.findByTestId("watching-badge")).toHaveTextContent(/watching/i);
+    expect(screen.getByTestId("turn-banner")).toHaveTextContent(/waiting on player 1/i);
+    // A watcher holds no seat, so there is nothing to give up.
+    expect(screen.queryByRole("button", { name: /leave table/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /start game/i })).toBeNull();
+  });
+
+  it("counts the room when more than one person is watching", async () => {
+    renderTablePage({ user: { id: "user-watch", name: "Watcher" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 1,
+        meta: baseMeta({ status: "active", spectatorsAllowed: true }),
+        state: activeState({ you: null }),
+      });
+      onMessage?.({
+        tableId: "table-123",
+        type: "presence",
+        onlineUserIds: ["user-a"],
+        spectatorUserIds: ["user-watch", "user-other"],
+        v: 2,
+      });
+    });
+
+    expect(await screen.findByTestId("watching-badge")).toHaveTextContent(/2 watching/i);
   });
 
   it("auto-joins invite links and shows lobby controls for the host", async () => {
@@ -429,6 +480,7 @@ describe("TablePage", () => {
         status: "active",
         hostUserId: "user-a",
         softSeatCap: 4,
+        spectators: false,
         createdAt: "2026-08-02T08:00:00.000Z",
         seatUserIds: ["user-a", "user-b"],
       },

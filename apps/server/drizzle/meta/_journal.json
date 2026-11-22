@@ -15,6 +15,13 @@
       "when": 1785655774574,
       "tag": "0001_flippant_lilandra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795353776919,
+      "tag": "0002_salty_serpent_society",
+      "breakpoints": true
     }
   ]
 }
