@@ -1,3 +1,4 @@
+import { tableReplaySchema } from "@roundhouse/game-core";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { TablesRuntime } from "../room/runtime";
@@ -9,6 +10,7 @@ function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
     createTable: vi.fn(),
     getTableLiveState: vi.fn(),
     getTableSnapshot: vi.fn(),
+    getTableReplay: vi.fn(),
     getTableSync: vi.fn(),
     joinTable: vi.fn(),
     startTable: vi.fn(),
@@ -372,5 +374,99 @@ describe("tables http api verification gate", () => {
     });
 
     expect(created.status).toBe(201);
+  });
+});
+
+describe("tables http replay", () => {
+  const replayBody = {
+    tableId: "table-1",
+    gameId: "yatzy",
+    finishedAt: "2026-11-22T00:00:00.000Z",
+    meta: {
+      code: "ABC123",
+      gameId: "yatzy",
+      config: { ruleset: "yatzy" },
+      status: "finished",
+      hostUserId: "user-1",
+      seatUserIds: ["user-1", "user-2"],
+      softSeatCap: 6,
+    },
+    turns: [
+      {
+        seq: 0,
+        actorId: null,
+        phrase: "game started",
+        view: { gameId: "yatzy", phase: "playing", you: 0 },
+      },
+      {
+        seq: 3,
+        actorId: "user-1",
+        phrase: "scored ones for 5",
+        view: { gameId: "yatzy", phase: "finished", you: 0 },
+      },
+    ],
+  };
+
+  it("serves a finished game as projected steps and no event payloads", async () => {
+    const getTableReplay = vi.fn().mockResolvedValue(replayBody);
+
+    const res = await makeApp(makeRuntime({ getTableReplay })).request(
+      "/api/tables/table-1/replay",
+    );
+
+    expect(res.status).toBe(200);
+    expect(getTableReplay).toHaveBeenCalledWith({ asUserId: "user-1", tableId: "table-1" });
+    const body = await res.json();
+    expect(tableReplaySchema.parse(body)).toEqual(replayBody);
+    for (const turn of body.turns) {
+      expect(Object.keys(turn).sort()).toEqual(["actorId", "phrase", "seq", "view"]);
+    }
+  });
+
+  it("refuses a caller who never sat at the table", async () => {
+    const res = await makeApp(
+      makeRuntime({
+        getTableReplay: vi
+          .fn()
+          .mockRejectedValue(new TablesError("not_a_participant", "not_a_participant", 403)),
+      }),
+    ).request("/api/tables/table-1/replay");
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ code: "not_a_participant" });
+  });
+
+  it("reports a missing table and an unfinished game separately", async () => {
+    const missing = await makeApp(
+      makeRuntime({
+        getTableReplay: vi
+          .fn()
+          .mockRejectedValue(new TablesError("table_missing", "table_missing", 404)),
+      }),
+    ).request("/api/tables/table-1/replay");
+    const unfinished = await makeApp(
+      makeRuntime({
+        getTableReplay: vi
+          .fn()
+          .mockRejectedValue(new TablesError("table_not_finished", "table_not_finished", 409)),
+      }),
+    ).request("/api/tables/table-1/replay");
+
+    expect(missing.status).toBe(404);
+    expect(unfinished.status).toBe(409);
+    await expect(unfinished.json()).resolves.toMatchObject({ code: "table_not_finished" });
+  });
+
+  it("refuses to serve a log with holes instead of guessing the missing steps", async () => {
+    const res = await makeApp(
+      makeRuntime({
+        getTableReplay: vi
+          .fn()
+          .mockRejectedValue(new TablesError("replay_unavailable", "replay_unavailable", 409)),
+      }),
+    ).request("/api/tables/table-1/replay");
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: "replay_unavailable" });
   });
 });

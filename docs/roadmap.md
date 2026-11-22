@@ -115,8 +115,10 @@ the self-hosting guide now means the same stranger can be handed a URL rather th
   Also fix the chat snapshot while here: `apps/server/src/ws/persistence.ts:32` stores the _sender's_
   projection with each message, so a hidden-information game writes that player's hand into shared
   history (findings F7 in [`m0-7-module-contract-findings.md`](m0-7-module-contract-findings.md)).
-- **M2-2** Turn replay scrub driven by `applyEvent` + a checkpoint per turn; HTTP event read
-  endpoint; the UI scrubs projections per event index.
+- **M2-2** ✅ Turn replay scrub: the server folds `applyEvent` and serves one projected step per
+  described event (`GET /api/tables/:id/replay`), and the web page scrubs those projections with
+  the live game view in read-only mode ([ADR 0009](adr/0009-replay-is-a-projection.md)). No
+  checkpoints: a 500-event replay is asserted under 200 ms.
 - **M2-3** Post-game summary card (final scores, best category, shareable image).
 
 **Exit criteria:** a finished game can be replayed turn by turn from the database alone.
@@ -172,3 +174,4 @@ seasons/custom crew metrics, no unauthenticated guests, no second title _before_
 | [0006](adr/0006-seats-are-positions.md)                 | A seat is a position `0..n-1`; removal compacts it, an empty lobby is deleted, the host moves down                          |
 | [0007](adr/0007-limits-are-per-process.md)              | Limits are per-process memory with a sliding window; `TRUST_PROXY` decides the address, and the proxy overwrites the header |
 | [0008](adr/0008-mail-is-a-port.md)                      | Mail is an injected `Mailer` (`log` by default); the token is spent by a page this app owns, not a `callbackURL` redirect   |
+| [0009](adr/0009-replay-is-a-projection.md)              | A replay is the server folding the log into per-viewer projections plus a phrase; the wire never carries event payloads     |

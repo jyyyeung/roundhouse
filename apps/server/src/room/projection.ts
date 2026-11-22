@@ -31,3 +31,12 @@ export function projectSnapshot(
 export function rawGameState(state: unknown): RawGameState | null {
   return (state ?? null) as RawGameState | null;
 }
+
+/**
+ * Project a state that came from folding the event log rather than from the
+ * `game` row (replay, ADR 0009). Replay state is raw module state too, so it
+ * crosses the same seam — a second cast site would be a second place to leak.
+ */
+export function projectReplayedState(module: GameModule, state: Json, viewer: ViewerView): Json {
+  return module.projectStateFor(state as RawGameState, viewer);
+}

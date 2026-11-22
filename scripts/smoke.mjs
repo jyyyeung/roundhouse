@@ -276,6 +276,58 @@ async function main() {
     );
   }
 
+  // A finished game has to survive its own table, and the replay endpoint is the
+  // only way to read one back. The finished-game round trip itself lives in the
+  // integration suite (`apps/server/src/room/runtime.integration.test.ts`): a game
+  // cannot finish without intents, intents arrive over the WebSocket, and Node's
+  // built-in WebSocket cannot send a Cookie header — the same limit that keeps the
+  // authenticated subscribe path in `apps/server/src/ws/hub.test.ts`. What this
+  // stack *can* prove is that the route reaches a real game row and refuses the
+  // cases it must.
+  let duelTableId;
+  ({ body, response } = await jsonRequest("/api/tables", {
+    body: { config: { rounds: 1 }, gameId: "duel" },
+    cookie: cookieA,
+  }));
+  let duelCode;
+  try {
+    ({ tableId: duelTableId, code: duelCode } = JSON.parse(body));
+  } catch {
+    // Left undefined so the checks below report the raw body.
+  }
+
+  const replayOf = (path, options) => jsonRequest(path, { method: "GET", ...options });
+
+  ({ response } = await replayOf(`/api/tables/${duelTableId ?? "missing"}/replay`));
+  check(
+    "GET /api/tables/:id/replay needs a session",
+    response.status === 401,
+    `status ${response.status}`,
+  );
+
+  ({ body, response } = await replayOf("/api/tables/no-such-table/replay", { cookie: cookieA }));
+  check(
+    "a replay of a table that does not exist is 404",
+    response.status === 404 && body.includes("table_missing"),
+    `${response.status} ${body.slice(0, 120)}`,
+  );
+
+  if (duelCode) {
+    await jsonRequest("/api/tables/join", { body: { code: duelCode }, cookie: cookieB });
+    ({ response } = await jsonRequest(`/api/tables/${duelTableId}/start`, { cookie: cookieA }));
+    check("a duel table starts", response.ok, `status ${response.status}`);
+
+    ({ body, response } = await replayOf(`/api/tables/${duelTableId}/replay`, { cookie: cookieA }));
+    check(
+      "a replay of a live game is 409",
+      response.status === 409 && body.includes("table_not_finished"),
+      `${response.status} ${body.slice(0, 120)}`,
+    );
+  } else {
+    check("a duel table starts", false, `create failed: ${body.slice(0, 160)}`);
+    check("a replay of a live game is 409", false, "no table");
+  }
+
   ({ response } = await jsonRequest("/api/auth/sign-out", { cookie: cookieA }));
   check("sign-out (empty body POST)", response.ok, `status ${response.status}`);
 

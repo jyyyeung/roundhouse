@@ -1,4 +1,4 @@
-import type { GameCatalogueEntry, Json } from "@roundhouse/game-core";
+import type { GameCatalogueEntry, Json, TableReplay } from "@roundhouse/game-core";
 
 export type RecentTable = {
   id: string;
@@ -23,12 +23,34 @@ export function buildShareUrl(input: { webBaseUrl: string; tableId: string; code
   return url.toString();
 }
 
+/**
+ * A failed API call, with the server's own code kept intact.
+ *
+ * The message is what a person reads; the code is what a page branches on when
+ * it wants to show a specific notice instead of a raw sentence.
+ */
+export class ApiError extends Error {
+  readonly code: string | null;
+  readonly status: number;
+
+  constructor(message: string, code: string | null, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
 async function readApiError(response: Response) {
   const body = (await response.json().catch(() => null)) as {
     message?: string;
     code?: string;
   } | null;
-  return body?.message ?? body?.code ?? `Request failed with ${response.status}`;
+  return new ApiError(
+    body?.message ?? body?.code ?? `Request failed with ${response.status}`,
+    body?.code ?? null,
+    response.status,
+  );
 }
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -42,7 +64,7 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(await readApiError(response));
+    throw await readApiError(response);
   }
 
   return response.json() as Promise<T>;
@@ -105,4 +127,13 @@ export function kickFromTable(input: { tableId: string; userId: string }) {
     method: "POST",
     body: JSON.stringify({ userId: input.userId }),
   });
+}
+
+/**
+ * A finished game's log, already folded and projected by the server (ADR 0009).
+ * The client never receives the events: for a hidden-information game the
+ * payloads are exactly what projection exists to withhold.
+ */
+export function getTableReplay(tableId: string) {
+  return fetchJson<TableReplay>(`/api/tables/${tableId}/replay`);
 }

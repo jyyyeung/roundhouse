@@ -13,6 +13,13 @@ type DiceTrayProps = {
   rollVersion: number;
   onToggleHold: (index: number) => void;
   onRoll: () => void;
+  /**
+   * A replay shows the tray without offering it. The dice must stay visible —
+   * they are the whole story of a turn — but a control that cannot act is a
+   * promise the table cannot keep, so the roll button is absent and each die is
+   * a picture rather than a button.
+   */
+  readOnly?: boolean;
 };
 
 export function DiceTray(props: DiceTrayProps) {
@@ -37,15 +44,17 @@ export function DiceTray(props: DiceTrayProps) {
           </div>
           <p className="mt-2 text-sm text-slate-600">{props.rollsLeft} rolls left</p>
         </div>
-        <motion.button
-          type="button"
-          className="rounded-2xl bg-[var(--color-ink)] px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-          whileTap={props.canRoll ? { scale: 0.96 } : undefined}
-          onClick={props.onRoll}
-          disabled={!props.canRoll}
-        >
-          Roll dice
-        </motion.button>
+        {props.readOnly ? null : (
+          <motion.button
+            type="button"
+            className="rounded-2xl bg-[var(--color-ink)] px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            whileTap={props.canRoll ? { scale: 0.96 } : undefined}
+            onClick={props.onRoll}
+            disabled={!props.canRoll}
+          >
+            Roll dice
+          </motion.button>
+        )}
       </div>
 
       <div className="dice-row mt-4 flex flex-wrap justify-center gap-3">
@@ -54,6 +63,27 @@ export function DiceTray(props: DiceTrayProps) {
           const held = props.holds[index];
           // A die belongs to its slot, so the slot is the identity.
           const slotId = `die-${index}`;
+
+          const className = [
+            "size-12 overflow-hidden rounded-[1.4rem] border p-1.5 shadow-sm transition md:size-14",
+            held
+              ? "border-[var(--color-teal-deep)] bg-[var(--color-teal)] text-[var(--color-ink)]"
+              : "border-slate-200 bg-white text-[var(--color-ink)]",
+          ].join(" ");
+
+          if (props.readOnly) {
+            return (
+              <div
+                key={slotId}
+                data-testid={`die-view-${index}`}
+                className={className}
+                role="img"
+                aria-label={`Die ${index + 1}: ${value}`}
+              >
+                <DieFace value={value} />
+              </div>
+            );
+          }
 
           return (
             <motion.button

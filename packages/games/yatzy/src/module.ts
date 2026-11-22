@@ -8,6 +8,7 @@ import type {
 import { applyYatzyEvent } from "./apply-event";
 import { yahtzeeCategories, yatzyCategories } from "./categories";
 import { defaultYatzyConfig, yatzyConfigSchema, yatzyPlayerCount } from "./config";
+import { describeYatzyEvent } from "./describe-event";
 import { yatzyIntents } from "./intents";
 import { reduce, type YatzyState } from "./reduce";
 import type { Ruleset } from "./types";
@@ -72,5 +73,6 @@ export const yatzyModule: GameModule = {
   reduce,
   projectStateFor,
   applyEvent,
+  describeEvent: describeYatzyEvent,
   isFinished,
 };

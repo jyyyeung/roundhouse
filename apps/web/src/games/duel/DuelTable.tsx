@@ -8,6 +8,8 @@ export type DuelTableProps = {
   currentUserId: string | null;
   onlineUserIds: string[];
   onIntent: (type: string, payload: Json) => void;
+  /** Replay shows a round that already resolved: picks are not available. */
+  readOnly?: boolean;
 };
 
 /** Display order: the triangle read clockwise. */
@@ -57,7 +59,7 @@ export function DuelTable(props: DuelTableProps) {
   const opponentId = state.playerIds.find((playerId) => playerId !== myId) ?? null;
   const waitingOn = state.playerIds.filter((playerId) => !state.pickedBy.includes(playerId));
   const finished = state.phase === "finished";
-  const canPick = seated && !finished && state.yourPick === null;
+  const canPick = !props.readOnly && seated && !finished && state.yourPick === null;
 
   const headline = finished
     ? state.winnerIds.length > 0
@@ -118,11 +120,13 @@ export function DuelTable(props: DuelTableProps) {
       <section className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_20px_60px_rgba(26,26,26,0.12)] backdrop-blur md:p-6">
         <h2 className="font-display text-xl text-[var(--color-ink)]">Pick a card</h2>
         <p className="mt-1 text-sm text-slate-600">
-          {finished
-            ? "This duel is over. Start a rematch from the table header to play again."
-            : canPick
-              ? "Choose now — your opponent will not see it until the round resolves."
-              : "You have already played this round."}
+          {props.readOnly
+            ? "A replay of a finished duel. Nothing here can change the result."
+            : finished
+              ? "This duel is over. Start a rematch from the table header to play again."
+              : canPick
+                ? "Choose now — your opponent will not see it until the round resolves."
+                : "You have already played this round."}
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">

@@ -669,6 +669,12 @@ export function TablePage({ session }: { session: SessionLike }) {
                 >
                   {busyAction === "rematch" ? "Shuffling..." : "Rematch"}
                 </button>
+                <Link
+                  to={`/t/${tableId}/replay`}
+                  className="rounded-2xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)]"
+                >
+                  Watch the replay
+                </Link>
               </div>
             </>
           ) : null}

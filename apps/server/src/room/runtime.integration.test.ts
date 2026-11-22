@@ -901,6 +901,94 @@ integration(title, () => {
       expect(replayed).toEqual(storedState);
     });
   });
+
+  describe("serving a finished game as a replay (M2-2, #57)", () => {
+    async function statusOf(gameRowId: string) {
+      const [row] = await sql<{ status: string }[]>`
+        select status from game where id = ${gameRowId}
+      `;
+      return row.status;
+    }
+
+    /** Plays the table out with legal intents until the game row says finished. */
+    async function finishedGame(playerCount = 2) {
+      const game = await startedGame(playerCount);
+      for (let step = 0; step < 200; step += 1) {
+        if ((await statusOf(game.gameRowId)) === "finished") return game;
+        await playOneLegalIntent({
+          gameRowId: game.gameRowId,
+          randomInt: () => step % 6,
+          seatUserIds: game.players,
+          tableId: game.tableId,
+        });
+      }
+      throw new Error("the scripted game never finished");
+    }
+
+    it("serves projected steps that end on the board the table shows", async () => {
+      const { tableId, players } = await finishedGame();
+
+      const ann = await runtime.getTableReplay({ asUserId: players[0], tableId });
+      const bob = await runtime.getTableReplay({ asUserId: players[1], tableId });
+      const live = await runtime.getTableSnapshot({ asUserId: players[0], tableId });
+
+      expect(ann.meta.status).toBe("finished");
+      expect(ann.turns.length).toBeGreaterThan(10);
+      // One step per recorded event: the opening board is the game row, not a step.
+      expect(ann.turns[0]).toMatchObject({ actorId: players[0], seq: 1 });
+      expect(ann.turns.at(-1)?.view).toEqual(live?.state);
+
+      // A step carries a phrase and a projected view — never an event payload.
+      for (const turn of ann.turns) {
+        expect(Object.keys(turn).sort()).toEqual(["actorId", "phrase", "seq", "view"]);
+        expect(turn.view).not.toHaveProperty("currentPlayerIndex");
+        expect(turn.phrase).not.toMatch(/^[a-z]+_[a-z]+$/);
+      }
+
+      const seqs = ann.turns.map((turn) => turn.seq);
+      expect([...seqs].sort((left, right) => left - right)).toEqual(seqs);
+
+      const annLast = ann.turns.at(-1)?.view as Record<string, unknown>;
+      const bobLast = bob.turns.at(-1)?.view as Record<string, unknown>;
+      expect(annLast.you).toBe(0);
+      expect(bobLast.you).toBe(1);
+      expect({ ...annLast, you: null }).toEqual({ ...bobLast, you: null });
+    });
+
+    it("refuses an unfinished game and a table that does not exist", async () => {
+      const { tableId, players } = await startedGame(2);
+
+      await expectTablesError(
+        runtime.getTableReplay({ asUserId: players[0], tableId }),
+        "table_not_finished",
+      );
+      await expectTablesError(
+        runtime.getTableReplay({ asUserId: players[0], tableId: "no-such-table" }),
+        "table_missing",
+      );
+    });
+
+    it("refuses an outsider and a log with a hole rather than inventing steps", async () => {
+      const { gameRowId, tableId, players } = await finishedGame();
+      const outsider = await makeUser();
+
+      await expectTablesError(
+        runtime.getTableReplay({ asUserId: outsider, tableId }),
+        "not_a_participant",
+      );
+
+      await sql`
+        delete from game_event
+        where game_row_id = ${gameRowId}
+          and seq = (select max(seq) from game_event where game_row_id = ${gameRowId})
+      `;
+
+      await expectTablesError(
+        runtime.getTableReplay({ asUserId: players[0], tableId }),
+        "replay_unavailable",
+      );
+    });
+  });
 });
 
 class MockSocket {

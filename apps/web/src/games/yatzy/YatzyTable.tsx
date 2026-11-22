@@ -22,6 +22,8 @@ type YatzyTableProps = {
   hasMoreChat: boolean;
   loadingOlderChat: boolean;
   onLoadOlderChat: () => void;
+  /** Replay shows a board that already happened: no intent, no chat. */
+  readOnly?: boolean;
 };
 
 /**
@@ -114,7 +116,9 @@ export function YatzyTable(props: YatzyTableProps) {
   const chatDocked = useXlChatDock();
   const chatMode = chatDocked ? "dock" : "overlay";
   const currentPlayerId = props.state.currentPlayerId;
-  const isCurrentPlayer = Boolean(props.currentUserId && currentPlayerId === props.currentUserId);
+  const readOnly = props.readOnly === true;
+  const isCurrentPlayer =
+    !readOnly && Boolean(props.currentUserId && currentPlayerId === props.currentUserId);
 
   const playerLabels = useMemo(
     () => seatLabels(props.meta.seatUserIds, props.currentUserId),
@@ -165,13 +169,15 @@ export function YatzyTable(props: YatzyTableProps) {
                     </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="rounded-2xl bg-white/20 px-4 py-3 text-sm font-semibold text-white backdrop-blur xl:hidden"
-                  onClick={() => setChatOpen(true)}
-                >
-                  Chat
-                </button>
+                {readOnly ? null : (
+                  <button
+                    type="button"
+                    className="rounded-2xl bg-white/20 px-4 py-3 text-sm font-semibold text-white backdrop-blur xl:hidden"
+                    onClick={() => setChatOpen(true)}
+                  >
+                    Chat
+                  </button>
+                )}
               </div>
 
               <div
@@ -226,6 +232,7 @@ export function YatzyTable(props: YatzyTableProps) {
                 props.state.phase !== "finished" &&
                 !props.state.dice.every((die) => die === 0)
               }
+              readOnly={readOnly}
               rollVersion={rollVersion}
               onRoll={() => props.onIntent("roll", {})}
               onToggleHold={(index) => {
@@ -273,25 +280,27 @@ export function YatzyTable(props: YatzyTableProps) {
           </div>
         </div>
 
-        <div className={chatMode === "dock" ? "min-h-0 xl:h-[calc(100dvh-6rem)]" : "min-h-0"}>
-          <ChatPanel
-            mode={chatMode}
-            open={chatOpen}
-            onClose={() => setChatOpen(false)}
-            messages={props.messages}
-            playerLabels={playerLabels}
-            canSend
-            onSend={handleSendChat}
-            draft={draft}
-            onDraftChange={setDraft}
-            hasMoreChat={props.hasMoreChat}
-            loadingOlderChat={props.loadingOlderChat}
-            onLoadOlderChat={props.onLoadOlderChat}
-          />
-        </div>
+        {readOnly ? null : (
+          <div className={chatMode === "dock" ? "min-h-0 xl:h-[calc(100dvh-6rem)]" : "min-h-0"}>
+            <ChatPanel
+              mode={chatMode}
+              open={chatOpen}
+              onClose={() => setChatOpen(false)}
+              messages={props.messages}
+              playerLabels={playerLabels}
+              canSend
+              onSend={handleSendChat}
+              draft={draft}
+              onDraftChange={setDraft}
+              hasMoreChat={props.hasMoreChat}
+              loadingOlderChat={props.loadingOlderChat}
+              onLoadOlderChat={props.onLoadOlderChat}
+            />
+          </div>
+        )}
       </div>
 
-      {chatMode === "overlay" && !chatOpen ? (
+      {!readOnly && chatMode === "overlay" && !chatOpen ? (
         <div
           data-testid="chat-float-composer"
           className="fixed inset-x-0 bottom-0 z-20 border-t border-white/60 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(26,26,26,0.12)] backdrop-blur md:hidden"

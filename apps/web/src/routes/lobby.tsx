@@ -316,13 +316,25 @@ export function LobbyPage({ session }: { session: SessionLike }) {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  className="mt-4 w-full rounded-2xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)] md:mt-0 md:w-auto md:shrink-0"
-                  onClick={() => navigate(`/t/${table.id}?code=${table.code}`)}
-                >
-                  Open table
-                </button>
+                <div className="mt-4 flex w-full flex-col gap-2 md:mt-0 md:w-auto md:shrink-0">
+                  <button
+                    type="button"
+                    className="w-full rounded-2xl bg-white px-4 py-3 font-semibold text-[var(--color-ink)] md:w-auto"
+                    onClick={() => navigate(`/t/${table.id}?code=${table.code}`)}
+                  >
+                    Open table
+                  </button>
+                  {table.status === "finished" ? (
+                    <button
+                      type="button"
+                      data-testid={`lobby-replay-${table.id}`}
+                      className="w-full rounded-2xl bg-[var(--color-ink)] px-4 py-3 font-semibold text-white md:w-auto"
+                      onClick={() => navigate(`/t/${table.id}/replay`)}
+                    >
+                      Replay
+                    </button>
+                  ) : null}
+                </div>
               </article>
             );
           })}
