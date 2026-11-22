@@ -19,7 +19,7 @@ type TableRow = typeof gameTable.$inferSelect;
 type GameRow = typeof game.$inferSelect;
 type SeatRow = typeof tablePlayer.$inferSelect;
 type GameEventRow = typeof gameEvent.$inferSelect;
-type DbLike = Pick<Database, "select" | "insert" | "update" | "transaction" | "execute">;
+type DbLike = Pick<Database, "select" | "insert" | "update" | "delete" | "transaction" | "execute">;
 
 /**
  * Projects stored game state for one viewer. Returns null (rather than throwing)
@@ -82,6 +82,12 @@ export type TablesRuntime = {
     userId: string;
     tableId: string;
   }): Promise<{ tableId: string; gameRowId: string }>;
+  leaveTable(input: { userId: string; tableId: string }): Promise<SeatChange>;
+  kickTablePlayer(input: {
+    hostUserId: string;
+    tableId: string;
+    targetUserId: string;
+  }): Promise<SeatChange>;
   getMine(input: { userId: string }): Promise<LobbyTableSummary[]>;
   getTableSnapshot(input: {
     tableId: string;
@@ -100,6 +106,19 @@ export type TablesRuntime = {
     randomInt?: (maxExclusive: number) => number;
     now?: () => Date;
   }): Promise<ApplyGameIntentResult>;
+};
+
+/**
+ * Outcome of giving up a seat or having it taken away. `removed: false` means
+ * the caller was not seated — the state they asked for — so leaving twice is a
+ * success rather than an error.
+ */
+export type SeatChange = {
+  tableId: string;
+  removed: boolean;
+  seatsRemaining: number;
+  tableDeleted: boolean;
+  hostUserId: string | null;
 };
 
 export type TableSnapshot = {
@@ -276,6 +295,71 @@ async function loadRecentTables(db: DbLike, userId: string) {
       return toLobbySummary(summary);
     }),
   );
+}
+
+/**
+ * Takes one seat out of a table and renumbers the survivors.
+ *
+ * Seats are positions, not labels: `seatUserIds` order *is* each player's seat,
+ * and a module reads that position to decide whose turn it is. Dropping a middle
+ * seat without renumbering shifts everyone after it, so the survivors move down
+ * in two passes — parked at negative indexes first, because `(tableId,
+ * seatIndex)` is unique and no row may take a seat another row still holds.
+ *
+ * The host moves to the lowest remaining seat (a seated table is never hostless),
+ * and the last seat out deletes the table, which also frees its invite code.
+ */
+async function removeSeatFromTable(
+  tx: DbLike,
+  table: TableSummary,
+  userId: string,
+): Promise<SeatChange> {
+  await tx
+    .delete(tablePlayer)
+    .where(and(eq(tablePlayer.tableId, table.id), eq(tablePlayer.userId, userId)));
+
+  const remaining = table.seats.filter((seat) => seat.userId !== userId);
+
+  if (remaining.length === 0) {
+    // Cascades take the game, its event log and its chat with it.
+    await tx.delete(gameTable).where(eq(gameTable.id, table.id));
+    return {
+      hostUserId: null,
+      removed: true,
+      seatsRemaining: 0,
+      tableDeleted: true,
+      tableId: table.id,
+    };
+  }
+
+  for (const [index, seat] of remaining.entries()) {
+    await tx
+      .update(tablePlayer)
+      .set({ seatIndex: -(index + 1) })
+      .where(and(eq(tablePlayer.tableId, table.id), eq(tablePlayer.userId, seat.userId)));
+  }
+  for (const [index, seat] of remaining.entries()) {
+    await tx
+      .update(tablePlayer)
+      .set({ seatIndex: index })
+      .where(and(eq(tablePlayer.tableId, table.id), eq(tablePlayer.userId, seat.userId)));
+  }
+
+  const nextHostUserId = table.hostUserId === userId ? remaining[0]?.userId : table.hostUserId;
+  if (nextHostUserId && nextHostUserId !== table.hostUserId) {
+    await tx
+      .update(gameTable)
+      .set({ hostUserId: nextHostUserId })
+      .where(eq(gameTable.id, table.id));
+  }
+
+  return {
+    hostUserId: nextHostUserId ?? null,
+    removed: true,
+    seatsRemaining: remaining.length,
+    tableDeleted: false,
+    tableId: table.id,
+  };
 }
 
 export function createRoomRuntime(db: Database): TablesRuntime {
@@ -466,6 +550,73 @@ export function createRoomRuntime(db: Database): TablesRuntime {
         await tx.update(gameTable).set({ status: "active" }).where(eq(gameTable.id, tableId));
 
         return { tableId, gameRowId };
+      });
+    },
+
+    async leaveTable({ userId, tableId }) {
+      return db.transaction(async (tx) => {
+        await lockTableById(tx, tableId);
+        const table = await loadTableById(tx, tableId);
+        // The table may already be gone (the last player left and it was deleted)
+        // or the caller may already be out of it. Both are the state leaving asks
+        // for, so they succeed instead of 404-ing at someone who tapped twice.
+        if (!table) {
+          return {
+            hostUserId: null,
+            removed: false,
+            seatsRemaining: 0,
+            tableDeleted: true,
+            tableId,
+          };
+        }
+        if (!table.seatUserIds.includes(userId)) {
+          return {
+            hostUserId: table.hostUserId,
+            removed: false,
+            seatsRemaining: table.seatUserIds.length,
+            tableDeleted: false,
+            tableId,
+          };
+        }
+        // Walking out of a live game would leave the others playing a seat that
+        // never moves. Forfeit semantics are a game-module concern (M3), so the
+        // table refuses and the player can leave once the game is decided.
+        if (table.currentGame?.status === "active") {
+          throw new TablesError(
+            "game_in_progress",
+            "Finish the game before leaving the table",
+            409,
+          );
+        }
+
+        return removeSeatFromTable(tx, table, userId);
+      });
+    },
+
+    async kickTablePlayer({ hostUserId, tableId, targetUserId }) {
+      return db.transaction(async (tx) => {
+        await lockTableById(tx, tableId);
+        const table = await loadTableById(tx, tableId);
+        if (!table) throw new TablesError("table_missing", "table_missing", 404);
+        if (table.hostUserId !== hostUserId) throw new TablesError("not_host", "not_host", 403);
+        if (!table.seatUserIds.includes(targetUserId)) {
+          throw new TablesError("not_seated", "not_seated", 404);
+        }
+        if (targetUserId === hostUserId) {
+          throw new TablesError(
+            "host_must_leave",
+            "The host cannot remove themselves — leave the table instead",
+          );
+        }
+        if (table.currentGame?.status === "active") {
+          throw new TablesError(
+            "game_in_progress",
+            "Finish the game before removing a player",
+            409,
+          );
+        }
+
+        return removeSeatFromTable(tx, table, targetUserId);
       });
     },
 

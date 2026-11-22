@@ -3,7 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getRecentTables, joinTable, startTable } from "../lib/tables";
+import { getRecentTables, joinTable, kickFromTable, leaveTable, startTable } from "../lib/tables";
 import { connectTableWs } from "../lib/ws";
 import { TablePage } from "./table";
 
@@ -17,6 +17,8 @@ vi.mock("../lib/tables", async () => {
     ...actual,
     getRecentTables: vi.fn(),
     joinTable: vi.fn(),
+    kickFromTable: vi.fn(),
+    leaveTable: vi.fn(),
     startTable: vi.fn(),
     rematchTable: vi.fn(),
   };
@@ -26,6 +28,8 @@ const mockedConnectTableWs = vi.mocked(connectTableWs);
 const mockedGetRecentTables = vi.mocked(getRecentTables);
 const mockedJoinTable = vi.mocked(joinTable);
 const mockedStartTable = vi.mocked(startTable);
+const mockedLeaveTable = vi.mocked(leaveTable);
+const mockedKickFromTable = vi.mocked(kickFromTable);
 
 type SessionLike = {
   user?: {
@@ -112,6 +116,20 @@ describe("TablePage", () => {
     mockedGetRecentTables.mockResolvedValue([]);
     mockedJoinTable.mockResolvedValue({ tableId: "table-123" });
     mockedStartTable.mockResolvedValue({ tableId: "table-123", gameRowId: "game-1" });
+    mockedLeaveTable.mockResolvedValue({
+      tableId: "table-123",
+      removed: true,
+      seatsRemaining: 1,
+      tableDeleted: false,
+      hostUserId: "user-a",
+    });
+    mockedKickFromTable.mockResolvedValue({
+      tableId: "table-123",
+      removed: true,
+      seatsRemaining: 1,
+      tableDeleted: false,
+      hostUserId: "user-a",
+    });
     mockedConnectTableWs.mockImplementation((opts) => {
       onMessage = opts.onMessage;
       return { send, close, isOpen };
@@ -596,5 +614,134 @@ describe("TablePage", () => {
         screen.queryByRole("button", { name: /load earlier messages/i }),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  it("lets the host kick another seat after an explicit confirmation", async () => {
+    const user = userEvent.setup();
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta(),
+        state: null,
+      });
+    });
+    send.mockClear();
+
+    expect(screen.getAllByRole("button", { name: "Kick" })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Kick" }));
+    expect(mockedKickFromTable).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /confirm kick/i }));
+
+    expect(mockedKickFromTable).toHaveBeenCalledWith({ tableId: "table-123", userId: "user-b" });
+    // The seat list comes back from the server, so the page re-reads it.
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "subscribe", tableId: "table-123" }),
+    );
+  });
+
+  it("offers no kick control to a player who is not the host", async () => {
+    renderTablePage({ user: { id: "user-b", name: "Bob" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta(),
+        state: null,
+      });
+    });
+
+    expect(screen.getByText(/2\/4 seated/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Kick" })).not.toBeInTheDocument();
+  });
+
+  it("leaves the table and returns to the lobby", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/t/table-123"]}>
+        <Routes>
+          <Route path="/t/:tableId" element={<TablePage session={{ user: { id: "user-a" } }} />} />
+          <Route path="/lobby" element={<p>the lobby screen</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta(),
+        state: null,
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: /leave table/i }));
+    expect(mockedLeaveTable).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /confirm leave/i }));
+
+    expect(mockedLeaveTable).toHaveBeenCalledWith({ tableId: "table-123" });
+    expect(await screen.findByText("the lobby screen")).toBeInTheDocument();
+  });
+
+  it("does not let a player leave while the game is running", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta({ status: "active" }),
+        state: activeState(),
+      });
+    });
+
+    expect(screen.getByRole("button", { name: /leave table/i })).toBeDisabled();
+  });
+
+  it("stops reconnecting once the host removes this player", async () => {
+    renderTablePage({ user: { id: "user-b", name: "Bob" } });
+
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalledTimes(1));
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta(),
+        state: null,
+      });
+    });
+
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "error",
+        code: "kicked",
+        message: "kicked",
+        tableId: "table-123",
+      });
+    });
+
+    expect(await screen.findByText(/the host removed you/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to lobby/i })).toBeInTheDocument();
+    // A removed seat has nothing to reconnect to; the server would refuse it.
+    expect(mockedConnectTableWs).toHaveBeenCalledTimes(1);
   });
 });

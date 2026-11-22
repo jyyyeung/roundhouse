@@ -590,6 +590,176 @@ integration(title, () => {
     });
   });
 
+  describe("leaving and kicking (M1-2, #44)", () => {
+    async function seatRows(tableId: string) {
+      return sql<{ seat_index: number; user_id: string }[]>`
+        select seat_index, user_id from table_player
+        where table_id = ${tableId} order by seat_index
+      `;
+    }
+
+    async function tableCount(tableId: string) {
+      const [row] = await sql<{ count: number }[]>`
+        select count(*)::int as count from game_table where id = ${tableId}
+      `;
+      return row.count;
+    }
+
+    it("compacts the seats when a middle player leaves", async () => {
+      const seats = await seatTable(3);
+      const [host, middle, last] = seats.players;
+
+      const result = await runtime.leaveTable({ tableId: seats.tableId, userId: middle });
+
+      expect(result).toMatchObject({ hostUserId: host, removed: true, seatsRemaining: 2 });
+      // The seat list is a position, not a set: `last` must move from 2 to 1 or
+      // every module that reads a seat index sees a hole where `middle` was.
+      expect(await seatRows(seats.tableId)).toEqual([
+        { seat_index: 0, user_id: host },
+        { seat_index: 1, user_id: last },
+      ]);
+      const snapshot = await runtime.getTableSnapshot({ asUserId: host, tableId: seats.tableId });
+      expect(snapshot?.meta.seatUserIds).toEqual([host, last]);
+    });
+
+    it("hands the host role to the lowest remaining seat", async () => {
+      const seats = await seatTable(3);
+      const [host, next, last] = seats.players;
+
+      await runtime.leaveTable({ tableId: seats.tableId, userId: host });
+
+      const snapshot = await runtime.getTableSnapshot({ asUserId: next, tableId: seats.tableId });
+      expect(snapshot?.meta.hostUserId).toBe(next);
+      expect(snapshot?.meta.seatUserIds).toEqual([next, last]);
+      // A seated table is never hostless, so the new host can actually start it.
+      await expect(
+        runtime.startTable({ tableId: seats.tableId, userId: next }),
+      ).resolves.toMatchObject({ tableId: seats.tableId });
+    });
+
+    it("deletes the table and frees its invite code when the last player leaves", async () => {
+      const seats = await seatTable(1);
+
+      const result = await runtime.leaveTable({
+        tableId: seats.tableId,
+        userId: seats.players[0],
+      });
+
+      expect(result).toMatchObject({ hostUserId: null, seatsRemaining: 0, tableDeleted: true });
+      expect(await tableCount(seats.tableId)).toBe(0);
+      expect(await seatRows(seats.tableId)).toEqual([]);
+      const [codeRow] = await sql<{ count: number }[]>`
+        select count(*)::int as count from game_table where code = ${seats.code}
+      `;
+      expect(codeRow.count).toBe(0);
+      expect(await runtime.getTableSnapshot({ asUserId: null, tableId: seats.tableId })).toBeNull();
+      // The code is truly free: a stale invite link finds nothing to join.
+      await expect(
+        runtime.joinTable({ code: seats.code, userId: await makeUser() }),
+      ).rejects.toMatchObject({ code: "unknown_table" });
+    });
+
+    it("is idempotent: leaving twice changes nothing the second time", async () => {
+      const seats = await seatTable(2);
+      const leaver = seats.players[1];
+
+      await runtime.leaveTable({ tableId: seats.tableId, userId: leaver });
+      const second = await runtime.leaveTable({ tableId: seats.tableId, userId: leaver });
+
+      expect(second).toMatchObject({ removed: false, seatsRemaining: 1, tableDeleted: false });
+      expect(await seatCount(seats.tableId)).toBe(1);
+    });
+
+    it("removes a kicked player's seat and keeps the survivors contiguous", async () => {
+      const seats = await seatTable(3);
+      const [host, kicked, last] = seats.players;
+
+      await runtime.kickTablePlayer({
+        hostUserId: host,
+        tableId: seats.tableId,
+        targetUserId: kicked,
+      });
+
+      expect(await seatRows(seats.tableId)).toEqual([
+        { seat_index: 0, user_id: host },
+        { seat_index: 1, user_id: last },
+      ]);
+      // The kicked player's next subscribe is refused by the seat check.
+      await expect(
+        runtime.getTableSnapshot({ asUserId: host, tableId: seats.tableId }),
+      ).resolves.toMatchObject({ meta: { seatUserIds: [host, last] } });
+    });
+
+    it("refuses a kick from someone who is not the host, and changes nothing", async () => {
+      const seats = await seatTable(3);
+      const [, guest, target] = seats.players;
+
+      await expectTablesError(
+        runtime.kickTablePlayer({
+          hostUserId: guest,
+          tableId: seats.tableId,
+          targetUserId: target,
+        }),
+        "not_host",
+      );
+      expect(await seatCount(seats.tableId)).toBe(3);
+    });
+
+    it("refuses to leave or kick while the game is running", async () => {
+      const seats = await startedGame(2);
+      const [host, guest] = seats.players;
+
+      await expectTablesError(
+        runtime.leaveTable({ tableId: seats.tableId, userId: guest }),
+        "game_in_progress",
+      );
+      await expectTablesError(
+        runtime.kickTablePlayer({
+          hostUserId: host,
+          tableId: seats.tableId,
+          targetUserId: guest,
+        }),
+        "game_in_progress",
+      );
+      expect(await seatCount(seats.tableId)).toBe(2);
+    });
+
+    it("keeps seats contiguous when a leave races two joins", async () => {
+      const seats = await seatTable(3, { softSeatCap: 3 });
+      const [, leaver] = seats.players;
+      const joiners = await Promise.all([makeUser(), makeUser()]);
+
+      // Same table row, three transactions: the lock is what keeps the
+      // (tableId, seatIndex) unique index from being violated.
+      const results = await Promise.allSettled([
+        runtime.leaveTable({ tableId: seats.tableId, userId: leaver }),
+        ...joiners.map((userId) => runtime.joinTable({ code: seats.code, userId })),
+      ]);
+
+      expect(results[0]).toMatchObject({ status: "fulfilled" });
+      for (const result of results.slice(1)) {
+        if (result.status === "rejected") {
+          expect(result.reason).toMatchObject({ code: "table_full" });
+        }
+      }
+
+      const rows = await seatRows(seats.tableId);
+      expect(rows.map((row) => row.seat_index)).toEqual(rows.map((_, index) => index));
+      expect(rows.some((row) => row.user_id === leaver)).toBe(false);
+      expect(rows.length).toBeLessThanOrEqual(3);
+    });
+
+    it("allows leaving once the game is over", async () => {
+      const seats = await startedGame(2);
+      const [host, guest] = seats.players;
+      await sql`update game set status = 'finished', finished_at = now() where table_id = ${seats.tableId}`;
+
+      const result = await runtime.leaveTable({ tableId: seats.tableId, userId: guest });
+
+      expect(result).toMatchObject({ removed: true, seatsRemaining: 1, hostUserId: host });
+    });
+  });
+
   describe("TablesError codes", () => {
     it("unknown_table: join with a code nobody used", async () => {
       await expectTablesError(

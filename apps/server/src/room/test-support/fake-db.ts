@@ -2,10 +2,10 @@ import type { Database } from "../../db/client";
 import { game, gameEvent, gameTable, tablePlayer } from "../../db/schema";
 
 export type FakeDbCall = {
-  op: "select" | "insert" | "update" | "execute";
+  op: "select" | "insert" | "update" | "delete" | "execute";
   table?: string;
   sql?: string;
-  /** The row handed to `insert().values()`, so tests can assert what was written. */
+  /** The row handed to `insert().values()` or `update().set()`. */
   row?: Record<string, unknown>;
 };
 
@@ -107,14 +107,22 @@ export function createFakeDb(seed: FakeDbSeed) {
       };
     },
     update(table: unknown) {
-      calls.push({ op: "update", table: tableName(table) });
       return {
-        set() {
+        set(values: Record<string, unknown>) {
+          calls.push({ op: "update", table: tableName(table), row: values });
           return {
             where() {
               return Promise.resolve(undefined);
             },
           };
+        },
+      };
+    },
+    delete(table: unknown) {
+      calls.push({ op: "delete", table: tableName(table) });
+      return {
+        where() {
+          return Promise.resolve(undefined);
         },
       };
     },

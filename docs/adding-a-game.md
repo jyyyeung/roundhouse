@@ -147,6 +147,7 @@ pnpm typecheck && pnpm test && pnpm check:projection && pnpm lint
 - [ ] `reduce` pure; randomness and time from `ReduceContext`
 - [ ] every `reduce` outcome reconstructible from `events` (fold property)
 - [ ] secrets are state, not event payloads, until the reveal (ADR 0005)
+- [ ] reads `playerIds` positionally and treats it as contiguous `0..n-1` — leaving compacts seats ([ADR 0006](adr/0006-seats-are-positions.md))
 - [ ] `projectStateFor` publishes an allowlist; spectators get a valid view with `you: null`
 - [ ] `describeModuleConformance(module, fixtures)` passes
 - [ ] one line in `apps/server/src/modules/registry.ts`

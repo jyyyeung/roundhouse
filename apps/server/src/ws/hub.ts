@@ -94,6 +94,27 @@ export function createWsHub(opts: {
     /** Called after an HTTP mutation so sockets see the new state immediately. */
     publishTableState,
     /**
+     * Drops one player's sockets out of a table room, telling them why.
+     *
+     * A seat can be given up or taken away; either way that person must stop
+     * receiving this table's frames and be refused if it reconnects. The refusal
+     * needs no new state: `subscribe` checks the seat list, which no longer
+     * contains them. Closing the socket is what makes a dropped client stop
+     * waiting for frames it will never get.
+     */
+    async evictFromTable(tableId: string, userId: string, reason: "left" | "kicked") {
+      const sockets = socketsByTable.get(tableId);
+      if (!sockets) return;
+
+      const code = reason === "kicked" ? "kicked" : "seat_left";
+      for (const socket of [...sockets]) {
+        if (socket.userId !== userId) continue;
+        sendError(socket, code, code, tableId);
+        await unsubscribe(socket);
+        socket.close(4403, code);
+      }
+    },
+    /**
      * Close every live socket with a retryable code (1012 = service restart) so a
      * client reconnects to the fresh process instead of treating the disconnect as
      * a failure worth backing off from.
