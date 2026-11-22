@@ -1,0 +1,1 @@
+ALTER TABLE "game_table" ADD COLUMN "spectators" boolean DEFAULT false NOT NULL;

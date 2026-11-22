@@ -15,6 +15,7 @@ import {
 type SessionLike = {
   user?: {
     email?: string | null;
+    id?: string | null;
     name?: string | null;
   };
 } | null;
@@ -38,6 +39,8 @@ export function LobbyPage({ session }: { session: SessionLike }) {
   const [gameId, setGameId] = useState<string | null>(null);
   const [config, setConfig] = useState<Json>(null);
   const [joinCode, setJoinCode] = useState("");
+  // Opt-in: a table is private unless the host opens it to watchers (M2-1, #56).
+  const [allowSpectators, setAllowSpectators] = useState(false);
   const [tables, setTables] = useState<RecentTable[]>([]);
   const [createdTable, setCreatedTable] = useState<{ tableId: string; code: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,7 +105,11 @@ export function LobbyPage({ session }: { session: SessionLike }) {
     setError(null);
     try {
       if (!selectedGame) throw new Error("No game selected");
-      const result = await createTable({ config, gameId: selectedGame.id });
+      const result = await createTable({
+        config,
+        gameId: selectedGame.id,
+        spectators: allowSpectators,
+      });
       setCreatedTable(result);
       await refreshTables();
     } catch (caughtError) {
@@ -197,6 +204,22 @@ export function LobbyPage({ session }: { session: SessionLike }) {
               <ConfigControls config={config} onChange={setConfig} />
             </div>
           ) : null}
+          <label
+            className="mt-4 flex items-start gap-3 rounded-2xl bg-[var(--color-cream)] px-4 py-3 text-sm text-slate-700"
+            htmlFor="create-spectators"
+          >
+            <input
+              id="create-spectators"
+              type="checkbox"
+              className="mt-0.5 size-4 accent-[var(--color-teal)]"
+              checked={allowSpectators}
+              onChange={(event) => setAllowSpectators(event.target.checked)}
+            />
+            <span>
+              Let anyone with the link watch this table. Watchers see the same board, cannot play,
+              and can chat.
+            </span>
+          </label>
           <button
             type="button"
             className="mt-auto w-full rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)] shadow-[0_14px_30px_rgba(42,157,143,0.24)] disabled:cursor-wait disabled:opacity-70"
@@ -277,6 +300,10 @@ export function LobbyPage({ session }: { session: SessionLike }) {
         <div className="mt-4 space-y-3">
           {tables.map((table) => {
             const shareUrl = buildShareUrl({ webBaseUrl, tableId: table.id, code: table.code });
+            const canWatch =
+              table.status === "active" &&
+              table.spectators &&
+              !table.seatUserIds.includes(session?.user?.id ?? "");
 
             return (
               <article
@@ -324,6 +351,16 @@ export function LobbyPage({ session }: { session: SessionLike }) {
                   >
                     Open table
                   </button>
+                  {canWatch ? (
+                    <button
+                      type="button"
+                      data-testid={`lobby-watch-${table.id}`}
+                      className="w-full rounded-2xl bg-[var(--color-teal)] px-4 py-3 font-semibold text-[var(--color-ink)] md:w-auto"
+                      onClick={() => navigate(`/t/${table.id}`)}
+                    >
+                      Watch
+                    </button>
+                  ) : null}
                   {table.status === "finished" ? (
                     <button
                       type="button"

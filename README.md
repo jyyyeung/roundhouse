@@ -56,6 +56,15 @@ normal game view in read-only mode. Entry points are the "Watch the replay" butt
 table and the replay button on a finished row in the lobby. Event payloads never cross the wire —
 see [ADR 0009](docs/adr/0009-replay-is-a-projection.md) for why that is the whole design.
 
+## Watching
+
+A table can be opened to watchers when it is created ("Anyone with the link can watch"). A
+watcher connects to the same WebSocket, receives the same frames, and is handed the spectator
+projection — the board with `you: null` — so no game view can offer them an action. Presence keeps
+the two roles apart (`onlineUserIds` is seats, `spectatorUserIds` is watchers), an intent from a
+non-seat is refused as `not_a_player`, and a watcher on an open table may chat. The switch is
+per table and fixed at creation; see [ADR 0010](docs/adr/0010-watching-is-a-projection-not-a-mode.md).
+
 ## Adding a game
 
 `docs/adding-a-game.md` is the walkthrough: a package under `packages/games/<id>/` declaring

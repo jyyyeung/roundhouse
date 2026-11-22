@@ -12,6 +12,8 @@ const createTableBodySchema = z.object({
   gameId: z.string().min(1),
   config: z.unknown().optional(),
   softSeatCap: z.number().int().positive().optional(),
+  // Opt-in: a table is private unless its host opens it to watchers (M2-1, #56).
+  spectators: z.boolean().optional(),
 });
 
 const joinBodySchema = z.object({
@@ -54,6 +56,7 @@ function parseCreateTableBody(input: unknown) {
   return {
     gameId: body.gameId,
     softSeatCap: body.softSeatCap,
+    spectators: body.spectators,
     config: (body.config === undefined
       ? module.defaultConfig
       : module.configSchema.parse(body.config)) as Json,
@@ -162,6 +165,7 @@ export function createTablesRouter(opts: {
         gameId: body.gameId,
         config: body.config,
         softSeatCap: body.softSeatCap,
+        spectators: body.spectators,
       });
       return c.json(result, 201);
     } catch (error) {

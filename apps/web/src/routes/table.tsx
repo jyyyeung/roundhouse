@@ -107,6 +107,8 @@ export function TablePage({ session }: { session: SessionLike }) {
   const [state, setState] = useState<unknown>(null);
   const [messages, setMessages] = useState<TableChatMessage[]>([]);
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  // Who is watching without a seat (M2-1, #56). Players never appear here.
+  const [spectatorUserIds, setSpectatorUserIds] = useState<string[]>([]);
   // A failure carries the server's code as well as its prose: the code picks the
   // notice kind, the prose is the fallback for codes this build does not know.
   const [error, setError] = useState<{ code?: string; message: string } | null>(null);
@@ -321,6 +323,7 @@ export function TablePage({ session }: { session: SessionLike }) {
 
           if (message.type === "presence") {
             setOnlineUserIds(message.onlineUserIds);
+            setSpectatorUserIds(message.spectatorUserIds);
             return;
           }
 
@@ -491,6 +494,9 @@ export function TablePage({ session }: { session: SessionLike }) {
   // One label implementation for the whole app: the lobby, the header and every
   // game view read the same map, so "You" cannot mean two different seats.
   const labels = seatLabels(meta.seatUserIds, currentUserId);
+  // Watching, not playing: admitted because the host opened the table, and given
+  // the spectator projection (`you: null`), so no game view can offer an action.
+  const isWatching = currentUserId !== null && !meta.seatUserIds.includes(currentUserId);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 xl:max-w-7xl">
@@ -509,10 +515,19 @@ export function TablePage({ session }: { session: SessionLike }) {
               state={state}
             />
           ) : null}
+          {isWatching ? (
+            <p
+              data-testid="watching-badge"
+              className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-[var(--color-ink)] shadow-sm"
+            >
+              Watching
+              {spectatorUserIds.length > 1 ? ` · ${spectatorUserIds.length} watching` : null}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SoundToggle />
-          {confirmLeave ? (
+          {isWatching ? null : confirmLeave ? (
             <>
               <button
                 type="button"

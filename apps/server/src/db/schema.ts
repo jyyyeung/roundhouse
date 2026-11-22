@@ -103,6 +103,10 @@ export const gameTable = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     softSeatCap: integer("soft_seat_cap").notNull().default(4),
+    // Off by default: a table is private unless its host says otherwise, and a
+    // hidden-information game must not publish its projections to whoever holds
+    // the link (M2-1, #56).
+    spectators: boolean("spectators").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (table) => [index("game_table_host_user_id_idx").on(table.hostUserId)],

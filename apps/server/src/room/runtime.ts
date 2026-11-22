@@ -74,6 +74,8 @@ export type TablesRuntime = {
     gameId: string;
     config: Json;
     softSeatCap?: number;
+    /** Let people without a seat watch (M2-1, #56). Defaults to a private table. */
+    spectators?: boolean;
   }): Promise<{ tableId: string; code: string }>;
   joinTable(input: { userId: string; code: string }): Promise<{ tableId: string }>;
   startTable(input: {
@@ -261,6 +263,7 @@ function toTableMeta(table: TableSummary, currentGame: GameRow | null): TableMet
     hostUserId: table.hostUserId,
     seatUserIds: table.seatUserIds,
     softSeatCap: table.softSeatCap,
+    spectatorsAllowed: table.spectators,
     status: resolveTableStatus(table, currentGame),
   };
 }
@@ -372,7 +375,7 @@ async function removeSeatFromTable(
 
 export function createRoomRuntime(db: Database): TablesRuntime {
   return {
-    async createTable({ userId, gameId, config, softSeatCap }) {
+    async createTable({ userId, gameId, config, softSeatCap, spectators }) {
       // The module owns the game's config shape and seat range, so both are read
       // from it here rather than from the HTTP layer. This is the seam every test
       // and every caller goes through, so the checks live here too: a module that
@@ -417,6 +420,7 @@ export function createRoomRuntime(db: Database): TablesRuntime {
           status: "lobby",
           hostUserId: userId,
           softSeatCap: seatCap,
+          spectators: spectators ?? false,
           createdAt,
         });
 

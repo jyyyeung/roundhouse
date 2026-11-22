@@ -24,6 +24,8 @@ type HubSocket = WebSocket & {
   connectionId: string;
   tableId?: string;
   userId?: string;
+  /** Holds no seat: admitted to watch a public table, never to play it. */
+  spectating?: boolean;
 };
 
 const ACTION_TTL_MS = 5 * 60 * 1000;
@@ -52,7 +54,6 @@ export function createWsHub(opts: {
 
   const actionIdsByTable = new Map<string, Map<string, number>>();
   const socketsByTable = new Map<string, Set<HubSocket>>();
-  const userIdsByTable = new Map<string, Set<string>>();
   // Last presence roster broadcast per table, so a socket joining an already
   // online roster does not make every other socket re-render the same list.
   const presenceByTable = new Map<string, string>();
@@ -136,7 +137,6 @@ export function createWsHub(opts: {
         }
       }
       socketsByTable.clear();
-      userIdsByTable.clear();
       presenceByTable.clear();
       actionIdsByTable.clear();
       log.info("ws.shutdown", { closed, code, reason });
@@ -305,10 +305,20 @@ export function createWsHub(opts: {
       sendError(socket, "table_missing", "table_missing", tableId);
       return;
     }
-    if (!socket.userId || !snapshot.meta.seatUserIds.includes(socket.userId)) {
+    const userId = socket.userId;
+    if (!userId) {
       sendError(socket, "not_seated", "not_seated", tableId);
       return;
     }
+    // A seat is the only way in unless the host opened the table to watchers
+    // (M2-1, #56). Either way the socket subscribes to the same room and is
+    // projected on its own: a spectator's frames carry `you: null`.
+    const seated = snapshot.meta.seatUserIds.includes(userId);
+    if (!seated && !snapshot.meta.spectatorsAllowed) {
+      sendError(socket, "not_seated", "not_seated", tableId);
+      return;
+    }
+    socket.spectating = !seated;
 
     const previousTableId = socket.tableId;
     if (previousTableId && previousTableId !== tableId) {
@@ -407,15 +417,6 @@ export function createWsHub(opts: {
       socketsByTable.set(tableId, sockets);
     }
     sockets.add(socket);
-
-    let userIds = userIdsByTable.get(tableId);
-    if (!userIds) {
-      userIds = new Set<string>();
-      userIdsByTable.set(tableId, userIds);
-    }
-    if (socket.userId) {
-      userIds.add(socket.userId);
-    }
   }
 
   function removeSocket(tableId: string, socket: HubSocket) {
@@ -424,20 +425,6 @@ export function createWsHub(opts: {
       sockets.delete(socket);
       if (sockets.size === 0) {
         socketsByTable.delete(tableId);
-      }
-    }
-
-    if (socket.userId) {
-      const userIds = new Set<string>();
-      for (const currentSocket of socketsByTable.get(tableId) ?? []) {
-        if (currentSocket.userId) {
-          userIds.add(currentSocket.userId);
-        }
-      }
-      if (userIds.size === 0) {
-        userIdsByTable.delete(tableId);
-      } else {
-        userIdsByTable.set(tableId, userIds);
       }
     }
   }
@@ -511,21 +498,43 @@ export function createWsHub(opts: {
    * not told the same list again.
    */
   function publishPresence(tableId: string, options: { only?: HubSocket } = {}) {
-    const onlineUserIds = [...(userIdsByTable.get(tableId) ?? [])].sort();
+    const roster = presenceRoster(tableId);
     const frame: ServerMessage = {
-      onlineUserIds,
+      onlineUserIds: roster.onlineUserIds,
+      spectatorUserIds: roster.spectatorUserIds,
       tableId,
       type: "presence",
       v: PROTOCOL_VERSION,
     };
+    const key = presenceKey(roster.onlineUserIds, roster.spectatorUserIds);
 
-    if (presenceByTable.get(tableId) !== presenceKey(onlineUserIds)) {
-      presenceByTable.set(tableId, presenceKey(onlineUserIds));
+    if (presenceByTable.get(tableId) !== key) {
+      presenceByTable.set(tableId, key);
       publishToTable(tableId, frame);
       return;
     }
 
     if (options.only) send(options.only, frame);
+  }
+
+  /**
+   * Who is at the table right now, derived from the sockets rather than tracked
+   * beside them: one source cannot disagree with itself. A person with any
+   * seated socket is a player, however many tabs they opened.
+   */
+  function presenceRoster(tableId: string) {
+    const players = new Set<string>();
+    const spectators = new Set<string>();
+    for (const socket of socketsByTable.get(tableId) ?? []) {
+      if (!socket.userId) continue;
+      if (socket.spectating) {
+        spectators.add(socket.userId);
+      } else {
+        players.add(socket.userId);
+      }
+    }
+    for (const userId of players) spectators.delete(userId);
+    return { onlineUserIds: [...players].sort(), spectatorUserIds: [...spectators].sort() };
   }
 
   function pruneExpiredActions(tableId: string) {
@@ -561,8 +570,10 @@ function sendError(socket: WebSocket, code: string, message: string, tableId?: s
 }
 
 /** Stable identity for a presence roster, so an unchanged set compares equal. */
-function presenceKey(onlineUserIds: string[]) {
-  return onlineUserIds.join("\u0000");
+function presenceKey(onlineUserIds: string[], spectatorUserIds: string[]) {
+  // The two lists are separated so ["a","b"] + [] never compares equal to
+  // ["a"] + ["b"].
+  return `${onlineUserIds.join("\u0000")}\u0001${spectatorUserIds.join("\u0000")}`;
 }
 
 function sendSnapshot(socket: WebSocket, snapshot: TableSnapshot) {

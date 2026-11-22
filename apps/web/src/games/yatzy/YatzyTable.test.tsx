@@ -38,6 +38,7 @@ function baseMeta(overrides: Partial<TableMeta> = {}): TableMeta {
     hostUserId: "user-a",
     seatUserIds: ["user-a", "user-b"],
     softSeatCap: 4,
+    spectatorsAllowed: false,
     ...overrides,
   };
 }

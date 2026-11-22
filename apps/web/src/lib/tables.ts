@@ -8,6 +8,8 @@ export type RecentTable = {
   status: "lobby" | "active" | "finished";
   hostUserId: string;
   softSeatCap: number;
+  /** The host opened this table to watchers (M2-1, #56). */
+  spectators: boolean;
   createdAt: string;
   seatUserIds: string[];
 };
@@ -80,13 +82,20 @@ export async function getGameCatalogue() {
   return body.games;
 }
 
-export function createTable(input: { gameId: string; config: Json; softSeatCap?: number }) {
+export function createTable(input: {
+  gameId: string;
+  config: Json;
+  softSeatCap?: number;
+  /** Open the table to watchers (M2-1, #56). Off unless the host asks. */
+  spectators?: boolean;
+}) {
   return fetchJson<{ tableId: string; code: string }>("/api/tables", {
     method: "POST",
     body: JSON.stringify({
       gameId: input.gameId,
       config: input.config,
       softSeatCap: input.softSeatCap,
+      spectators: input.spectators,
     }),
   });
 }

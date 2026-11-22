@@ -164,7 +164,12 @@ export function createWsHandlers(deps: {
           return;
         }
 
-        if (!snapshot.meta.seatUserIds.includes(userId)) {
+        // A seat is not required to talk, only to play: a spectator admitted to a
+        // public table is a guest at it (M2-1, #56). A private table still says
+        // nothing to anyone without a seat.
+        const mayChat =
+          snapshot.meta.seatUserIds.includes(userId) || snapshot.meta.spectatorsAllowed;
+        if (!mayChat) {
           connection.send(
             errorMessage({
               actionId,

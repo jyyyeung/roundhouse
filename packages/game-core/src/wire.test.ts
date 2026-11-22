@@ -133,6 +133,7 @@ describe("server frames", () => {
     hostUserId: "user-a",
     seatUserIds: ["user-a"],
     softSeatCap: 4,
+    spectatorsAllowed: false,
     status: "lobby",
   };
 
@@ -179,7 +180,13 @@ describe("server frames", () => {
       { message: chat, tableId: "table-1", type: "spoke", v: 2 },
       { hasMore: true, messages: [chat], tableId: "table-1", type: "chatPage", v: 2 },
       { code: "not_seated", message: "not_seated", tableId: "table-1", type: "error", v: 2 },
-      { onlineUserIds: ["user-a"], tableId: "table-1", type: "presence", v: 2 },
+      {
+        onlineUserIds: ["user-a"],
+        spectatorUserIds: ["user-c"],
+        tableId: "table-1",
+        type: "presence",
+        v: 2,
+      },
     ];
 
     for (const frame of frames) {

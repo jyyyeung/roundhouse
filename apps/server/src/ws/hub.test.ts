@@ -1,8 +1,10 @@
 import type { IncomingMessage } from "node:http";
 import type { ChatWire, RawGameState, TableMeta } from "@roundhouse/game-core";
+import { duelModule } from "@roundhouse/game-duel";
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it, vi } from "vitest";
 
+import { viewerForUser } from "../room/projection";
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
 
 vi.mock("../db/client", () => ({ db: {} }));
@@ -48,6 +50,7 @@ function lobbySnapshot(seatUserIds: string[]): TableSnapshot {
       hostUserId: seatUserIds[0],
       seatUserIds,
       softSeatCap: 4,
+      spectatorsAllowed: false,
       status: "lobby",
     },
   };
@@ -67,9 +70,9 @@ class MockSocket {
   readyState = 1;
   sent: string[] = [];
   closed: { code?: number; reason?: string } | null = null;
-  private handlers: Record<string, ((value?: unknown) => unknown) | undefined> = {};
+  private handlers: Record<string, ((...args: unknown[]) => unknown) | undefined> = {};
 
-  on(event: string, handler: (value?: unknown) => unknown) {
+  on(event: string, handler: (...args: unknown[]) => unknown) {
     this.handlers[event] = handler;
     return this;
   }
@@ -88,6 +91,13 @@ class MockSocket {
 
   close(code?: number, reason?: string) {
     this.closed = { code, reason };
+  }
+
+  /** Fire the transport's `close` event, so the hub forgets the socket. */
+  async emitClose(code = 1000, reason = "") {
+    await this.handlers.close?.(code, Buffer.from(reason));
+    // `unsubscribe` is fire-and-forget, so let its presence broadcast settle.
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
   frames() {
@@ -137,6 +147,7 @@ describe("ws hub access control", () => {
         hostUserId: "user-a",
         seatUserIds: ["user-a", "user-b"],
         softSeatCap: 4,
+        spectatorsAllowed: false,
         status: "lobby",
       },
     };
@@ -178,6 +189,7 @@ describe("ws hub access control", () => {
         hostUserId: "user-a",
         seatUserIds: ["user-a", "user-b"],
         softSeatCap: 4,
+        spectatorsAllowed: false,
         status: "active",
       },
     };
@@ -313,6 +325,7 @@ describe("ws hub snapshot projection", () => {
       hostUserId: "user-a",
       seatUserIds: ["user-a", "user-b"],
       softSeatCap: 4,
+      spectatorsAllowed: false,
       status: "active",
     };
     const finishedState = yatzyModule.createInitialState({ ruleset: "yatzy" }, [
@@ -387,6 +400,7 @@ describe("ws hub message boundary", () => {
     hostUserId: "user-a",
     seatUserIds: ["user-a", "user-b"],
     softSeatCap: 4,
+    spectatorsAllowed: false,
     status: "active",
   };
 
@@ -479,6 +493,7 @@ describe("ws hub sync v2", () => {
     hostUserId: "user-a",
     seatUserIds: ["user-a", "user-b"],
     softSeatCap: 4,
+    spectatorsAllowed: false,
     status: "active",
   };
   const activeState = yatzyModule.createInitialState(
@@ -611,6 +626,7 @@ describe("hub shutdown", () => {
     hostUserId: "user-a",
     seatUserIds: ["user-a", "user-b"],
     softSeatCap: 4,
+    spectatorsAllowed: false,
     status: "active",
   };
 
@@ -745,5 +761,227 @@ describe("hub seat eviction", () => {
     ]);
     // A refused subscribe answers, it does not hang up: the page keeps its socket.
     expect(reconnect.closed).toBeNull();
+  });
+});
+
+describe("ws hub spectators (M2-1, #56)", () => {
+  const meta = (overrides: Partial<TableMeta> = {}): TableMeta => ({
+    code: "ABCD23",
+    config: { ruleset: "yatzy" },
+    gameId: "yatzy",
+    hostUserId: "user-a",
+    seatUserIds: ["user-a", "user-b"],
+    softSeatCap: 4,
+    spectatorsAllowed: true,
+    status: "active",
+    ...overrides,
+  });
+
+  const liveState = () =>
+    yatzyModule.createInitialState({ ruleset: "yatzy" }, ["user-a", "user-b"]);
+
+  function seatedRuntime(tableMeta: TableMeta, state: RawGameState = liveState() as RawGameState) {
+    return makeRuntime({
+      // The runtime projects the subscribe snapshot itself (ADR 0001), so a
+      // spectator's snapshot arrives already projected for nobody.
+      getTableSnapshot: vi.fn().mockImplementation(async ({ asUserId }) => ({
+        meta: tableMeta,
+        seq: 1,
+        state:
+          state === null
+            ? null
+            : yatzyModule.projectStateFor(state, viewerForUser(tableMeta.seatUserIds, asUserId)),
+        tableId: "table-1",
+      })),
+      getTableLiveState: vi.fn().mockResolvedValue({
+        meta: tableMeta,
+        seq: 1,
+        state,
+        tableId: "table-1",
+      }),
+    });
+  }
+
+  /** One hub whose session identity is chosen per connection, in call order. */
+  function hubFor(runtime: TablesRuntime, userIds: string[]) {
+    const queue = [...userIds];
+    return createWsHub({
+      runtime,
+      getSessionFromHeaders: async () => ({ user: { id: queue.shift() ?? "user-anon" } }),
+    });
+  }
+
+  it("admits someone without a seat to a public table, projected for a spectator", async () => {
+    const runtime = seatedRuntime(meta());
+    const hub = hubFor(runtime, ["user-c"]);
+    const socket = new MockSocket();
+
+    await hub.handleConnection(socket as any, { headers: {} } as IncomingMessage);
+    await socket.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+
+    const frames = socket.frames();
+    expect(frames.map((frame) => frame.type)).toEqual(["snapshot", "presence"]);
+    // The spectator projection: the board, with no seat of their own.
+    expect(frames[0].state).toMatchObject({ phase: "playing", you: null });
+    expect(frames[0].state.currentPlayerIndex).toBeUndefined();
+    // Watching is not playing: a seat list and a watcher list, kept apart.
+    expect(frames[1]).toMatchObject({ onlineUserIds: [], spectatorUserIds: ["user-c"] });
+  });
+
+  it("refuses a non-seat on a private table and on a table that does not exist", async () => {
+    const privateHub = hubFor(seatedRuntime(meta({ spectatorsAllowed: false })), ["user-c"]);
+    const privateSocket = new MockSocket();
+    await privateHub.handleConnection(privateSocket as any, { headers: {} } as IncomingMessage);
+    await privateSocket.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+    expect(privateSocket.frames()).toEqual([
+      expect.objectContaining({ code: "not_seated", type: "error" }),
+    ]);
+
+    const missingHub = hubFor(makeRuntime({ getTableSnapshot: vi.fn().mockResolvedValue(null) }), [
+      "user-c",
+    ]);
+    const missingSocket = new MockSocket();
+    await missingHub.handleConnection(missingSocket as any, { headers: {} } as IncomingMessage);
+    await missingSocket.emitMessage({ tableId: "no-such-table", type: "subscribe", v: 2 });
+    expect(missingSocket.frames()).toEqual([
+      expect.objectContaining({ code: "table_missing", type: "error" }),
+    ]);
+  });
+
+  it("sends a watcher the same applied frame the players get, projected for a spectator", async () => {
+    const tableMeta = meta();
+    const state = liveState();
+    const rolled = yatzyModule.reduce(
+      state,
+      { payload: {}, type: "roll" },
+      {
+        actorId: "user-a",
+        now: () => new Date(),
+        playerIds: ["user-a", "user-b"],
+        randomInt: () => 0,
+      },
+    );
+    if (!rolled.ok) throw new Error(rolled.error);
+
+    const runtime = seatedRuntime(tableMeta, rolled.state as unknown as RawGameState);
+    runtime.applyGameIntent = vi.fn().mockResolvedValue({
+      events: [],
+      finished: false,
+      meta: tableMeta,
+      ok: true,
+      seq: 2,
+      state: rolled.state as unknown as RawGameState,
+    });
+    const hub = hubFor(runtime, ["user-a", "user-c"]);
+    const player = new MockSocket();
+    const watcher = new MockSocket();
+
+    await hub.handleConnection(player as any, { headers: {} } as IncomingMessage);
+    await player.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+    await hub.handleConnection(watcher as any, { headers: {} } as IncomingMessage);
+    await watcher.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+    // Presence follows membership, so the watcher's own join is the frame that
+    // names it — read it before the intent clears the buffer.
+    const presenceOnJoin = watcher
+      .frames()
+      .filter((frame) => frame.type === "presence")
+      .at(-1);
+    player.sent.length = 0;
+    watcher.sent.length = 0;
+
+    await player.emitMessage({
+      actionId: "action-1",
+      intentType: "roll",
+      payload: {},
+      tableId: "table-1",
+      type: "intent",
+      v: 2,
+    });
+
+    const applied = (socket: MockSocket) =>
+      socket.frames().find((frame) => frame.type === "applied");
+    const playerFrame = applied(player);
+    const watcherFrame = applied(watcher);
+
+    expect(watcherFrame.state.you).toBeNull();
+    expect({ ...playerFrame.state, you: null }).toEqual(watcherFrame.state);
+    // Presence says who is playing and who is only watching.
+    expect(presenceOnJoin).toMatchObject({
+      onlineUserIds: ["user-a"],
+      spectatorUserIds: ["user-c"],
+    });
+  });
+
+  it("never shows a hidden pick to a spectator before the reveal", async () => {
+    const tableMeta = meta({ config: { rounds: 3 }, gameId: "duel" });
+    const initial = duelModule.createInitialState({ rounds: 3 }, ["user-a", "user-b"]);
+    const picked = duelModule.reduce(
+      initial,
+      { payload: { card: "strike" }, type: "play" },
+      {
+        actorId: "user-a",
+        now: () => new Date(),
+        playerIds: ["user-a", "user-b"],
+        randomInt: () => 0,
+      },
+    );
+    if (!picked.ok) throw new Error(picked.error);
+
+    const runtime = seatedRuntime(tableMeta, picked.state as unknown as RawGameState);
+    runtime.applyGameIntent = vi.fn().mockResolvedValue({
+      events: [],
+      finished: false,
+      meta: tableMeta,
+      ok: true,
+      seq: 2,
+      state: picked.state as unknown as RawGameState,
+    });
+    const hub = hubFor(runtime, ["user-a", "user-c"]);
+    const player = new MockSocket();
+    const watcher = new MockSocket();
+    await hub.handleConnection(player as any, { headers: {} } as IncomingMessage);
+    await player.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+    await hub.handleConnection(watcher as any, { headers: {} } as IncomingMessage);
+    await watcher.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+    watcher.sent.length = 0;
+
+    await player.emitMessage({
+      actionId: "action-1",
+      intentType: "play",
+      payload: { card: "strike" },
+      tableId: "table-1",
+      type: "intent",
+      v: 2,
+    });
+
+    // Asserted on the serialised frame, not on a field name: a card that is not
+    // in the bytes cannot be read off the wire.
+    const serialised = JSON.stringify(watcher.frames());
+    expect(serialised).not.toContain("strike");
+    expect(serialised).not.toContain("pending");
+  });
+
+  it("stops listing a watcher as a spectator when their socket closes", async () => {
+    const runtime = seatedRuntime(meta());
+    const hub = hubFor(runtime, ["user-a", "user-c"]);
+    const player = new MockSocket();
+    const watcher = new MockSocket();
+    await hub.handleConnection(player as any, { headers: {} } as IncomingMessage);
+    await player.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+    await hub.handleConnection(watcher as any, { headers: {} } as IncomingMessage);
+    await watcher.emitMessage({ tableId: "table-1", type: "subscribe", v: 2 });
+    player.sent.length = 0;
+
+    await watcher.emitClose();
+
+    expect(
+      player
+        .frames()
+        .filter((frame) => frame.type === "presence")
+        .at(-1),
+    ).toMatchObject({
+      onlineUserIds: ["user-a"],
+      spectatorUserIds: [],
+    });
   });
 });

@@ -92,6 +92,34 @@ describe("tables http api", () => {
     );
   });
 
+  it("opens a table to watchers only when the host asks for it", async () => {
+    const runtime = makeRuntime();
+
+    const res = await makeApp(runtime).request("/api/tables", {
+      method: "POST",
+      body: JSON.stringify({ gameId: "yatzy", spectators: true }),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(res.status).toBe(201);
+    expect(runtime.createTable).toHaveBeenCalledWith(expect.objectContaining({ spectators: true }));
+  });
+
+  it("leaves the default to the runtime rather than inventing one here", async () => {
+    const runtime = makeRuntime();
+
+    await makeApp(runtime).request("/api/tables", {
+      method: "POST",
+      body: JSON.stringify({ gameId: "yatzy" }),
+      headers: { "content-type": "application/json" },
+    });
+
+    // Watching is opt-in (#56), and the default lives with table creation, so a
+    // caller that sends nothing hands the decision to one place, not two.
+    const [input] = vi.mocked(runtime.createTable).mock.calls[0] as [{ spectators?: boolean }];
+    expect(input.spectators).toBeUndefined();
+  });
+
   it("validates the config with the module's schema rather than a known game id", async () => {
     const runtime = makeRuntime();
 
@@ -390,6 +418,7 @@ describe("tables http replay", () => {
       hostUserId: "user-1",
       seatUserIds: ["user-1", "user-2"],
       softSeatCap: 6,
+      spectatorsAllowed: false,
     },
     turns: [
       {

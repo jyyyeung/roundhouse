@@ -20,6 +20,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { schema, user } from "../db/schema";
 import { assertDisposableDatabase } from "../test/assert-disposable-database";
+import { persistChatMessageToDb } from "../ws/persistence";
 import { createRoomRuntime, TablesError } from "./runtime";
 
 const testUrl = process.env.DATABASE_URL_TEST;
@@ -83,13 +84,14 @@ integration(title, () => {
 
   async function makeTable(
     host: string,
-    options: { config?: Json; gameId?: string; softSeatCap?: number } = {},
+    options: { config?: Json; gameId?: string; softSeatCap?: number; spectators?: boolean } = {},
   ) {
     return runtime.createTable({
       config: options.config ?? { ruleset: "yatzy" },
       gameId: options.gameId ?? "yatzy",
       // Undefined means "the game decides" — the runtime defaults to playerCount.max.
       softSeatCap: options.softSeatCap,
+      spectators: options.spectators,
       userId: host,
     });
   }
@@ -987,6 +989,122 @@ integration(title, () => {
         runtime.getTableReplay({ asUserId: players[0], tableId }),
         "replay_unavailable",
       );
+    });
+  });
+
+  describe("watching a table (M2-1, #56)", () => {
+    // The published yatzy view, spelled out: a spectator must be given exactly
+    // this and nothing else, or the allowlist is not the thing deciding.
+    const YATZY_VIEW_KEYS = [
+      "currentPlayerId",
+      "dice",
+      "gameId",
+      "holds",
+      "phase",
+      "playerIds",
+      "rollsLeft",
+      "ruleset",
+      "sheets",
+      "winnerIds",
+      "you",
+    ];
+
+    it("keeps a table closed to watchers unless the host opened it", async () => {
+      const host = await makeUser();
+      const closed = await makeTable(host);
+      const open = await makeTable(host, { spectators: true });
+
+      const closedSnapshot = await runtime.getTableSnapshot({
+        asUserId: host,
+        tableId: closed.tableId,
+      });
+      const openSnapshot = await runtime.getTableSnapshot({
+        asUserId: host,
+        tableId: open.tableId,
+      });
+
+      expect(closedSnapshot?.meta.spectatorsAllowed).toBe(false);
+      expect(openSnapshot?.meta.spectatorsAllowed).toBe(true);
+    });
+
+    it("hands a watcher the stored board with no seat of their own", async () => {
+      const { players, tableId } = await startedGame(2);
+      await runtime.applyGameIntent({
+        intent: { payload: {}, type: "roll" },
+        randomInt: () => 0,
+        tableId,
+        userId: players[0],
+      });
+
+      const asSeat = await runtime.getTableSnapshot({ asUserId: players[0], tableId });
+      const asWatcher = await runtime.getTableSnapshot({ asUserId: null, tableId });
+      // Someone who is not on the seat list reads the same projection as a
+      // spectator: membership does not silently widen what a stranger sees.
+      const asStranger = await runtime.getTableSnapshot({
+        asUserId: "user-never-joined",
+        tableId,
+      });
+
+      expect(asWatcher).not.toBeNull();
+      const watcherState = asWatcher?.state as Record<string, unknown>;
+      expect(Object.keys(watcherState).sort()).toEqual(YATZY_VIEW_KEYS);
+      expect({ ...(asSeat?.state as object), you: null }).toEqual(watcherState);
+      expect(asStranger?.state).toEqual(watcherState);
+      expect(watcherState.you).toBeNull();
+    });
+
+    it("refuses an intent from someone without a seat and writes nothing", async () => {
+      const { gameRowId, players, tableId } = await startedGame(2);
+      const before = await gameRow(gameRowId);
+
+      const result = await runtime.applyGameIntent({
+        intent: { payload: {}, type: "roll" },
+        randomInt: () => 0,
+        tableId,
+        userId: "user-watcher",
+      });
+
+      expect(result).toMatchObject({ code: "not_a_player", ok: false, seq: before.seq });
+      const [row] = await sql<{ events: number }[]>`
+        select count(*)::int as events from game_event where game_row_id = ${gameRowId}
+      `;
+      expect(row.events).toBe(await eventSeqs(gameRowId).then((seqs) => seqs.length));
+      expect((await gameRow(gameRowId)).seq).toBe(before.seq);
+      expect(await eventSeqs(gameRowId)).toEqual(await eventSeqs(gameRowId));
+      expect(players).toHaveLength(2);
+    });
+
+    it("stores a chat message's snapshot with no viewer's seat", async () => {
+      const { players, tableId } = await startedGame(2);
+      await runtime.applyGameIntent({
+        intent: { payload: {}, type: "roll" },
+        randomInt: () => 0,
+        tableId,
+        userId: players[0],
+      });
+
+      // What the chat handler does: project for no particular reader, because
+      // the row is shared by everyone who ever opens the history.
+      const snapshot = await runtime.getTableSnapshot({ asUserId: null, tableId });
+      if (!snapshot) throw new Error("expected a snapshot");
+
+      await persistChatMessageToDb(db, {
+        createdAt: new Date("2026-11-22T00:00:00.000Z"),
+        snapshot: {
+          meta: snapshot.meta,
+          seq: snapshot.seq,
+          state: snapshot.state,
+          tableId: snapshot.tableId,
+        },
+        tableId,
+        text: "nice roll",
+        userId: players[0],
+      });
+
+      const [row] = await sql<{ snapshot: { state: { you: unknown } } }[]>`
+        select snapshot from chat_message where table_id = ${tableId}
+      `;
+      expect(row.snapshot.state.you).toBeNull();
     });
   });
 });

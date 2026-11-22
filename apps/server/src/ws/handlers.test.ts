@@ -9,6 +9,7 @@ import type {
 import { yatzyModule } from "@roundhouse/game-yatzy";
 import { describe, expect, it } from "vitest";
 
+import { viewerForUser } from "../room/projection";
 import { createWsHandlers, type WsRuntime } from "./handlers";
 import { createLimiter } from "./rate-limit";
 
@@ -23,6 +24,7 @@ function makeRuntime(): WsRuntime {
     hostUserId: "user-a",
     seatUserIds: playerIds,
     softSeatCap: 4,
+    spectatorsAllowed: false,
   };
 
   let seq = 0;
@@ -444,5 +446,94 @@ describe("ws handlers rate limits", () => {
     expect(published.map((message) => message.type)).toEqual(["chat"]);
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ code: "rate_limited", retryAfterMs: 1_000 });
+  });
+});
+
+describe("ws handlers spectators (M2-1, #56)", () => {
+  // The chat snapshot is shared by every reader of the history, so it is
+  // projected for no particular viewer rather than for the author — a seat
+  // index in a public log would tell every reader whose turn it was.
+  it("stores chat history projected for nobody, even when the author holds a seat", async () => {
+    const base = makeRuntime();
+    const seatUserIds = ["user-a", "user-b"];
+    let stored: Json | undefined;
+    const handlers = createWsHandlers({
+      isDuplicateAction: () => false,
+      persistChatMessage: async ({ snapshot }) => {
+        stored = snapshot;
+        return { createdAt: "2026-08-02T00:00:00.000Z", id: "chat-1" };
+      },
+      publishApplied: () => {},
+      publishToTable: () => {},
+      rememberAction: () => {},
+      forgetAction: () => {},
+      runtime: {
+        ...base,
+        async getTableSnapshot(input) {
+          const snapshot = await base.getTableSnapshot(input);
+          if (!snapshot) return null;
+          const state = yatzyModule.createInitialState(
+            { ruleset: "yatzy" },
+            seatUserIds,
+          ) as unknown as RawGameState;
+          return {
+            ...snapshot,
+            state: yatzyModule.projectStateFor(state, viewerForUser(seatUserIds, input.asUserId)),
+          };
+        },
+      },
+    });
+    const connection = { send: () => {}, userId: "user-a" };
+
+    await handlers.onMessage(connection, {
+      actionId: "c-1",
+      tableId: "table-1",
+      text: "hello",
+      type: "chat",
+      v: 2,
+    });
+
+    expect(stored).toBeDefined();
+    const state = (stored as { state: Record<string, unknown> }).state;
+    expect(state.you).toBeNull();
+  });
+
+  it("passes a non-seat's refusal straight through and records nothing", async () => {
+    const sent: ServerMessage[] = [];
+    const published: ServerMessage[] = [];
+    const applied: unknown[] = [];
+    const handlers = createWsHandlers({
+      isDuplicateAction: () => false,
+      forgetAction: () => {},
+      publishApplied: (_tableId, message) => {
+        applied.push(message);
+      },
+      publishToTable: (_tableId, message) => {
+        published.push(message);
+      },
+      rememberAction: () => {},
+      runtime: {
+        ...makeRuntime(),
+        async applyGameIntent() {
+          // What the runtime answers a non-seat, in its own words.
+          return { code: "not_a_player", message: "not_a_player", ok: false, seq: 3 };
+        },
+      },
+    });
+    const connection = { send: (m: ServerMessage) => sent.push(m), userId: "user-c" };
+
+    await handlers.onMessage(connection, {
+      actionId: "a-1",
+      intentType: "roll",
+      payload: {} satisfies Json,
+      tableId: "table-1",
+      type: "intent",
+      v: 2,
+    });
+
+    expect(sent).toEqual([expect.objectContaining({ code: "not_a_player", type: "error" })]);
+    // A refusal is not a turn: nothing is broadcast and no seq moves.
+    expect(applied).toEqual([]);
+    expect(published).toEqual([]);
   });
 });
