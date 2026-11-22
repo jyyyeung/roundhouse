@@ -27,9 +27,12 @@ Compose starts:
 
 - `db`: Postgres 16 with a persistent `postgres-data` volume
 - `server`: applies pending migrations in process, then starts the API/websocket server; it reports readiness on `/ready` and Compose waits for that before starting `web`
-- `web`: serves the Vite build from nginx and proxies `/api` plus `/ws` to the server container
+- `web`: serves the Vite build from nginx and proxies `/api`, `/ws`, `/health` and `/ready` to the server container
 
 To stop the stack, run `docker compose down`. Add `-v` if you also want to remove the Postgres volume (needed after DB name/user defaults change).
+
+Deploying this on a real machine — TLS in front, backups, upgrades, every setting explained —
+is [`docs/self-hosting.md`](docs/self-hosting.md).
 
 ## Tests
 
@@ -37,8 +40,11 @@ To stop the stack, run `docker compose down`. Add `-v` if you also want to remov
 - `just test-integration` — `apps/server/src/room/runtime.integration.test.ts` against real Postgres (concurrent joins, concurrent intents, every `TablesError` code, per-viewer projection). It refuses to run unless `DATABASE_URL_TEST` names a database ending in `_test`, because it truncates every table between tests. Create it once:
   `docker compose exec -T db createdb -U roundhouse roundhouse_test`
 - `just check-projection` — the contract guard: module state is projected in exactly one place (invariant I1) and platform code names no specific game.
+- `just check-env-docs` — every variable the app reads appears in `docs/self-hosting.md` and `.env.example`. The guard is itself unit-tested against a fixture (`pnpm test:scripts`), so a silently broken scan fails.
+- `just check-deploy-samples` — parses the Caddy and nginx TLS samples in their real images against a throwaway certificate, so a sample that cannot boot fails here instead of on a self-hoster's box.
 - `just smoke` — end-to-end run against a started server (`scripts/smoke.mjs`).
 - `just compose-smoke` — builds both Docker images, boots the packaged stack on throwaway ports, checks `/health` and `/ready`, the web root, and the end-to-end script, then tears it down and removes the volume.
+- `just backup` / `just restore <file>` — dump the running database into `backups/` and put it back. The restore stops the server first and starts it again even if the restore fails; [`docs/self-hosting.md`](docs/self-hosting.md#backup-and-restore) has the cron line and the verify steps.
 - `pnpm lint` / `pnpm format` — Biome does linting, formatting, and import order in one pass. `pnpm lint:fix` writes fixes; CI fails on `pnpm lint` and `pnpm format:check`.
 
 ## Adding a game
@@ -53,7 +59,7 @@ off the wire (Duel is the worked example).
 
 ## Operations
 
-`docs/ops.md` is the full story; the short version:
+`docs/ops.md` is the full story for a running server; [`docs/self-hosting.md`](docs/self-hosting.md) covers standing one up, backing it up and upgrading it. The short version:
 
 - `GET /health` is process liveness (no I/O) and `GET /ready` checks Postgres plus
   pending migrations, answering `503` within a second when either is unhappy.
@@ -81,17 +87,20 @@ off the wire (Duel is the worked example).
   only when `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are both set, because the
   sign-in page asks `GET /api/auth/providers`. See
   [ADR 0008](docs/adr/0008-mail-is-a-port.md).
+- `just backup` writes a custom-format dump into `backups/`; `just restore <file>` stops the
+  server, replaces the schema and starts it again. Dumps contain accounts and sessions, so
+  `backups/` is gitignored — treat a copy like a password file.
 
 ## CI
 
 Every push to `main` and every pull request runs four workflows:
 
-| workflow            | what it proves                                                           |
-| ------------------- | ------------------------------------------------------------------------ |
-| `ci.yml`            | typecheck, lint, format, unit tests, and a production build              |
-| `integration.yml`   | the room runtime against a real `postgres:16` (races, locks, migrations) |
-| `compose-smoke.yml` | the Docker images and nginx actually serve a working stack               |
-| `contracts.yml`     | the projection guard (invariant I1)                                      |
+| workflow            | what it proves                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `ci.yml`            | typecheck, lint, format, unit tests, and a production build                           |
+| `integration.yml`   | the room runtime against a real `postgres:16` (races, locks, migrations)              |
+| `compose-smoke.yml` | the Docker images and nginx serve a working stack, and the TLS samples parse          |
+| `contracts.yml`     | the projection guard (invariant I1) and the env-docs guard (every setting documented) |
 
 `main` is protected: the five checks above are required, changes land through a pull
 request, and force-pushes are disabled.

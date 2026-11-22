@@ -87,7 +87,7 @@ and a friend who forgets a password is permanently locked out (`apps/server/src/
 | [M1-2](../issues/44) | ✅ Leave, kick, host transfer: `POST /:id/leave` and `/:id/kick`, contiguous seat compaction, host moves to the lowest seat, empty lobby deleted ([ADR 0006](adr/0006-seats-are-positions.md))             | —          |
 | [M1-3](../issues/45) | ✅ Abuse limits: one sliding-window limiter (intent 20/10s, chat 5/10s), better-auth rules 10/60s, `TRUST_PROXY` enforced by rewriting `x-forwarded-for` ([ADR 0007](adr/0007-limits-are-per-process.md))  | M1-1, M1-2 |
 | [M1-4](../issues/46) | ✅ Feel and failure UX: `feedback` (sound/haptics, muted by default), one seat-label implementation, `TableNotice` per error kind, "your turn" from the view                                               | M1-2       |
-| [M1-5](../issues/47) | Self-hosting docs an operator can follow, with `scripts/check-env-docs.mjs` keeping the env reference true                                                                                                 | M1-1       |
+| [M1-5](../issues/47) | ✅ Self-hosting docs an operator can follow (`docs/self-hosting.md`), with `scripts/check-env-docs.mjs` keeping the env reference true and `docs/deploy/` TLS samples parsed in CI                         | M1-1       |
 
 Notes on the shape of this milestone:
 

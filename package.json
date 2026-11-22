@@ -11,6 +11,8 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "check:projection": "node scripts/check-projection.mjs",
+    "check:env-docs": "node scripts/check-env-docs.mjs",
+    "test:scripts": "node --test scripts/",
     "test:integration": "pnpm --filter @roundhouse/server exec vitest run integration --config vitest.integration.config.ts"
   },
   "pnpm": {

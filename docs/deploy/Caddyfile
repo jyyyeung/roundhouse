@@ -1,0 +1,44 @@
+# Roundhouse behind Caddy — the whole TLS story in one file (issue #47).
+#
+# Caddy obtains and renews the certificate for the hostname below, so all you
+# need is DNS pointing at this box and ports 80/443 reachable (Caddy uses 80 for
+# the ACME challenge).
+#
+#   1. replace table.example.com with your hostname
+#   2. start it on the Compose network, next to the stack:
+#
+#        docker run -d --name roundhouse-caddy --restart unless-stopped \
+#          --network roundhouse_default \
+#          -v "$PWD/docs/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+#          -v caddy-data:/data -v caddy-config:/config \
+#          -p 80:80 -p 443:443 caddy:2-alpine
+#
+#   3. set BETTER_AUTH_URL and PUBLIC_WEB_URL to https://<hostname> in .env and
+#      restart the stack: cookies are scoped to the origin and mail links are
+#      built from PUBLIC_WEB_URL.
+#
+# Everything the app serves — the SPA, /api, /ws, /health, /ready — is one
+# origin, so one reverse_proxy is enough. Caddy upgrades /ws on its own.
+#
+# X-Forwarded-For: Caddy sets it to the address it saw, ignoring any value the
+# client sent, which is exactly what the API's TRUST_PROXY mode expects. Leave
+# TRUST_PROXY=true in .env (its Compose default) so each player keeps their own
+# rate-limit bucket.
+
+table.example.com {
+	encode zstd gzip
+
+	reverse_proxy web:80
+
+	header {
+		# The service is HTTPS-only; tell browsers not to try plain HTTP again.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

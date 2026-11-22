@@ -37,6 +37,25 @@ db-reset:
     docker compose down -v
     just db
 
+# Dump the running database into backups/ (Postgres custom format, so
+# `just restore` can read it). Safe to run while players are connected.
+backup:
+    @mkdir -p backups
+    @stamp=$(date -u +%Y%m%dT%H%M%SZ); \
+      dump="backups/roundhouse-$stamp.dump"; \
+      docker compose exec -T db pg_dump -U "${POSTGRES_USER:-roundhouse}" -d "${POSTGRES_DB:-roundhouse}" -Fc > "$dump"; \
+      echo "backup: wrote $dump ($(du -h "$dump" | cut -f1))"
+
+# Restore a dump produced by `just backup`. The server is stopped first so
+# nothing writes while the schema is replaced, and started again afterwards —
+# including when the restore fails.
+restore file:
+    @if [ ! -f "{{file}}" ]; then echo "restore: no such dump: {{file}}" >&2; exit 1; fi
+    docker compose stop server
+    @trap 'docker compose start server' EXIT; \
+      docker compose exec -T db pg_restore -U "${POSTGRES_USER:-roundhouse}" -d "${POSTGRES_DB:-roundhouse}" --clean --if-exists --no-owner < "{{file}}"; \
+      echo "restore: wrote {{file}} back into ${POSTGRES_DB:-roundhouse}"
+
 # Hybrid: Compose Postgres + local pnpm apps (run `just setup` once first)
 dev: db
     @if [ ! -f .env ]; then just setup; fi
@@ -83,6 +102,16 @@ format:
 # Invariant I1: stored module state is projected in exactly one place (ADR 0001)
 check-projection:
     pnpm check:projection
+
+# Every variable the app reads is in docs/self-hosting.md and .env.example.
+# The script is unit-tested against a fixture, so it cannot rot silently.
+check-env-docs:
+    pnpm check:env-docs
+
+# Parse the TLS samples in docs/deploy (Caddyfile + nginx) in their real images
+# without owning a certificate. Needs docker.
+check-deploy-samples:
+    ./scripts/check-deploy-samples.sh
 
 # Build both images and run the packaged stack on throwaway ports (:3101/:8180),
 # then tear it down. The only check that exercises the Dockerfiles and nginx.
