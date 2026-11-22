@@ -8,6 +8,7 @@ import type {
 
 import { applyDuelEvent } from "./apply-event";
 import { defaultDuelConfig, duelConfigSchema, duelPlayerCount } from "./config";
+import { describeDuelEvent } from "./describe-event";
 import { duelIntents } from "./intents";
 import { createDuelState, type DuelState, reduce } from "./reduce";
 import { projectDuelView } from "./view";
@@ -35,5 +36,6 @@ export const duelModule: GameModule = {
   reduce,
   projectStateFor,
   applyEvent,
+  describeEvent: describeDuelEvent,
   isFinished,
 };

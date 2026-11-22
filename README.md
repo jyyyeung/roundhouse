@@ -47,11 +47,22 @@ is [`docs/self-hosting.md`](docs/self-hosting.md).
 - `just backup` / `just restore <file>` — dump the running database into `backups/` and put it back. The restore stops the server first and starts it again even if the restore fails; [`docs/self-hosting.md`](docs/self-hosting.md#backup-and-restore) has the cron line and the verify steps.
 - `pnpm lint` / `pnpm format` — Biome does linting, formatting, and import order in one pass. `pnpm lint:fix` writes fixes; CI fails on `pnpm lint` and `pnpm format:check`.
 
+## Replays
+
+A finished game can be watched back one step at a time. The server folds the stored event log with
+the game's own `applyEvent`, projects each step for the viewer, and serves it from
+`GET /api/tables/:id/replay`; the page at `/t/:tableId/replay` scrubs those projections with the
+normal game view in read-only mode. Entry points are the "Watch the replay" button on a finished
+table and the replay button on a finished row in the lobby. Event payloads never cross the wire —
+see [ADR 0009](docs/adr/0009-replay-is-a-projection.md) for why that is the whole design.
+
 ## Adding a game
 
 `docs/adding-a-game.md` is the walkthrough: a package under `packages/games/<id>/` declaring
 `playerCount`, `defaultConfig` and `configSchema` plus a `GameModule`, one line in
-`apps/server/src/modules/registry.ts`, one entry in `apps/web/src/games/registry.tsx`. The lobby, the
+`apps/server/src/modules/registry.ts`, one entry in `apps/web/src/games/registry.tsx`. Optionally implement `describeEvent(event)` to give each recorded
+action a human phrase in a replay (`null` means "not a step"); without it a step is titled with the
+event type. The lobby, the
 `/api/games` catalogue and the table route pick it up with no further edits — see
 [ADR 0004](docs/adr/0004-games-are-data.md) for why the platform is not allowed to branch per game,
 and [ADR 0005](docs/adr/0005-secrets-enter-the-log-at-the-reveal.md) for how a game keeps a secret

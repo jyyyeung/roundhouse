@@ -84,6 +84,13 @@ export interface GameModule {
    */
   applyEvent(state: Json, event: EventEnvelope): Json;
   /**
+   * One short verb phrase for a recorded event, used by replay to label a step
+   * ("scored Fives for 20"). Return `null` for events that are bookkeeping
+   * rather than something a player did, so every scrubber step is an action.
+   * Optional: a module without it labels steps with its humanised event type.
+   */
+  describeEvent?(event: EventEnvelope): string | null;
+  /**
    * The only way module state becomes client-visible: returns exactly what
    * `viewer` is allowed to see, never the raw state.
    */

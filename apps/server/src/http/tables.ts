@@ -240,6 +240,17 @@ export function createTablesRouter(opts: {
     }
   });
 
+  app.get("/:id/replay", async (c) => {
+    try {
+      const userId = await requireSession(getSession, c.req.raw.headers);
+      const { id } = tableIdSchema.parse({ id: c.req.param("id") });
+      const replay = await runtime.getTableReplay({ asUserId: userId, tableId: id });
+      return c.json(replay);
+    } catch (error) {
+      return handleError(error);
+    }
+  });
+
   app.get("/mine", async (c) => {
     try {
       const userId = await requireSession(getSession, c.req.raw.headers);

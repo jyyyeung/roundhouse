@@ -25,6 +25,7 @@ function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
     getMine: vi.fn(),
     getTableLiveState: vi.fn(),
     getTableSnapshot: vi.fn(),
+    getTableReplay: vi.fn(),
     getTableSync: vi.fn(),
     joinTable: vi.fn(),
     rematchTable: vi.fn(),

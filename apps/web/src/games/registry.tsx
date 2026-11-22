@@ -23,6 +23,11 @@ export type GameViewProps = {
   hasMoreChat: boolean;
   loadingOlderChat: boolean;
   onLoadOlderChat: () => void;
+  /**
+   * Replay renders a board that already happened. A view must not offer an
+   * action it cannot deliver, so every control is off when this is set.
+   */
+  readOnly?: boolean;
 };
 
 /** The per-game half of the create-table form, rendered by the lobby. */
@@ -64,6 +69,7 @@ function DuelViewForTable(props: GameViewProps) {
       currentUserId={props.currentUserId}
       onlineUserIds={props.onlineUserIds}
       onIntent={props.onIntent}
+      readOnly={props.readOnly}
     />
   );
 }

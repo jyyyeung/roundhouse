@@ -5,6 +5,7 @@ import type {
   Json,
   RawGameState,
   TableMeta,
+  TableReplay,
   ViewerView,
 } from "@roundhouse/game-core";
 import { generateInviteCode, parseIntent } from "@roundhouse/game-core";
@@ -14,6 +15,7 @@ import type { Database } from "../db/client";
 import { game, gameEvent, gameTable, tablePlayer } from "../db/schema";
 import { getModule } from "../modules/registry";
 import { projectSnapshot, rawGameState, viewerForUser } from "./projection";
+import { buildReplay } from "./replay";
 
 type TableRow = typeof gameTable.$inferSelect;
 type GameRow = typeof game.$inferSelect;
@@ -99,6 +101,12 @@ export type TablesRuntime = {
     sinceSeq: number;
   }): Promise<TableSync | null>;
   getTableLiveState(input: { tableId: string }): Promise<TableLiveState | null>;
+  /**
+   * Folds a finished game's event log into per-step projections (ADR 0009).
+   * Requires the caller to be a participant: a spectator of a finished game is
+   * M2-1's problem, not a side effect of replay.
+   */
+  getTableReplay(input: { tableId: string; asUserId: string }): Promise<TableReplay>;
   applyGameIntent(input: {
     tableId: string;
     userId: string;
@@ -649,6 +657,67 @@ export function createRoomRuntime(db: Database): TablesRuntime {
         state: currentGame ? rawGameState(currentGame.state) : null,
         tableId,
       };
+    },
+
+    async getTableReplay({ tableId, asUserId }) {
+      const table = await loadTableById(db, tableId);
+      if (!table) throw new TablesError("table_missing", "table_missing", 404);
+
+      const currentGame = table.currentGame;
+      if (!currentGame) throw new TablesError("table_not_finished", "table_not_finished", 409);
+      if (resolveTableStatus(table, currentGame) !== "finished") {
+        throw new TablesError("table_not_finished", "table_not_finished", 409);
+      }
+      // Participants only: a finished game's board is not public reading until
+      // spectators exist (M2-1), and this endpoint must not pre-empt that decision.
+      if (!table.seatUserIds.includes(asUserId)) {
+        throw new TablesError("not_a_participant", "not_a_participant", 403);
+      }
+
+      let module: GameModule;
+      try {
+        module = getModule(table.gameId);
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith("unknown_game:")) {
+          throw new TablesError("unknown_game", error.message);
+        }
+        throw error;
+      }
+
+      const events = await db
+        .select()
+        .from(gameEvent)
+        .where(eq(gameEvent.gameRowId, currentGame.id))
+        .orderBy(asc(gameEvent.seq));
+
+      // A hole means the log cannot rebuild the game (chat used to bump `seq`
+      // without recording a game event). Showing a board assembled across a hole
+      // would be a quiet lie, so refuse instead — the same rule `getTableSync`
+      // applies when it falls back to a snapshot.
+      if (events.length !== currentGame.seq) {
+        throw new TablesError("replay_unavailable", "replay_unavailable", 409);
+      }
+
+      // The initial state is rebuilt from the table, not stored: a game's seed
+      // lives in its config, and seats are frozen while a game is active, so this
+      // is the same state `startTable` handed the reducer.
+      const initialState = module.createInitialState(
+        { ...(table.config as object), tableId: table.id } as Json,
+        table.seatUserIds,
+      );
+
+      return {
+        finishedAt: (currentGame.finishedAt ?? currentGame.createdAt).toISOString(),
+        gameId: table.gameId,
+        meta: toTableMeta(table, currentGame),
+        tableId,
+        turns: buildReplay({
+          events: events.map(toEventEnvelope),
+          initialState,
+          module,
+          viewer: viewerForUser(table.seatUserIds, asUserId),
+        }),
+      } satisfies TableReplay;
     },
 
     async getTableSync({ tableId, asUserId, sinceSeq }) {

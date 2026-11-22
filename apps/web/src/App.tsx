@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { authClient } from "./lib/auth-client";
 import { LobbyPage } from "./routes/lobby";
 import { LoginPage } from "./routes/login";
+import { ReplayPage } from "./routes/replay";
 import { ResetPasswordPage } from "./routes/reset-password";
 import { TablePage } from "./routes/table";
 import { VerifyEmailPage } from "./routes/verify-email";
@@ -62,6 +63,7 @@ export function App() {
         <Route index element={<Navigate to="/lobby" replace />} />
         <Route path="/lobby" element={<LobbyPage session={session.data} />} />
         <Route path="/t/:tableId" element={<TablePage session={session.data} />} />
+        <Route path="/t/:tableId/replay" element={<ReplayPage session={session.data} />} />
       </Route>
       <Route path="*" element={<Navigate to={session.data ? "/lobby" : "/login"} replace />} />
     </Routes>

@@ -1,4 +1,5 @@
 export { type DuelConfig, defaultDuelConfig, duelConfigSchema, duelPlayerCount } from "./config";
+export { describeDuelEvent } from "./describe-event";
 export { duelIntents } from "./intents";
 export { duelModule } from "./module";
 export {
