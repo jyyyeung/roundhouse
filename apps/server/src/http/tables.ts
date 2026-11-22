@@ -1,10 +1,11 @@
 import type { Json } from "@roundhouse/game-core";
 import { Hono } from "hono";
 import { z } from "zod";
+import { env } from "../env";
 import { getModule } from "../modules/registry";
 import { TablesError, type TablesRuntime } from "../room/runtime";
 
-type Session = { user?: { id: string } } | null;
+type Session = { user?: { emailVerified?: boolean; id: string } } | null;
 type GetSession = (headers: Headers) => Promise<Session> | Session;
 
 const createTableBodySchema = z.object({
@@ -59,7 +60,7 @@ function parseCreateTableBody(input: unknown) {
   };
 }
 
-async function requireSession(
+async function loadSession(
   getSession: (headers: Headers) => Promise<Session> | Session,
   headers: Headers,
 ) {
@@ -67,6 +68,36 @@ async function requireSession(
   const userId = session?.user?.id;
   if (!userId) {
     throw new TablesError("not_authenticated", "not_authenticated", 401);
+  }
+  return { emailVerified: session?.user?.emailVerified === true, userId };
+}
+
+async function requireSession(
+  getSession: (headers: Headers) => Promise<Session> | Session,
+  headers: Headers,
+) {
+  return (await loadSession(getSession, headers)).userId;
+}
+
+/**
+ * Browsing needs a session; *playing* needs a proven address, because that is
+ * what stops a script from filling tables with throwaway sign-ups. Only create
+ * and join ask for it — reading the lobby, chatting from a seat you already hold
+ * and leaving are all allowed, so an account that lost its address still has a
+ * way to keep playing until an operator looks.
+ */
+async function requirePlayerSession(
+  getSession: (headers: Headers) => Promise<Session> | Session,
+  headers: Headers,
+  requireVerification: boolean,
+) {
+  const { emailVerified, userId } = await loadSession(getSession, headers);
+  if (requireVerification && !emailVerified) {
+    throw new TablesError(
+      "needs_verify",
+      "verify your email address before creating or joining a table",
+      403,
+    );
   }
   return userId;
 }
@@ -86,9 +117,16 @@ export function createTablesRouter(opts: {
    * is the hub's job (its sockets are keyed by table).
    */
   onSeatRemoved?: (tableId: string, userId: string, reason: "left" | "kicked") => void;
+  /**
+   * Refuse to create or join without a verified address. Defaults to
+   * `AUTH_REQUIRE_VERIFICATION`; a test flips it without touching the process
+   * environment.
+   */
+  requireVerification?: boolean;
 }) {
   const runtime = opts.runtime;
   const getSession = opts.getSessionFromHeaders;
+  const requireVerification = opts.requireVerification ?? env.AUTH_REQUIRE_VERIFICATION;
   const app = new Hono();
 
   const handleError = (error: unknown) => {
@@ -117,7 +155,7 @@ export function createTablesRouter(opts: {
 
   app.post("/", async (c) => {
     try {
-      const userId = await requireSession(getSession, c.req.raw.headers);
+      const userId = await requirePlayerSession(getSession, c.req.raw.headers, requireVerification);
       const body = parseCreateTableBody(await c.req.json());
       const result = await runtime.createTable({
         userId,
@@ -133,7 +171,7 @@ export function createTablesRouter(opts: {
 
   app.post("/join", async (c) => {
     try {
-      const userId = await requireSession(getSession, c.req.raw.headers);
+      const userId = await requirePlayerSession(getSession, c.req.raw.headers, requireVerification);
       const body = joinBodySchema.parse(await c.req.json());
       const result = await runtime.joinTable({ userId, code: body.code });
       // A seat change is a state change: the host's open view has to learn about

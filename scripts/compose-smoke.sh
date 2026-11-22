@@ -51,11 +51,20 @@ for spec in "db:$db_port:COMPOSE_SMOKE_DB_PORT" \
   fi
 done
 
+log_file=""
+log_pid=""
+
 cleanup() {
   local status=$?
   if [ "$status" -ne 0 ]; then
     echo "--- compose logs (tail) ---"
     compose logs --no-color --tail=200 || true
+  fi
+  if [ -n "$log_pid" ]; then
+    kill "$log_pid" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$log_file" ]; then
+    rm -f "$log_file"
   fi
   compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   exit "$status"
@@ -65,11 +74,19 @@ trap cleanup EXIT
 echo "compose smoke: project=$project api=$api_origin web=$web_origin db=:$db_port"
 compose up --build --detach --wait --wait-timeout 300
 
+# The default mail transporter logs each message instead of mailing it, so the
+# packaged stack can prove account recovery without an SMTP server: follow the
+# server's stdout and let smoke.mjs read the reset link out of it.
+log_file="$(mktemp)"
+compose logs --follow --no-color --since 1s server >"$log_file" 2>&1 &
+log_pid=$!
+
 node scripts/wait-for-url.mjs "$api_origin/health" "api /health" --expect '"ok"' --timeout 120000
 node scripts/wait-for-url.mjs "$web_origin/" "web root" --expect '<div id="root">' --timeout 60000
 
 # The full end-to-end script, now against the packaged stack rather than a dev
 # server: auth cookies, table creation, a WebSocket upgrade and a game start.
-SMOKE_BASE_URL="$api_origin" SMOKE_WEB_ORIGIN="$web_origin" node scripts/smoke.mjs
+SMOKE_BASE_URL="$api_origin" SMOKE_WEB_ORIGIN="$web_origin" SMOKE_SERVER_LOG="$log_file" \
+  node scripts/smoke.mjs
 
 echo "compose smoke: ok"

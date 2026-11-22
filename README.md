@@ -72,6 +72,15 @@ off the wire (Duel is the worked example).
   overwrites it, so each browser gets its own auth budget. See
   [`docs/ops.md`](docs/ops.md#rate-limits) and
   [ADR 0007](docs/adr/0007-limits-are-per-process.md).
+- Account recovery works without a mail provider: `MAIL_TRANSPORT=log` (the
+  default) writes each message to stdout, `smtp` needs `MAIL_SMTP_URL`, and
+  `MAIL_FROM` sets the sender. Reset links are single use, expire in an hour, and
+  a successful reset signs out existing sessions.
+  `AUTH_REQUIRE_VERIFICATION=true` refuses sign-in until the address is
+  confirmed and blocks creating or joining tables first; Google sign-in appears
+  only when `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are both set, because the
+  sign-in page asks `GET /api/auth/providers`. See
+  [ADR 0008](docs/adr/0008-mail-is-a-port.md).
 
 ## CI
 

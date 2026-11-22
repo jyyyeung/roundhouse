@@ -3,7 +3,9 @@ import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { authClient } from "./lib/auth-client";
 import { LobbyPage } from "./routes/lobby";
 import { LoginPage } from "./routes/login";
+import { ResetPasswordPage } from "./routes/reset-password";
 import { TablePage } from "./routes/table";
+import { VerifyEmailPage } from "./routes/verify-email";
 
 type SessionLike = {
   user?: {
@@ -52,6 +54,10 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage session={session} />} />
+      {/* Both landings come from a mail and must work while signed out: a
+          forgotten password is exactly the case with no session. */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route element={<RequireAuth session={session} />}>
         <Route index element={<Navigate to="/lobby" replace />} />
         <Route path="/lobby" element={<LobbyPage session={session.data} />} />

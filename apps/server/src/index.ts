@@ -5,8 +5,8 @@ import { PROTOCOL_VERSION } from "@roundhouse/game-core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { type WebSocket, WebSocketServer } from "ws";
-
 import { auth, getSessionFromHeaders } from "./auth";
+import { socialProviderStatus } from "./auth-options";
 import { closeDatabase, db } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { env } from "./env";
@@ -81,6 +81,13 @@ app.use(
     allowMethods: ["GET", "POST", "OPTIONS"],
   }),
 );
+
+/**
+ * Public on purpose: the sign-in page must know whether to draw a Google button
+ * before anybody is signed in. Registered ahead of the better-auth catch-all so
+ * it answers here rather than falling through to an unknown-route 404.
+ */
+app.get("/api/auth/providers", (c) => c.json(socialProviderStatus()));
 
 /**
  * better-auth keys its limiter on `x-forwarded-for`, which the client controls.

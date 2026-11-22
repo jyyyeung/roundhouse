@@ -24,15 +24,19 @@ function makeApp(
   runtime: TablesRuntime,
   onTableChanged?: (tableId: string) => void,
   onSeatRemoved?: (tableId: string, userId: string, reason: "left" | "kicked") => void,
+  options: { emailVerified?: boolean; requireVerification?: boolean } = {},
 ) {
   const app = new Hono();
   app.route(
     "/api/tables",
     createTablesRouter({
       runtime,
-      getSessionFromHeaders: async () => ({ user: { id: "user-1" } }),
+      getSessionFromHeaders: async () => ({
+        user: { emailVerified: options.emailVerified ?? false, id: "user-1" },
+      }),
       onTableChanged,
       onSeatRemoved,
+      requireVerification: options.requireVerification ?? false,
     }),
   );
   return app;
@@ -301,5 +305,72 @@ describe("tables http api: leaving and kicking", () => {
     for (const call of onTableChanged.mock.calls) {
       expect(call).toEqual(["table-1"]);
     }
+  });
+});
+
+describe("tables http api verification gate", () => {
+  it("lets an unverified player create and join while verification is optional", async () => {
+    const runtime = makeRuntime({
+      createTable: vi.fn().mockResolvedValue({ code: "ABC123", tableId: "table-1" }),
+      joinTable: vi.fn().mockResolvedValue({ tableId: "table-1" }),
+    });
+    const app = makeApp(runtime);
+
+    const created = await app.request("/api/tables", {
+      method: "POST",
+      body: JSON.stringify({ gameId: "yatzy" }),
+      headers: { "content-type": "application/json" },
+    });
+    const joined = await app.request("/api/tables/join", {
+      method: "POST",
+      body: JSON.stringify({ code: "ABC123" }),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(created.status).toBe(201);
+    expect(joined.status).toBe(200);
+  });
+
+  it("refuses an unverified address when verification is required, without touching the table", async () => {
+    const createTable = vi.fn();
+    const joinTable = vi.fn();
+    const app = makeApp(makeRuntime({ createTable, joinTable }), undefined, undefined, {
+      requireVerification: true,
+    });
+
+    const created = await app.request("/api/tables", {
+      method: "POST",
+      body: JSON.stringify({ gameId: "yatzy" }),
+      headers: { "content-type": "application/json" },
+    });
+    const joined = await app.request("/api/tables/join", {
+      method: "POST",
+      body: JSON.stringify({ code: "ABC123" }),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(created.status).toBe(403);
+    await expect(created.json()).resolves.toMatchObject({ code: "needs_verify" });
+    expect(joined.status).toBe(403);
+    await expect(joined.json()).resolves.toMatchObject({ code: "needs_verify" });
+    expect(createTable).not.toHaveBeenCalled();
+    expect(joinTable).not.toHaveBeenCalled();
+  });
+
+  it("lets a verified address through the same gate", async () => {
+    const app = makeApp(
+      makeRuntime({ createTable: vi.fn().mockResolvedValue({ code: "ABC123", tableId: "t" }) }),
+      undefined,
+      undefined,
+      { emailVerified: true, requireVerification: true },
+    );
+
+    const created = await app.request("/api/tables", {
+      method: "POST",
+      body: JSON.stringify({ gameId: "yatzy" }),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(created.status).toBe(201);
   });
 });
