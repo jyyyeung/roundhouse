@@ -95,6 +95,11 @@ app.route(
       // failed push is repaired by the client's next `sync`.
       void wsHub.publishTableState(tableId);
     },
+    onSeatRemoved: (tableId, userId, reason) => {
+      // The evicted player is not in the room `publishTableState` addresses, so
+      // the hub has to be told directly who lost a seat and why.
+      void wsHub.evictFromTable(tableId, userId, reason);
+    },
   }),
 );
 

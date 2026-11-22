@@ -223,6 +223,27 @@ async function main() {
       response.ok && body.includes(tableId ?? ""),
       `${response.status}`,
     );
+
+    // A seat you cannot give up strands a player forever (ADR 0006): leaving a
+    // lobby must delete the seat and take the table out of the leaver's list.
+    ({ body, response } = await jsonRequest(`/api/tables/${tableId}/leave`, {
+      cookie: cookieB,
+    }));
+    check(
+      "POST /api/tables/:id/leave",
+      response.ok && body.includes('"removed":true'),
+      `${response.status} ${body.slice(0, 160)}`,
+    );
+
+    ({ body, response } = await jsonRequest("/api/tables/mine", {
+      cookie: cookieB,
+      method: "GET",
+    }));
+    check(
+      "a left table disappears from /api/tables/mine",
+      response.ok && !body.includes(tableId ?? ""),
+      `${response.status}`,
+    );
   }
 
   ({ response } = await jsonRequest("/api/auth/sign-out", { cookie: cookieA }));

@@ -13,12 +13,18 @@ function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
     joinTable: vi.fn(),
     startTable: vi.fn(),
     rematchTable: vi.fn(),
+    leaveTable: vi.fn(),
+    kickTablePlayer: vi.fn(),
     getMine: vi.fn(),
     ...overrides,
   };
 }
 
-function makeApp(runtime: TablesRuntime, onTableChanged?: (tableId: string) => void) {
+function makeApp(
+  runtime: TablesRuntime,
+  onTableChanged?: (tableId: string) => void,
+  onSeatRemoved?: (tableId: string, userId: string, reason: "left" | "kicked") => void,
+) {
   const app = new Hono();
   app.route(
     "/api/tables",
@@ -26,6 +32,7 @@ function makeApp(runtime: TablesRuntime, onTableChanged?: (tableId: string) => v
       runtime,
       getSessionFromHeaders: async () => ({ user: { id: "user-1" } }),
       onTableChanged,
+      onSeatRemoved,
     }),
   );
   return app;
@@ -138,5 +145,161 @@ describe("tables http api", () => {
 
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(onTableChanged).not.toHaveBeenCalled();
+  });
+});
+
+function seatChange(overrides: Record<string, unknown> = {}) {
+  return {
+    hostUserId: "user-1",
+    removed: true,
+    seatsRemaining: 1,
+    tableDeleted: false,
+    tableId: "table-1",
+    ...overrides,
+  };
+}
+
+describe("tables http api: leaving and kicking", () => {
+  it("leaving pushes the new seat list and evicts the leaver", async () => {
+    const runtime = makeRuntime({
+      leaveTable: vi.fn().mockResolvedValue(seatChange()),
+    });
+    const onTableChanged = vi.fn();
+    const onSeatRemoved = vi.fn();
+
+    const res = await makeApp(runtime, onTableChanged, onSeatRemoved).request(
+      "/api/tables/table-1/leave",
+      { method: "POST" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(runtime.leaveTable).toHaveBeenCalledWith({ tableId: "table-1", userId: "user-1" });
+    expect(onTableChanged).toHaveBeenCalledWith("table-1");
+    expect(onSeatRemoved).toHaveBeenCalledWith("table-1", "user-1", "left");
+  });
+
+  it("leaving does not push state for a table that no longer exists", async () => {
+    const runtime = makeRuntime({
+      leaveTable: vi
+        .fn()
+        .mockResolvedValue(seatChange({ hostUserId: null, seatsRemaining: 0, tableDeleted: true })),
+    });
+    const onTableChanged = vi.fn();
+    const onSeatRemoved = vi.fn();
+
+    const res = await makeApp(runtime, onTableChanged, onSeatRemoved).request(
+      "/api/tables/table-1/leave",
+      { method: "POST" },
+    );
+
+    expect(res.status).toBe(200);
+    expect(onTableChanged).not.toHaveBeenCalled();
+    expect(onSeatRemoved).toHaveBeenCalledWith("table-1", "user-1", "left");
+  });
+
+  it("kicking passes the host and target through and evicts the target", async () => {
+    const runtime = makeRuntime({
+      kickTablePlayer: vi.fn().mockResolvedValue(seatChange()),
+    });
+    const onTableChanged = vi.fn();
+    const onSeatRemoved = vi.fn();
+
+    const res = await makeApp(runtime, onTableChanged, onSeatRemoved).request(
+      "/api/tables/table-1/kick",
+      {
+        method: "POST",
+        body: JSON.stringify({ userId: "user-2" }),
+        headers: { "content-type": "application/json" },
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(runtime.kickTablePlayer).toHaveBeenCalledWith({
+      hostUserId: "user-1",
+      tableId: "table-1",
+      targetUserId: "user-2",
+    });
+    expect(onTableChanged).toHaveBeenCalledWith("table-1");
+    expect(onSeatRemoved).toHaveBeenCalledWith("table-1", "user-2", "kicked");
+  });
+
+  it("kicking requires a target user", async () => {
+    const runtime = makeRuntime();
+
+    const res = await makeApp(runtime).request("/api/tables/table-1/kick", {
+      method: "POST",
+      body: JSON.stringify({}),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ code: "invalid_request" });
+    expect(runtime.kickTablePlayer).not.toHaveBeenCalled();
+  });
+
+  it("a refused leave evicts nobody", async () => {
+    const runtime = makeRuntime({
+      leaveTable: vi
+        .fn()
+        .mockRejectedValue(new TablesError("game_in_progress", "game_in_progress", 409)),
+    });
+    const onSeatRemoved = vi.fn();
+
+    const res = await makeApp(runtime, vi.fn(), onSeatRemoved).request(
+      "/api/tables/table-1/leave",
+      { method: "POST" },
+    );
+
+    expect(res.status).toBe(409);
+    expect(onSeatRemoved).not.toHaveBeenCalled();
+  });
+
+  it("refuses a kick from someone who is not the host, and evicts nobody", async () => {
+    const runtime = makeRuntime({
+      kickTablePlayer: vi.fn().mockRejectedValue(new TablesError("not_host", "not_host", 403)),
+    });
+    const onTableChanged = vi.fn();
+    const onSeatRemoved = vi.fn();
+
+    const res = await makeApp(runtime, onTableChanged, onSeatRemoved).request(
+      "/api/tables/table-1/kick",
+      {
+        method: "POST",
+        body: JSON.stringify({ userId: "user-2" }),
+        headers: { "content-type": "application/json" },
+      },
+    );
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ code: "not_host" });
+    expect(onTableChanged).not.toHaveBeenCalled();
+    expect(onSeatRemoved).not.toHaveBeenCalled();
+  });
+
+  it("pushes exactly once for every seat mutation", async () => {
+    const runtime = makeRuntime({
+      kickTablePlayer: vi.fn().mockResolvedValue(seatChange()),
+      leaveTable: vi.fn().mockResolvedValue(seatChange()),
+      rematchTable: vi.fn().mockResolvedValue({ tableId: "table-1", gameRowId: "game-2" }),
+      startTable: vi.fn().mockResolvedValue({ tableId: "table-1", gameRowId: "game-1" }),
+    });
+    const onTableChanged = vi.fn();
+    const app = makeApp(runtime, onTableChanged);
+
+    const post = (path: string, body?: string) =>
+      app.request(path, {
+        method: "POST",
+        ...(body ? { body, headers: { "content-type": "application/json" } } : {}),
+      });
+
+    await post("/api/tables/table-1/start");
+    await post("/api/tables/table-1/rematch");
+    await post("/api/tables/table-1/leave");
+    await post("/api/tables/table-1/kick", JSON.stringify({ userId: "user-2" }));
+
+    expect(onTableChanged).toHaveBeenCalledTimes(4);
+    for (const call of onTableChanged.mock.calls) {
+      expect(call).toEqual(["table-1"]);
+    }
   });
 });

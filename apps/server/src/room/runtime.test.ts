@@ -408,3 +408,166 @@ describe("room runtime lobby list", () => {
     expect(row?.status).toBe("active");
   });
 });
+
+function lobbySeed(seatUserIds: string[]) {
+  return {
+    game: null,
+    seats: seatUserIds.map((userId, index) => ({ seatIndex: index, tableId, userId })),
+    table: {
+      code: "ABC123",
+      config: { ruleset: "yatzy", tableId },
+      createdAt: new Date("2026-08-02T00:00:00.000Z"),
+      gameId: "yatzy",
+      hostUserId: seatUserIds[0],
+      id: tableId,
+      mode: "live",
+      softSeatCap: 4,
+      status: "lobby",
+    },
+  };
+}
+
+function seatWrites(calls: { op: string; row?: Record<string, unknown> }[]) {
+  return calls
+    .filter((call) => call.op === "update" || call.op === "delete")
+    .map((call) => `${call.op}:${call.row?.seatIndex ?? ""}`);
+}
+
+describe("room runtime leaving a table", () => {
+  it("locks the table before it writes anything", async () => {
+    const { runtime, calls } = makeRuntime(lobbySeed(["user-a", "user-b"]));
+
+    await runtime.leaveTable({ tableId, userId: "user-b" });
+
+    expect(calls[0]).toMatchObject({ op: "execute" });
+    expect(calls[0]?.sql).toMatch(/for update/i);
+  });
+
+  it("renumbers the survivors into a contiguous seat list", async () => {
+    const { runtime, calls } = makeRuntime(lobbySeed(["user-a", "user-b", "user-c"]));
+
+    const result = await runtime.leaveTable({ tableId, userId: "user-b" });
+
+    expect(result).toMatchObject({
+      hostUserId: "user-a",
+      removed: true,
+      seatsRemaining: 2,
+      tableDeleted: false,
+    });
+    // Two passes: park outside the live range, then place contiguous. A single
+    // pass collides on (tableId, seatIndex) with the row still holding seat 1.
+    expect(
+      calls
+        .filter((call) => call.op === "update" && call.table === "table_player")
+        .map((call) => call.row?.seatIndex),
+    ).toEqual([-1, -2, 0, 1]);
+    expect(calls.some((call) => call.op === "update" && call.table === "game_table")).toBe(false);
+  });
+
+  it("hands the table to the lowest remaining seat when the host leaves", async () => {
+    const { runtime, calls } = makeRuntime(lobbySeed(["user-a", "user-b", "user-c"]));
+
+    const result = await runtime.leaveTable({ tableId, userId: "user-a" });
+
+    expect(result.hostUserId).toBe("user-b");
+    expect(calls.find((call) => call.op === "update" && call.table === "game_table")?.row).toEqual({
+      hostUserId: "user-b",
+    });
+  });
+
+  it("deletes the table when the last player leaves", async () => {
+    const { runtime, calls } = makeRuntime(lobbySeed(["user-a"]));
+
+    const result = await runtime.leaveTable({ tableId, userId: "user-a" });
+
+    expect(result).toMatchObject({ hostUserId: null, seatsRemaining: 0, tableDeleted: true });
+    expect(calls.some((call) => call.op === "delete" && call.table === "game_table")).toBe(true);
+    // No survivors to renumber.
+    expect(calls.some((call) => call.op === "update")).toBe(false);
+  });
+
+  it("is idempotent: leaving a table you are not seated at changes nothing", async () => {
+    const { runtime, calls } = makeRuntime(lobbySeed(["user-a", "user-b"]));
+
+    const result = await runtime.leaveTable({ tableId, userId: "user-z" });
+
+    expect(result).toMatchObject({ removed: false, seatsRemaining: 2, tableDeleted: false });
+    expect(seatWrites(calls)).toEqual([]);
+  });
+
+  it("succeeds when the table is already gone", async () => {
+    const { runtime } = makeRuntime({ seats: [], table: null });
+
+    const result = await runtime.leaveTable({ tableId, userId: "user-a" });
+
+    expect(result).toMatchObject({ removed: false, seatsRemaining: 0, tableDeleted: true });
+  });
+
+  it("refuses to leave a table whose game is still running", async () => {
+    const { runtime, calls } = makeRuntime({
+      ...makeSeed(),
+      table: { ...makeSeed().table, status: "active" },
+    });
+
+    await expect(runtime.leaveTable({ tableId, userId: "user-b" })).rejects.toMatchObject({
+      code: "game_in_progress",
+    });
+    expect(seatWrites(calls)).toEqual([]);
+  });
+});
+
+describe("room runtime kicking a player", () => {
+  it("refuses a host that is not the host", async () => {
+    const { runtime, calls } = makeRuntime(lobbySeed(["user-a", "user-b"]));
+    const host = "user-b";
+
+    await expect(
+      runtime.kickTablePlayer({ hostUserId: host, tableId, targetUserId: "user-a" }),
+    ).rejects.toMatchObject({ code: "not_host", status: 403 });
+    expect(seatWrites(calls)).toEqual([]);
+  });
+
+  it("tells the host to leave instead of kicking themselves", async () => {
+    const { runtime } = makeRuntime(lobbySeed(["user-a", "user-b"]));
+
+    await expect(
+      runtime.kickTablePlayer({ hostUserId: "user-a", tableId, targetUserId: "user-a" }),
+    ).rejects.toMatchObject({ code: "host_must_leave" });
+  });
+
+  it("404s for someone who is not seated", async () => {
+    const { runtime } = makeRuntime(lobbySeed(["user-a", "user-b"]));
+
+    await expect(
+      runtime.kickTablePlayer({ hostUserId: "user-a", tableId, targetUserId: "user-z" }),
+    ).rejects.toMatchObject({ code: "not_seated", status: 404 });
+  });
+
+  it("removes the seat and renumbers the survivors", async () => {
+    const { runtime, calls } = makeRuntime(lobbySeed(["user-a", "user-b", "user-c"]));
+
+    const result = await runtime.kickTablePlayer({
+      hostUserId: "user-a",
+      tableId,
+      targetUserId: "user-b",
+    });
+
+    expect(result).toMatchObject({ hostUserId: "user-a", seatsRemaining: 2 });
+    expect(
+      calls
+        .filter((call) => call.op === "update" && call.table === "table_player")
+        .map((call) => call.row?.seatIndex),
+    ).toEqual([-1, -2, 0, 1]);
+  });
+
+  it("refuses to kick while the game is live", async () => {
+    const { runtime } = makeRuntime({
+      ...makeSeed(),
+      table: { ...makeSeed().table, status: "active" },
+    });
+
+    await expect(
+      runtime.kickTablePlayer({ hostUserId: "user-a", tableId, targetUserId: "user-b" }),
+    ).rejects.toMatchObject({ code: "game_in_progress" });
+  });
+});

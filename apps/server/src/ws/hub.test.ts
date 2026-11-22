@@ -27,6 +27,8 @@ function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
     getTableSync: vi.fn(),
     joinTable: vi.fn(),
     rematchTable: vi.fn(),
+    leaveTable: vi.fn(),
+    kickTablePlayer: vi.fn(),
     startTable: vi.fn(),
     ...overrides,
   };
@@ -643,5 +645,98 @@ describe("hub shutdown", () => {
     await hub.publishTableState("table-1");
 
     expect(socket.frames().filter((frame) => frame.type === "snapshot")).toHaveLength(1);
+  });
+});
+describe("hub seat eviction", () => {
+  async function twoSeatsInOneRoom() {
+    let nextUserId = "user-a";
+    const hub = createWsHub({
+      runtime: makeRuntime({
+        getTableSnapshot: vi.fn().mockResolvedValue(lobbySnapshot(["user-a", "user-b"])),
+      }),
+      getSessionFromHeaders: async () => ({ user: { id: nextUserId } }),
+    });
+
+    const host = new MockSocket();
+    await hub.handleConnection(host as any, { headers: {} } as IncomingMessage);
+    await host.emitMessage({ v: 2, type: "subscribe", tableId: "table-1" });
+
+    nextUserId = "user-b";
+    const guest = new MockSocket();
+    await hub.handleConnection(guest as any, { headers: {} } as IncomingMessage);
+    await guest.emitMessage({ v: 2, type: "subscribe", tableId: "table-1" });
+
+    host.sent.length = 0;
+    guest.sent.length = 0;
+    return { guest, host, hub };
+  }
+
+  it("tells the kicked player why, drops their socket and updates presence", async () => {
+    const { guest, host, hub } = await twoSeatsInOneRoom();
+
+    await hub.evictFromTable("table-1", "user-b", "kicked");
+
+    expect(guest.frames()).toEqual([
+      expect.objectContaining({ code: "kicked", type: "error", tableId: "table-1" }),
+    ]);
+    expect(guest.closed).toEqual({ code: 4403, reason: "kicked" });
+    // The room is told who is left, so the kicked player's dot disappears.
+    expect(host.frames()).toEqual([
+      expect.objectContaining({ onlineUserIds: ["user-a"], type: "presence" }),
+    ]);
+  });
+
+  it("tells a player who gave up their seat that the seat is gone", async () => {
+    const { guest, hub } = await twoSeatsInOneRoom();
+
+    await hub.evictFromTable("table-1", "user-b", "left");
+
+    expect(guest.frames()).toEqual([expect.objectContaining({ code: "seat_left", type: "error" })]);
+    expect(guest.closed).toEqual({ code: 4403, reason: "seat_left" });
+  });
+
+  it("leaves the room alone when the evicted user has no socket there", async () => {
+    const { host, hub } = await twoSeatsInOneRoom();
+
+    await hub.evictFromTable("table-1", "user-z", "kicked");
+
+    expect(host.frames()).toEqual([]);
+  });
+
+  it("stops evicted sockets from receiving later state pushes", async () => {
+    const { guest, hub } = await twoSeatsInOneRoom();
+
+    await hub.evictFromTable("table-1", "user-b", "kicked");
+    guest.sent.length = 0;
+    await hub.publishTableState("table-1");
+
+    expect(guest.frames()).toEqual([]);
+  });
+
+  it("refuses a later subscribe from the kicked player", async () => {
+    let nextUserId = "user-a";
+    const getTableSnapshot = vi.fn(async () => lobbySnapshot(["user-a"]));
+    const hub = createWsHub({
+      runtime: makeRuntime({ getTableSnapshot }),
+      getSessionFromHeaders: async () => ({ user: { id: nextUserId } }),
+    });
+
+    const host = new MockSocket();
+    await hub.handleConnection(host as any, { headers: {} } as IncomingMessage);
+    await host.emitMessage({ v: 2, type: "subscribe", tableId: "table-1" });
+    await hub.evictFromTable("table-1", "user-b", "kicked");
+
+    // The kicked player reconnects to a page they still have open: the seat is
+    // gone, so the subscribe is refused rather than silently joined.
+    nextUserId = "user-b";
+    const reconnect = new MockSocket();
+    await hub.handleConnection(reconnect as any, { headers: {} } as IncomingMessage);
+    await reconnect.emitMessage({ v: 2, type: "subscribe", tableId: "table-1" });
+
+    expect(reconnect.frames()).toEqual([
+      expect.objectContaining({ code: "not_seated", type: "error" }),
+    ]);
+    // A refused subscribe answers, it does not hang up: the page keeps its socket.
+    expect(reconnect.closed).toBeNull();
   });
 });

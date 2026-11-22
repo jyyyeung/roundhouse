@@ -17,6 +17,10 @@ const joinBodySchema = z.object({
   code: z.string().min(1),
 });
 
+const kickBodySchema = z.object({
+  userId: z.string().min(1).max(64),
+});
+
 const tableIdSchema = z.object({
   id: z.string().min(1),
 });
@@ -76,6 +80,12 @@ export function createTablesRouter(opts: {
    * this to the hub's state push.
    */
   onTableChanged?: (tableId: string) => void;
+  /**
+   * A player's seat can be given up or taken away. The state push above cannot
+   * carry that: the person has to be told why and dropped from the room, which
+   * is the hub's job (its sockets are keyed by table).
+   */
+  onSeatRemoved?: (tableId: string, userId: string, reason: "left" | "kicked") => void;
 }) {
   const runtime = opts.runtime;
   const getSession = opts.getSessionFromHeaders;
@@ -153,6 +163,39 @@ export function createTablesRouter(opts: {
       const { id } = tableIdSchema.parse({ id: c.req.param("id") });
       const result = await runtime.rematchTable({ userId, tableId: id });
       opts.onTableChanged?.(id);
+      return c.json(result);
+    } catch (error) {
+      return handleError(error);
+    }
+  });
+
+  app.post("/:id/leave", async (c) => {
+    try {
+      const userId = await requireSession(getSession, c.req.raw.headers);
+      const { id } = tableIdSchema.parse({ id: c.req.param("id") });
+      const result = await runtime.leaveTable({ userId, tableId: id });
+      // The survivors need the new seat list; the leaver's own sockets need to be
+      // told and dropped, which the state push cannot do.
+      if (!result.tableDeleted) opts.onTableChanged?.(id);
+      opts.onSeatRemoved?.(id, userId, "left");
+      return c.json(result);
+    } catch (error) {
+      return handleError(error);
+    }
+  });
+
+  app.post("/:id/kick", async (c) => {
+    try {
+      const userId = await requireSession(getSession, c.req.raw.headers);
+      const { id } = tableIdSchema.parse({ id: c.req.param("id") });
+      const body = kickBodySchema.parse(await c.req.json());
+      const result = await runtime.kickTablePlayer({
+        hostUserId: userId,
+        tableId: id,
+        targetUserId: body.userId,
+      });
+      opts.onTableChanged?.(id);
+      opts.onSeatRemoved?.(id, body.userId, "kicked");
       return c.json(result);
     } catch (error) {
       return handleError(error);

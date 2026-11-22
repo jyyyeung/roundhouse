@@ -87,3 +87,22 @@ export function rematchTable(input: { tableId: string }) {
     method: "POST",
   });
 }
+
+export type SeatChange = {
+  tableId: string;
+  removed: boolean;
+  seatsRemaining: number;
+  tableDeleted: boolean;
+  hostUserId: string | null;
+};
+
+export function leaveTable(input: { tableId: string }) {
+  return fetchJson<SeatChange>(`/api/tables/${input.tableId}/leave`, { method: "POST" });
+}
+
+export function kickFromTable(input: { tableId: string; userId: string }) {
+  return fetchJson<SeatChange>(`/api/tables/${input.tableId}/kick`, {
+    method: "POST",
+    body: JSON.stringify({ userId: input.userId }),
+  });
+}
