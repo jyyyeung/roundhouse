@@ -63,6 +63,15 @@ off the wire (Duel is the worked example).
   reconnects immediately), then the pool, all inside a 5-second budget.
 - The server image builds in two stages, installs production dependencies only, and
   runs as `node`, not root.
+- Inputs are rate limited: intents and chat per player per table, password and
+  mail routes per address. Limits live in environment variables
+  (`INTENT_RATE_LIMIT`, `CHAT_RATE_LIMIT`, `AUTH_RATE_LIMIT`, …), a refused intent
+  answers `rate_limited` with `retryAfterMs` and writes nothing, and the counters
+  are **per process** — correct for one container, doubled by a second replica.
+  `TRUST_PROXY` decides whether `x-forwarded-for` counts; the bundled nginx
+  overwrites it, so each browser gets its own auth budget. See
+  [`docs/ops.md`](docs/ops.md#rate-limits) and
+  [ADR 0007](docs/adr/0007-limits-are-per-process.md).
 
 ## CI
 

@@ -16,6 +16,7 @@ import { projectSnapshot, viewerForUser } from "../room/projection";
 import type { TableSnapshot, TablesRuntime } from "../room/runtime";
 import { createWsHandlers } from "./handlers";
 import { type ChatPage, listChatMessagesForTable, persistChatMessageToDb } from "./persistence";
+import type { Limiter } from "./rate-limit";
 
 type Session = { user?: { id: string } } | null;
 type GetSession = (headers: Headers) => Promise<Session> | Session;
@@ -37,6 +38,12 @@ export function createWsHub(opts: {
   listChatPage?: (input: { tableId: string; beforeId?: string }) => Promise<ChatPage>;
   /** Structured logger; tests inject a capturing one. */
   logger?: Logger;
+  /**
+   * Abuse budgets; production leaves these at their env defaults. A test that
+   * sends fifty intents in a millisecond is exercising frame fan-out, not the
+   * limiter, so it injects its own.
+   */
+  limits?: { intent?: Limiter; chat?: Limiter };
 }) {
   const log = opts.logger ?? createLogger({ fields: { component: "ws.hub" } });
   const listChatPage =
@@ -62,6 +69,7 @@ export function createWsHub(opts: {
   };
 
   const handlers = createWsHandlers({
+    limits: opts.limits,
     logger: log,
     runtime: opts.runtime,
     publishToTable,

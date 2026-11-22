@@ -16,6 +16,7 @@ vi.mock("./persistence", async () => {
 
 import { createWsHub } from "./hub";
 import { listChatMessagesForTable, persistChatMessageToDb } from "./persistence";
+import { createLimiter } from "./rate-limit";
 
 function makeRuntime(overrides: Partial<TablesRuntime> = {}): TablesRuntime {
   return {
@@ -487,6 +488,11 @@ describe("ws hub sync v2", () => {
   function makeHub(overrides: Partial<TablesRuntime> = {}, userId = "user-a") {
     let seq = 0;
     return createWsHub({
+      // Fifty intents in one tick prove frame fan-out, not the budget (#45).
+      limits: {
+        chat: createLimiter({ limit: 1_000, windowMs: 1_000 }),
+        intent: createLimiter({ limit: 1_000, windowMs: 1_000 }),
+      },
       runtime: makeRuntime({
         applyGameIntent: vi.fn().mockImplementation(async () => {
           seq += 1;

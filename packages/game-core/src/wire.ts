@@ -192,6 +192,9 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     actionId: idSchema.optional(),
     code: z.string(),
     message: z.string(),
+    // A refusal that cannot say when to come back forces the client to guess or
+    // hammer; only a rate-limited frame carries it.
+    retryAfterMs: z.number().int().nonnegative().optional(),
     tableId: idSchema.optional(),
     type: z.literal("error"),
     v: z.literal(PROTOCOL_VERSION),
