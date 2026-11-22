@@ -34,6 +34,14 @@ services:
       # here gives each browser its own auth budget. A direct-exposed server
       # (no web container) must leave this unset.
       TRUST_PROXY: ${TRUST_PROXY:-true}
+      # `log` writes mails to stdout so a Compose stack needs no SMTP server and
+      # `scripts/compose-smoke.sh` can read a reset link out of the log.
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-log}
+      MAIL_FROM: ${MAIL_FROM:-Roundhouse <no-reply@roundhouse.local>}
+      MAIL_SMTP_URL: ${MAIL_SMTP_URL:-}
+      AUTH_REQUIRE_VERIFICATION: ${AUTH_REQUIRE_VERIFICATION:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     ports:
       - "${SERVER_PORT:-3001}:3001"
     healthcheck:

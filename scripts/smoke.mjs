@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 /**
  * End-to-end smoke test for a running Roundhouse stack.
  *
@@ -11,6 +13,8 @@
  * Configuration (all optional):
  *   SMOKE_BASE_URL    HTTP origin of the API      default http://localhost:3001
  *   SMOKE_WEB_ORIGIN  origin sent as `Origin`     default http://localhost:5173
+ *   SMOKE_SERVER_LOG  a growing copy of the server's stdout; when set, the
+ *                     password-reset round trip reads the mailed link from it
  *
  * SMOKE_WEB_ORIGIN must match the server's PUBLIC_WEB_URL, because better-auth
  * rejects requests whose Origin is not trusted. Compose serves the web bundle on
@@ -22,6 +26,7 @@
  * `just db-reset` discards them.
  */
 const baseUrl = (process.env.SMOKE_BASE_URL ?? "http://localhost:3001").replace(/\/$/, "");
+const serverLog = process.env.SMOKE_SERVER_LOG;
 const webOrigin = process.env.SMOKE_WEB_ORIGIN ?? "http://localhost:5173";
 const password = "Smoke-password-12345";
 const stamp = Date.now();
@@ -55,6 +60,31 @@ async function jsonRequest(path, { body, cookie, method = "POST" } = {}) {
     method,
   });
   return { body: await response.text(), response };
+}
+
+/**
+ * Reads the reset link out of the server's log.
+ *
+ * The default mail transporter writes the message to the log instead of a
+ * mailbox, which is the only way a stack with no SMTP server can prove the
+ * whole flow: request, mail, click, new password. Polls because the send may
+ * still be in flight when the request returns.
+ */
+async function waitForResetLink(file, email, timeoutMs = 15_000) {
+  const pattern = /https?:\/\/[^\s"']*\/reset-password\?token=[A-Za-z0-9._~-]+/g;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const text = await readFile(file, "utf8").catch(() => "");
+    const links = text
+      .split("\n")
+      .filter((line) => line.includes(email))
+      .flatMap((line) => line.match(pattern) ?? []);
+    if (links.length > 0) return links.at(-1);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return null;
 }
 
 async function signIn(email) {
@@ -258,6 +288,65 @@ async function main() {
     body.trim() === "null",
     `${response.status} ${body.slice(0, 60)}`,
   );
+
+  // Account recovery, end to end: ask for a link, find the mail the server
+  // wrote, spend the token, and sign in with the new password. Only possible
+  // when the caller can see the server's log, which the compose smoke does.
+  if (serverLog) {
+    const newPassword = "Smoke-password-67890";
+
+    const known = await jsonRequest("/api/auth/request-password-reset", {
+      body: { email: emailA },
+    });
+    check(
+      "request-password-reset accepts a known address",
+      known.response.ok,
+      `${known.response.status}`,
+    );
+
+    // Identical bytes either way, or the endpoint becomes an account oracle.
+    const unknown = await jsonRequest("/api/auth/request-password-reset", {
+      body: { email: `smoke-nobody-${stamp}@example.test` },
+    });
+    check(
+      "an unknown address gets the same answer",
+      unknown.response.status === known.response.status && unknown.body === known.body,
+      `${unknown.response.status}`,
+    );
+
+    const link = await waitForResetLink(serverLog, emailA);
+    check(
+      "the reset link reaches the mailer",
+      Boolean(link),
+      link ? `${link.slice(0, 48)}...` : "not found in the server log",
+    );
+
+    const token = link ? new URL(link).searchParams.get("token") : null;
+    if (token) {
+      ({ response } = await jsonRequest("/api/auth/reset-password", {
+        body: { newPassword, token },
+      }));
+      check("reset-password spends the mailed token", response.ok, `${response.status}`);
+
+      const spent = await jsonRequest("/api/auth/reset-password", {
+        body: { newPassword: `${newPassword}x`, token },
+      });
+      check(
+        "the same token cannot be spent twice",
+        spent.response.status === 400,
+        `${spent.response.status}`,
+      );
+
+      const resigned = await jsonRequest("/api/auth/sign-in/email", {
+        body: { email: emailA, password: newPassword },
+      });
+      check("the new password signs in", resigned.response.ok, `${resigned.response.status}`);
+    } else {
+      check("reset-password spends the mailed token", false, "no token");
+      check("the same token cannot be spent twice", false, "no token");
+      check("the new password signs in", false, "no token");
+    }
+  }
 
   // An unlimited sign-in endpoint is an offline password guess with a network
   // round trip. The budget has to be observable from outside: a unit test can

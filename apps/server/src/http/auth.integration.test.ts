@@ -20,6 +20,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createAuthOptions } from "../auth-options";
 import { schema } from "../db/schema";
+import { captureMailer } from "../mail";
 import { assertDisposableDatabase } from "../test/assert-disposable-database";
 
 const testUrl = process.env.DATABASE_URL_TEST;
@@ -44,7 +45,7 @@ const integration = testUrl ? describe : describe.skip;
 integration(title, () => {
   const sql = postgres(testUrl as string, { max: 10 });
   const db = drizzle(sql, { schema });
-  const auth = betterAuth(createAuthOptions(db));
+  const auth = betterAuth(createAuthOptions(db, { mailer: captureMailer() }));
 
   const origin = process.env.PUBLIC_WEB_URL as string;
   let ipCounter = 0;
@@ -86,7 +87,7 @@ integration(title, () => {
     await sql`
       truncate table
         game_event, chat_message, game, table_player, game_table,
-        session, account, "user"
+        session, account, verification, "user"
       restart identity cascade
     `;
   });

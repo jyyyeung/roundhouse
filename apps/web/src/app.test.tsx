@@ -9,9 +9,13 @@ vi.mock("./lib/auth-client", () => ({
   authClient: {
     useSession: vi.fn(),
     signOut: vi.fn(),
-    signIn: { email: vi.fn() },
+    requestPasswordReset: vi.fn(),
+    resetPassword: vi.fn(),
+    verifyEmail: vi.fn(),
+    signIn: { email: vi.fn(), social: vi.fn() },
     signUp: { email: vi.fn() },
   },
+  googleEnabled: vi.fn().mockResolvedValue(false),
 }));
 
 const mockedUseSession = vi.mocked(authClient.useSession);
