@@ -113,6 +113,20 @@ Put the browser half in `apps/web/src/games/<id>/`:
 Anything a client needs must already be in the projection: the view may not fetch game state, and
 the platform will not hand it the raw row.
 
+Two pieces of feel come free if the projection says the right things:
+
+- **The turn banner.** Publish `currentPlayerId` (a seat id, or `null`) when play is sequential and
+  the table header tells the current player "Your turn" and everyone else who they wait for.
+  A simultaneous game (Duel) publishes nothing and gets no banner — no per-game branch anywhere.
+- **Sound and haptics.** Call `feedback.play("roll" | "hold" | "score" | "win")`
+  (`apps/web/src/lib/feedback.ts`) from your view when the projected state you already render
+  changes. It is muted by default, respects `prefers-reduced-motion`, and no-ops where the platform
+  has no audio — the server never learns that a phone buzzed, and no event is invented for it.
+
+Never derive a player's name yourself: `seatLabels(seatUserIds, currentUserId)` in
+`apps/web/src/lib/seats.ts` is the one implementation, and `avatarFor(userId)` gives a stable
+generated avatar for the same id.
+
 ## 5. Prove it
 
 Add `packages/games/<id>/src/conformance.test.ts`:
@@ -152,4 +166,5 @@ pnpm typecheck && pnpm test && pnpm check:projection && pnpm lint
 - [ ] `describeModuleConformance(module, fixtures)` passes
 - [ ] one line in `apps/server/src/modules/registry.ts`
 - [ ] one entry in `apps/web/src/games/registry.tsx` (plus the game's own `View`)
+- [ ] turn state published as `currentPlayerId` if the game is sequential; feedback fired from the view
 - [ ] `pnpm check:projection` clean — no game id outside `games/`, `modules/` or `packages/games/`
