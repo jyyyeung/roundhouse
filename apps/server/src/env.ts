@@ -37,7 +37,6 @@ const envSchema = z.object({
    * stack does). Default false: trusting the header from a direct client lets
    * the client choose which bucket it lands in.
    */
-  PROBE_UNDOCUMENTED: z.string().optional(),
   TRUST_PROXY: z
     .string()
     .optional()
