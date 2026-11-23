@@ -181,6 +181,41 @@ describe("ReplayPage", () => {
     }
   });
 
+  it("shows the finished game's summary only on the last step", async () => {
+    const user = userEvent.setup();
+    renderReplayPage();
+
+    expect(await screen.findByTestId("game-summary")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Previous step" }));
+
+    // An earlier step is a board the game had not finished, so the card goes away.
+    expect(screen.queryByTestId("game-summary")).toBeNull();
+  });
+
+  it("names the winner the game recorded, not the last player to act", async () => {
+    const fixture = replayFixture();
+    fixture.turns[2] = {
+      ...fixture.turns[2],
+      view: view({
+        dice: [6, 6, 6, 6, 6],
+        phase: "finished",
+        rollsLeft: 0,
+        sheets: {
+          "user-a": { ...emptySheet(), chance: 12 },
+          "user-b": { ...emptySheet(), chance: 30 },
+        },
+        winnerIds: ["user-b"],
+        you: null,
+      }),
+    };
+    mockedGetTableReplay.mockResolvedValue(fixture);
+
+    renderReplayPage();
+
+    expect(await screen.findByTestId("game-summary-headline")).toHaveTextContent("Player 2 wins");
+  });
+
   it("renders the not-found notice for a table that is gone", async () => {
     mockedGetTableReplay.mockRejectedValue(new ApiError("table_missing", "table_missing", 404));
 

@@ -109,6 +109,13 @@ Put the browser half in `apps/web/src/games/<id>/`:
   `{ config, onChange }` and nothing else; keep the `<select>`/`<input>` ids prefixed with the game
   id so two games cannot collide.
 - **`tableTitle`** (optional) names a table in the lobby list, e.g. "Yahtzee" rather than "Yatzy".
+- **`summarize`** (optional) turns your projected view into a `GameSummary`
+  (`apps/web/src/lib/summary.ts`): `winners`, `standings` (`{ playerId, total }`, in your own seat
+  order — the card ranks them), `rounds`, and up to a couple of `lines` like
+  `{ label: "Best category", value: "Fives — 20" }`. Return `null` unless the view's phase is
+  `finished`. The platform then renders the end-of-game card, its copyable text, and a PNG it draws
+  itself, on a finished table and on a replay's last step. Skip it and no card appears — your board is
+  still the result ([ADR 0011](adr/0011-games-describe-their-own-ending.md)).
 
 Anything a client needs must already be in the projection: the view may not fetch game state, and
 the platform will not hand it the raw row.
@@ -167,4 +174,5 @@ pnpm typecheck && pnpm test && pnpm check:projection && pnpm lint
 - [ ] one line in `apps/server/src/modules/registry.ts`
 - [ ] one entry in `apps/web/src/games/registry.tsx` (plus the game's own `View`)
 - [ ] turn state published as `currentPlayerId` if the game is sequential; feedback fired from the view
+- [ ] `summarize(view)` beside the view (optional) so a finished game gets the summary card
 - [ ] `pnpm check:projection` clean — no game id outside `games/`, `modules/` or `packages/games/`

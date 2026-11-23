@@ -3,7 +3,7 @@ import { PROTOCOL_VERSION } from "@roundhouse/game-core";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { renderGameView, tableTitleFor } from "../games/registry";
+import { renderGameView, summarizeGame, tableTitleFor } from "../games/registry";
 import type { TableChatMessage } from "../lib/chat";
 import { avatarFor, avatarStyle, seatLabels } from "../lib/seats";
 import {
@@ -16,6 +16,7 @@ import {
   startTable,
 } from "../lib/tables";
 import { connectTableWs, type TableWsConnection } from "../lib/ws";
+import { GameSummaryCard } from "../ui/GameSummary";
 import { SoundToggle } from "../ui/SoundToggle";
 import { type NoticeKind, noticeKindForCode, TableNotice } from "../ui/TableNotice";
 import { TurnBanner } from "../ui/TurnBanner";
@@ -497,6 +498,9 @@ export function TablePage({ session }: { session: SessionLike }) {
   // Watching, not playing: admitted because the host opened the table, and given
   // the spectator projection (`you: null`), so no game view can offer an action.
   const isWatching = currentUserId !== null && !meta.seatUserIds.includes(currentUserId);
+  // The ending, from the game itself: no card when there is nothing to say (or
+  // the table is still being played).
+  const summary = meta.status === "finished" ? summarizeGame(meta.gameId, state) : null;
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 xl:max-w-7xl">
@@ -672,6 +676,15 @@ export function TablePage({ session }: { session: SessionLike }) {
           })}
           {meta.status === "finished" ? (
             <>
+              {summary ? (
+                <div className="mt-5">
+                  <GameSummaryCard
+                    labels={labels}
+                    summary={summary}
+                    title={tableTitleFor(meta.gameId, meta.config)}
+                  />
+                </div>
+              ) : null}
               <div className="mt-5">
                 <TableNotice kind="finished" />
               </div>

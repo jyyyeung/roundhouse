@@ -1,5 +1,5 @@
 import type { ClientMessage, ServerMessage, TableMeta } from "@roundhouse/game-core";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -895,6 +895,51 @@ describe("TablePage failure notices", () => {
 
     expect(await screen.findByText(/game over/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /rematch/i })).toBeInTheDocument();
+  });
+
+  it("shows the finished game's summary card, ranked and labelled", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta({ status: "finished" }),
+        state: activeState({
+          phase: "finished",
+          sheets: {
+            "user-a": { ...emptySheet(), chance: 12 },
+            "user-b": { ...emptySheet(), chance: 30 },
+          },
+          winnerIds: ["user-b"],
+        }),
+      });
+    });
+
+    expect(await screen.findByTestId("game-summary")).toBeInTheDocument();
+    expect(screen.getByTestId("game-summary-headline")).toHaveTextContent("Player 2 wins");
+    const rows = within(screen.getByTestId("game-summary-standings")).getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual(["1Player 230", "2You12"]);
+  });
+
+  it("shows no summary card while the game is still being played", async () => {
+    renderTablePage({ user: { id: "user-a", name: "Alice" } });
+    await waitFor(() => expect(mockedConnectTableWs).toHaveBeenCalled());
+    act(() => {
+      onMessage?.({
+        v: 2,
+        type: "snapshot",
+        tableId: "table-123",
+        seq: 0,
+        meta: baseMeta({ status: "active" }),
+        state: activeState(),
+      });
+    });
+
+    expect(await screen.findByText(/2 rolls left|3 rolls left/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("game-summary")).toBeNull();
   });
 });
 

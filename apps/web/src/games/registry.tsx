@@ -3,7 +3,10 @@ import type { DuelView } from "@roundhouse/game-duel";
 import type { YatzyView } from "@roundhouse/game-yatzy";
 import type { ComponentType } from "react";
 import type { TableChatMessage } from "../lib/chat";
+import type { GameSummary } from "../lib/summary";
 import { DuelTable } from "./duel/DuelTable";
+import { summarizeDuel } from "./duel/summary";
+import { summarizeYatzy } from "./yatzy/summary";
 import { YatzyConfigControls, yatzyTableTitle } from "./yatzy/YatzyConfigControls";
 import { YatzyTable } from "./yatzy/YatzyTable";
 
@@ -42,6 +45,12 @@ export type GameUi = {
   ConfigControls?: ComponentType<GameConfigControlsProps>;
   /** How a table of this game is named in the lobby list; defaults to the catalogue name. */
   tableTitle?: (config: Json | undefined) => string;
+  /**
+   * How this game says its finished board: who won, what everyone scored, and
+   * anything sharper it can add. Absent when the game has nothing to say beyond
+   * the board itself, in which case no summary card is shown.
+   */
+  summarize?: (state: unknown) => GameSummary | null;
 };
 
 /**
@@ -76,10 +85,12 @@ function DuelViewForTable(props: GameViewProps) {
 
 const gameUi: Record<string, GameUi> = {
   duel: {
+    summarize: (state) => summarizeDuel(state as DuelView),
     View: DuelViewForTable,
   },
   yatzy: {
     ConfigControls: YatzyConfigControls,
+    summarize: (state) => summarizeYatzy(state as YatzyView),
     View: YatzyViewForTable,
     tableTitle: yatzyTableTitle,
   },
@@ -113,4 +124,13 @@ export function renderGameView(props: GameViewProps) {
  */
 export function tableTitleFor(gameId: string, config: Json | undefined, fallback?: string): string {
   return getGameUi(gameId)?.tableTitle?.(config) ?? fallback ?? gameId;
+}
+
+/**
+ * The finished game's summary, or null when the game has none to give — which is
+ * also what a game this build does not know about answers. Callers render the
+ * card only when this returns something, so no route branches per game.
+ */
+export function summarizeGame(gameId: string, state: unknown): GameSummary | null {
+  return getGameUi(gameId)?.summarize?.(state) ?? null;
 }
