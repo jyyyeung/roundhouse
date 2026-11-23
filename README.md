@@ -65,6 +65,20 @@ the two roles apart (`onlineUserIds` is seats, `spectatorUserIds` is watchers), 
 non-seat is refused as `not_a_player`, and a watcher on an open table may chat. The switch is
 per table and fixed at creation; see [ADR 0010](docs/adr/0010-watching-is-a-projection-not-a-mode.md).
 
+## The end of a game
+
+When a table finishes, a card appears above the result notice: the winner, the final scores ranked
+highest first, how many rounds it took, and one or two facts the game thought worth saying (Yatzy's
+best category, Duel's longest streak). It can be copied as text or saved as a 1080×1350 PNG that the
+browser draws itself. The card also appears on the last step of a replay, built from that step's
+projection.
+
+None of that content lives in the platform: each game turns its own projected view into a
+`GameSummary` (`apps/web/src/games/<game>/summary.ts`) and the platform renders the type, ranks it, and
+draws the image. The platform never reads a board, so no game id appears in `apps/web/src/ui` and a new
+game gets the card by implementing one function — see
+[ADR 0011](docs/adr/0011-games-describe-their-own-ending.md).
+
 ## Adding a game
 
 `docs/adding-a-game.md` is the walkthrough: a package under `packages/games/<id>/` declaring

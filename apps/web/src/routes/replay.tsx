@@ -2,9 +2,10 @@ import type { TableReplay } from "@roundhouse/game-core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { renderGameView, tableTitleFor } from "../games/registry";
+import { renderGameView, summarizeGame, tableTitleFor } from "../games/registry";
 import { seatLabels } from "../lib/seats";
 import { ApiError, getTableReplay } from "../lib/tables";
+import { GameSummaryCard } from "../ui/GameSummary";
 import { noticeKindForCode, TableNotice } from "../ui/TableNotice";
 
 type SessionLike = {
@@ -98,6 +99,11 @@ export function ReplayPage({ session }: { session: SessionLike }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [move]);
+
+  // The card belongs to the ending, so it appears on the final step only: every
+  // earlier step is a board the game had not finished yet.
+  const summary =
+    replay && turn && index >= lastIndex ? summarizeGame(replay.gameId, turn.view) : null;
 
   const stepLabel = (() => {
     if (!turn) return "Nothing has happened yet.";
@@ -196,6 +202,16 @@ export function ReplayPage({ session }: { session: SessionLike }) {
               readOnly: true,
             })}
           </div>
+
+          {summary && replay ? (
+            <div className="mt-6">
+              <GameSummaryCard
+                labels={labels}
+                summary={summary}
+                title={tableTitleFor(replay.gameId, replay.meta.config, replay.meta.gameId)}
+              />
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>

@@ -120,7 +120,10 @@ the self-hosting guide now means the same stranger can be handed a URL rather th
   described event (`GET /api/tables/:id/replay`), and the web page scrubs those projections with
   the live game view in read-only mode ([ADR 0009](adr/0009-replay-is-a-projection.md)). No
   checkpoints: a 500-event replay is asserted under 200 ms.
-- **M2-3** Post-game summary card (final scores, best category, shareable image).
+- **M2-3** ✅ Post-game summary card: the game converts its own projected view into a `GameSummary`
+  (`winners`, `standings`, `rounds`, `lines`), the platform ranks it once and renders the card, its
+  clipboard text and a locally drawn shareable image, and the replay page shows it on the final step
+  only. See [ADR 0011](adr/0011-games-describe-their-own-ending.md).
 
 **Exit criteria:** a stranger with the link can watch a live table without a seat, and a finished
 game can be replayed turn by turn from the database alone.
