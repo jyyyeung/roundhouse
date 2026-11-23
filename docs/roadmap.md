@@ -128,6 +128,11 @@ the self-hosting guide now means the same stranger can be handed a URL rather th
 **Exit criteria:** a stranger with the link can watch a live table without a seat, and a finished
 game can be replayed turn by turn from the database alone.
 
+**Status: complete.** All three issues shipped (#56, #57, #58) between `c89b469` and `0f95deb`; the
+exit criteria are covered by `scripts/smoke.mjs` (watch an open table, replay a finished one) and by
+`apps/server/src/room/runtime.integration.test.ts`, and every surface a spectator or a replay can
+reach reads the same per-viewer projection.
+
 ## M3 — Async
 
 - **M3-1** Wire the unused `gameTable.mode` column (`apps/server/src/db/schema.ts:99`), turn
@@ -180,3 +185,5 @@ seasons/custom crew metrics, no unauthenticated guests, no second title _before_
 | [0007](adr/0007-limits-are-per-process.md)              | Limits are per-process memory with a sliding window; `TRUST_PROXY` decides the address, and the proxy overwrites the header |
 | [0008](adr/0008-mail-is-a-port.md)                      | Mail is an injected `Mailer` (`log` by default); the token is spent by a page this app owns, not a `callbackURL` redirect   |
 | [0009](adr/0009-replay-is-a-projection.md)              | A replay is the server folding the log into per-viewer projections plus a phrase; the wire never carries event payloads     |
+| [0010](adr/0010-watching-is-a-projection-not-a-mode.md) | Watching is the spectator projection admitted by a per-table switch, not a mode; presence splits seats from watchers        |
+| [0011](adr/0011-games-describe-their-own-ending.md)     | A game turns its own view into a `GameSummary`; the platform ranks it once, renders the card, and draws the shareable image |
