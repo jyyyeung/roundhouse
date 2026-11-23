@@ -11,10 +11,10 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.6.6",
     "@types/nodemailer": "^8.0.2",
     "@types/ws": "^8.18.1",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^5.7.0",
     "vitest": "^5.1.1"
   },
